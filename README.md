@@ -1,5 +1,7 @@
 # The Gaffer
 
+**▶ Play now:** https://moniversity23.github.io/manager/ — runs in the browser, installs as an app (📲 Install), plays offline.
+
 A football management game: start at a poor club in the lowest division and climb to the top.
 Node.js server (plain `http`), a deterministic simulation engine, a single-file web UI, and
 MongoDB saves with a gzip-file fallback.
