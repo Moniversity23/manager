@@ -39,6 +39,7 @@ html[data-size="large"]{font-size:16px}
 .meter{height:8px;background:var(--s3);border-radius:5px;overflow:hidden}.meter>span{display:block;height:100%}
 .mv3d{position:relative;width:100%;aspect-ratio:16/9;background:#0b2a18;border-radius:12px;overflow:hidden}
 .mv3d canvas{display:block;width:100%!important;height:100%!important}
+@media(max-width:640px){.mv3d{aspect-ratio:3/2}}
 .mv-flash{position:absolute;left:0;right:0;top:8%;text-align:center;font-family:var(--fn);font-size:52px;font-weight:900;line-height:1;color:#ffd740;text-shadow:0 4px 18px rgba(0,0,0,.7);pointer-events:none;opacity:0;transition:opacity .25s;z-index:2}
 .mv-flash small{display:block;font-family:var(--fb);font-size:15px;font-weight:600;color:#fff;margin-top:4px}
 .mv-label{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:600;color:#fff;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:8px;pointer-events:none;white-space:nowrap;z-index:1}
@@ -503,7 +504,7 @@ function normalizeMatch(x){
   return { home: name(x.home), away: name(x.away), compName: x.compName, events: (x.events || []).slice().sort((a, b) => a.min - b.min), lineups: x.lineups || { home: [], away: [] }, pos: x.pos, myKey: x.myKey || null };
 }
 function playHalf(match, fromMin, toMin, done){
-  const mode = PREFS.viewMode || 'full';
+  const mode = PREFS.viewMode || '3d';
   const m = normalizeMatch(match);
   if (mode === 'instant' || !m.lineups.home.length) return done();
   openMo('genMo');
@@ -511,7 +512,7 @@ function playHalf(match, fromMin, toMin, done){
   document.getElementById('genMoContent').innerHTML = `
     <div class="small dim" style="text-align:center">${esc(m.compName || '')}</div>
     <div class="mv-bar"><div class="mv-score" id="mvScore"></div><div class="mv-clock" id="mvClock"></div></div>
-    ${mode === 'commentary' ? '' : use3d ? `<div class="mv3d" id="mv3d"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam">${[['tv', 'TV'], ['high', 'Tactical'], ['goal', 'Behind goal']].map(([c, l]) => `<button onclick="PREFS.cam='${c}';savePrefs()">${l}</button>`).join('')}</div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas></div>'}
+    ${mode === 'commentary' ? '' : use3d ? `<div class="mv3d" id="mv3d"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam">${[['tv', 'TV'], ['close', 'Close'], ['high', 'Tactical'], ['goal', 'Goal']].map(([c, l]) => `<button onclick="PREFS.cam='${c}';savePrefs()">${l}</button>`).join('')}</div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas></div>'}
     <div class="row mt8">${[1, 2, 4, 8].map(s => `<button class="btn bsm ${((PREFS.speed || 2) === s) ? 'bact' : 'bg'}" onclick="setSpeed(${s})">${s}×</button>`).join('')}
       <button class="btn bsm bg" id="mvPause" onclick="togglePause()">⏸ Pause</button><button class="btn bsm bs" onclick="skipHalf()">Skip ⏭</button>
       <select onchange="PREFS.viewMode=this.value;savePrefs()" style="width:auto;padding:4px 6px;font-size:11px">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -620,7 +621,7 @@ const simSpeed = () => { const sp = PREFS.speed || 2; return sp >= 8 ? 2.2 : sp 
 function simInit(v, fromMin){
   const gk = side => { const lu = (v.m.lineups[side] || []); const i = lu.findIndex(x => x.slot === 'GK'); return i >= 0 ? i : 0; };
   v.sim = { poss: fromMin < 45 ? 'home' : 'away', holder: 0, phase: 'reset', until: 0.6, kick: fromMin < 45 ? 'home' : 'away', pass: null, shot: null, nextAt: 0,
-    attack: null, celebrate: null, dive: null, net: null, t: 0, gk: { home: gk('home'), away: gk('away') }, excite: 0, exciteAt: 0 };
+    attack: null, celebrate: null, dive: null, net: null, strike: null, tackle: null, t: 0, gk: { home: gk('home'), away: gk('away') }, excite: 0, exciteAt: 0 };
   v.ball.x = 0.5; v.ball.y = 0.5; v.ball.z = 0; v.hold = 0;
 }
 function simNearest(team, x, y, skip = -1){
@@ -663,7 +664,8 @@ function simPass(v, secsTo){
     if (oi >= 0) { steal = oi; tp[0] += (opp[oi].x - tp[0]) * 0.5; tp[1] += (opp[oi].y - tp[1]) * 0.5; }
   }
   const dist = Math.hypot(tp[0] - v.ball.x, (tp[1] - v.ball.y) * 0.65);
-  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t, dur: dist / 0.25 + 0.1, lob: dist > 0.27 ? 0.42 : 0 };
+  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: dist / 0.25 + 0.1, lob: dist > 0.27 ? 0.42 : 0 };
+  s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: dist > 0.27 ? 0.9 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
   sfx('pass');
 }
 function simShoot(v, secs){
@@ -675,7 +677,8 @@ function simShoot(v, secs){
   else if (e.outcome === 'saved' || /saved/.test(e.text || '')) { type = 'saved'; to = [gx - dir * 0.012, 0.5 + rnd(-0.035, 0.035)]; z1 = rnd(0.08, 0.28); }
   else { type = 'off'; const wide = Math.random() < 0.6; to = [gx + dir * 0.04, 0.5 + (wide ? (Math.random() < 0.5 ? -1 : 1) * rnd(0.075, 0.13) : rnd(-0.03, 0.03))]; z1 = wide ? rnd(0.05, 0.3) : rnd(0.55, 0.75); }
   s.phase = 'shot';
-  s.shot = { from: [d.x + dir * 0.008, d.y], to, z1, t0: s.t, dur: Math.max(0.3, secs), type, side: a.side };
+  s.shot = { from: [v.ball.x, v.ball.y], to, z1, t0: s.t + 0.12, dur: Math.max(0.25, secs - 0.12), type, side: a.side };
+  s.strike = { side: a.side, idx: a.shooter, t0: s.t, power: 1, dir: [to[0] - d.x, to[1] - d.y] };
   const def = otherSide(a.side);
   s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t };
   sfx('kick');
@@ -733,16 +736,18 @@ function stepPositions(now, dt){
   const team = v.dots[s.poss], opp = v.dots[otherSide(s.poss)], dir = sideDir(s.poss), h = team[s.holder] || team[0];
   if (s.phase === 'play') {
     if (s.pass) {
-      const p = Math.min(1, (s.t - s.pass.t0) / s.pass.dur);
+      const p0 = Math.max(0, Math.min(1, (s.t - s.pass.t0) / s.pass.dur)), p = s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
       ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = Math.sin(p * Math.PI) * s.pass.lob;
-      if (p >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); }
+      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); }
     } else {
-      ball.x += (h.x + dir * 0.009 - ball.x) * 0.5; ball.y += (h.y - ball.y) * 0.5; ball.z *= 0.6;
+      const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
+      const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
+      ball.x += (h.x + ox - ball.x) * 0.5; ball.y += (h.y + oy - ball.y) * 0.5; ball.z *= 0.6;
       if (s.t >= s.nextAt) simPass(v, secsTo);
-      else if (!s.attack) { const [oi, od] = simNearest(opp, h.x, h.y, s.gk[otherSide(s.poss)]); if (oi >= 0 && od < 0.022 && Math.random() < 0.4 * dt) { simGive(v, otherSide(s.poss), oi, rnd(0.7, 1.5)); sfx('pass'); } }
+      else if (!s.attack) { const [oi, od] = simNearest(opp, h.x, h.y, s.gk[otherSide(s.poss)]); if (oi >= 0 && od < 0.022 && Math.random() < 0.4 * dt) { s.tackle = { side: otherSide(s.poss), idx: oi, t0: s.t }; simGive(v, otherSide(s.poss), oi, rnd(0.7, 1.5)); sfx('pass'); } }
     }
   } else if (s.phase === 'shot' && s.shot) {
-    const p = Math.min(1, (s.t - s.shot.t0) / s.shot.dur);
+    const p = Math.max(0, Math.min(1, (s.t - s.shot.t0) / s.shot.dur));
     ball.x = s.shot.from[0] + (s.shot.to[0] - s.shot.from[0]) * p; ball.y = s.shot.from[1] + (s.shot.to[1] - s.shot.from[1]) * p; ball.z = s.shot.z1 * p + Math.sin(p * Math.PI) * 0.1;
   } else if (s.phase === 'held') {
     if (!s.goalKick) { ball.x += (h.x + dir * 0.006 - ball.x) * 0.4; ball.y += (h.y - ball.y) * 0.4; ball.z += (0.2 - ball.z) * 0.3; }
@@ -776,9 +781,9 @@ function stepPositions(now, dt){
       } else if (s.phase === 'reset') { tx = i === taker ? 0.5 - d0 * 0.012 : d.bx; ty = i === taker ? 0.5 : d.by; sp = 0.2; }
       else if (s.phase === 'held') { sp = 0.045; tx = d.bx + (inPoss ? d0 * 0.02 : -d0 * 0.04) * (gk ? 0 : 1); if (gk && inPoss && !s.goalKick) { tx = d.x; ty = d.y; } }
       tx = Math.max(0.015, Math.min(0.985, tx)); ty = Math.max(0.03, Math.min(0.97, ty));
-      const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy * 0.65), step = Math.min(dist, sp * dt);
-      const mx = dist > 1e-5 ? dx / dist * step : 0, my = dist > 1e-5 ? dy / dist * step : 0;
-      d.x += mx; d.y += my; d.vx = mx / dt; d.vy = my / dt; d.tx = tx; d.ty = ty;
+      const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy * 0.65), want = Math.min(sp, dist * 6), acc = Math.min(1, dt * (sp > 0.12 ? 14 : 7));
+      d.vx = (d.vx || 0) + ((dist > 1e-5 ? dx / dist * want : 0) - (d.vx || 0)) * acc; d.vy = (d.vy || 0) + ((dist > 1e-5 ? dy / dist * want : 0) - (d.vy || 0)) * acc;
+      d.x += d.vx * dt; d.y += d.vy * dt; d.tx = tx; d.ty = ty;
     });
   }
   // Crowd noise follows the danger: louder as a chance builds.
@@ -1430,7 +1435,7 @@ function rSettings(){
     <div class="card"><div class="ch">Display</div>
       <label class="lbl">Theme</label><div class="row" style="margin-bottom:10px">${['dark', 'light'].map(t => `<button class="btn bsm ${(PREFS.theme || 'dark') === t ? 'bact' : 'bg'}" onclick="PREFS.theme='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Text size</label><div class="row" style="margin-bottom:10px">${['normal', 'large'].map(t => `<button class="btn bsm ${(PREFS.size || 'normal') === t ? 'bact' : 'bg'}" onclick="PREFS.size='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
-      <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || 'full') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Sound</label><div class="row"><button class="btn bsm ${PREFS.sound === false ? 'bg' : 'bact'}" onclick="toggleSound();renderSection('settings')">${PREFS.sound === false ? '🔇 Off' : '🔊 On'}</button>
         <input type="range" min="0" max="1" step="0.05" value="${PREFS.volume ?? 0.6}" oninput="PREFS.volume=+this.value;savePrefs();if(window.GafferSound)GafferSound.setVolume(PREFS.volume)" style="flex:1;padding:0"></div></div>
     ${settingsExtra()}
