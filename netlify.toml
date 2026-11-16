@@ -1,0 +1,10 @@
+# Static hosting (Netlify, and the same idea for Vercel, Cloudflare Pages or GitHub Pages):
+# the public/ folder is the whole game; it runs in the browser with saves on the device.
+[build]
+  command = "npm install && npm run build"
+  publish = "public"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

@@ -1,15 +1,25 @@
-const { rng, clamp, POS_ALL } = require('../utils');
+// src/engine/youthEngine.js — intake, promotion, wonderkids.
+//
+// Root causes fixed:
+//  • Youth and wonderkids were never added to world.players, so fromSave dropped them on every reload.
+//    Every generated player now goes through world.registerPlayer().
+//  • Fresh youth could be generated with near-elite attributes. Intake now applies YOUTH_CAPS
+//    (16-year-old overall ≤ 55, single attribute ≤ 75, wonderkids ≤ 82).
+
+const { clamp, POS_ALL } = require('../utils');
+const { Player, applyYouthCaps } = require('../models');
+const { staffRating } = require('./staffEngine');
 
 const REGIONS = {
-  'West Africa':    { boosts: ['pace','strength'],        label: 'Pace & Power'       },
-  'East Africa':    { boosts: ['workRate','strength'],    label: 'Stamina & Work Rate' },
-  'South America':  { boosts: ['dribbling','vision'],     label: 'Flair & Creativity'  },
-  'Eastern Europe': { boosts: ['defending','workRate'],   label: 'Discipline & Grit'   },
-  'Western Europe': { boosts: ['passing','vision'],       label: 'Technique & Vision'  },
-  'Scandinavia':    { boosts: ['strength','defending'],   label: 'Physicality & Discipline'},
-  'Japan/Korea':    { boosts: ['workRate','passing'],     label: 'Work Rate & Precision'},
-  'North America':  { boosts: ['pace','strength'],        label: 'Athleticism'         },
-  'Caribbean':      { boosts: ['pace','dribbling'],       label: 'Pace & Flair'        },
+  'West Africa':    { boosts: ['pace', 'strength'],      label: 'Pace & Power' },
+  'East Africa':    { boosts: ['workRate', 'strength'],  label: 'Stamina & Work Rate' },
+  'South America':  { boosts: ['dribbling', 'vision'],   label: 'Flair & Creativity' },
+  'Eastern Europe': { boosts: ['defending', 'workRate'], label: 'Discipline & Grit' },
+  'Western Europe': { boosts: ['passing', 'vision'],     label: 'Technique & Vision' },
+  'Scandinavia':    { boosts: ['strength', 'defending'], label: 'Physicality & Discipline' },
+  'Japan/Korea':    { boosts: ['workRate', 'passing'],   label: 'Work Rate & Precision' },
+  'North America':  { boosts: ['pace', 'strength'],      label: 'Athleticism' },
+  'Caribbean':      { boosts: ['pace', 'dribbling'],     label: 'Pace & Flair' },
 };
 
 const COUNTRY_REGION = {
@@ -20,83 +30,85 @@ const COUNTRY_REGION = {
   Poland: 'Eastern Europe', Czech: 'Eastern Europe', Croatia: 'Eastern Europe', Serbia: 'Eastern Europe',
   Sweden: 'Scandinavia', Norway: 'Scandinavia', Denmark: 'Scandinavia',
   Japan: 'Japan/Korea', Korea: 'Japan/Korea',
-  USA: 'North America', Canada: 'North America',
-  Australia: 'North America',
+  USA: 'North America', Canada: 'North America', Australia: 'North America',
 };
 
-function getRegion(country) {
-  return COUNTRY_REGION[country] || rng.pick(Object.keys(REGIONS));
+function getRegion(country) { return COUNTRY_REGION[country] || 'Western Europe'; }
+
+function applyRegionalBoosts(rng, p, country) {
+  const region = getRegion(country);
+  for (const attr of REGIONS[region].boosts) p.attributes[attr] = clamp(p.attributes[attr] + rng.int(4, 12), 1, 99);
+  p.region = region;
 }
 
-function applyRegionalBoosts(player, country) {
-  const region = REGIONS[getRegion(country)];
-  if (!region) return;
-  region.boosts.forEach(attr => {
-    if (player.attributes[attr] !== undefined) {
-      player.attributes[attr] = clamp(player.attributes[attr] + rng.int(4, 12), 20, 99);
-    }
+function makeYouth(world, club, { wonderkid = false } = {}) {
+  const rng = world.rng;
+  const p = new Player(world.ctx(), {
+    age: rng.int(15, 16), nation: club.country, clubId: club.id, position: rng.pick(POS_ALL), wonderkid,
+    ability: wonderkid ? [44, 58] : [26, 46],
   });
-  player.region = getRegion(country);
+  applyRegionalBoosts(rng, p, club.country);
+  const yf = club.facilities.youth || 1;
+  if (!wonderkid) {
+    // Better academies and bigger clubs produce higher ceilings.
+    // Better academies, bigger clubs and a better head of youth produce higher ceilings.
+    p.hiddenPotential = clamp(p.hiddenPotential + Math.round(yf * 1.5 + club.prestige / 8 + (staffRating(club, 'youth') - 10) * 0.5), 1, 92);
+    if (rng.chance(0.04 + yf * 0.012)) p.hiddenPotential = clamp(p.hiddenPotential + rng.int(6, 14), 55, 92);
+  }
+  p.refreshAbility();
+  applyYouthCaps(p);
+  p.weeklyWage = Math.max(150, Math.round(p.weeklyWage * 0.3)); // academy contract
+  p.contractYears = rng.int(2, 3);
+  p.homegrownClubId = club.id;
+  p.lastFee = 0;
+  world.registerPlayer(p);
+  return p;
 }
 
-function generateYouthPlayers(club, PlayerClass, CFG) {
+function intake(world, club, cfg) {
+  const rng = world.rng;
   const made = [];
-  const intakeCount = rng.int(CFG.youthIntake[0], CFG.youthIntake[1]);
-
-  for (let i = 0; i < intakeCount; i++) {
-    const youthFac = club.facilities.youth || 1;
-    const score = clamp(50 + youthFac * 5 + rng.int(-15, 20), 30, 95);
-    const passChance = score >= 70 ? 0.82 : score >= 55 ? 0.60 : 0.38;
-    if (!rng.chance(passChance)) continue;
-
-    const pos = rng.pick(POS_ALL);
-    const p = new PlayerClass({ age: rng.int(14, 18), nation: club.country, clubId: club.id, position: pos });
-
-    // Academy quality improves potential
-    if (rng.chance(0.04 + youthFac * 0.012)) {
-      p.hiddenPotential = clamp(p.hiddenPotential + rng.int(8, 18), 62, 99);
-    }
-
-    // Regional boosts to attributes
-    applyRegionalBoosts(p, club.country);
-    p.currentAbility = p.overall();
-
+  const n = rng.int(cfg.youthIntake[0], cfg.youthIntake[1]);
+  const yf = club.facilities.youth || 1;
+  for (let i = 0; i < n; i++) {
+    const score = clamp(50 + yf * 5 + rng.int(-15, 20), 30, 95);
+    const pass = score >= 70 ? 0.82 : score >= 55 ? 0.6 : 0.38;
+    if (!rng.chance(pass)) continue;
+    const p = makeYouth(world, club);
     club.youth.push(p);
-    const region = getRegion(club.country);
-    const regionInfo = REGIONS[region] || { label: 'Mixed' };
-    made.push({
-      p,
-      region,
-      text: `Youth intake: ${p.name} (${pos}, age ${p.age}) — ${regionInfo.label} talent. Potential: ${p.hiddenPotential >= 82 ? 'Elite' : p.hiddenPotential >= 70 ? 'High' : 'Promising'}.`
-    });
+    made.push(p);
   }
   return made;
 }
 
-function promoteYouth(club) {
-  const ready = club.youth
-    .filter(p => !p.retired && (p.currentAbility >= 50 || p.hiddenPotential >= 80 || p.age >= 21))
-    .slice(0, 3);
-  ready.forEach(p => {
-    club.youth = club.youth.filter(x => x.id !== p.id);
-    p.contractYears = rng.int(2, 4);
-    club.squad.push(p);
-    club.fanMood    = clamp(club.fanMood + 2, 0, 100);
-    club.boardTrust = clamp(club.boardTrust + 1, 0, 100);
-  });
-}
-
-function generateWonderkids(clubs, PlayerClass) {
-  const n = rng.int(8, 14);
-  for (let i = 0; i < n; i++) {
-    const club = rng.pick(clubs.filter(c => c.division >= 2));
+// About one wonderkid per nation per season, placed in a lower-division academy.
+function generateWonderkids(world) {
+  const rng = world.rng;
+  const made = [];
+  const nations = [...new Set(world.clubs.map(c => c.country))];
+  for (const country of nations) {
+    if (!rng.chance(0.9)) continue;
+    const club = rng.pick(world.clubs.filter(c => c.country === country && c.division >= 2));
     if (!club) continue;
-    const pos = rng.pick(POS_ALL);
-    const p = new PlayerClass({ age: rng.int(15, 17), nation: club.country, clubId: club.id, wonderkid: true, position: pos });
-    applyRegionalBoosts(p, club.country);
-    p.currentAbility = p.overall();
-    club.squad.push(p);
+    const p = makeYouth(world, club, { wonderkid: true });
+    club.youth.push(p);
+    made.push(p);
   }
+  return made;
 }
 
-module.exports = { generateYouthPlayers, promoteYouth, generateWonderkids, REGIONS, getRegion };
+// AI clubs promote ready youngsters. Over-age academy players (21+) are never left to rot:
+// they move up to the senior squad (the manager is told) or, if the squad is full, are released.
+function promoteYouth(world, club, isManagerClub) {
+  const promoted = [];
+  const ready = club.youth.filter(p => !p.retired && (p.age >= 21 || (!isManagerClub && (p.currentAbility >= 50 || p.hiddenPotential >= 80) && p.age >= 17)));
+  for (const p of ready.slice(0, isManagerClub ? ready.length : 3)) {
+    club.youth = club.youth.filter(x => x.id !== p.id);
+    club.squad.push(p);
+    p.contractYears = Math.max(p.contractYears, 2);
+    promoted.push(p);
+  }
+  return promoted;
+}
+
+module.exports = { intake, generateWonderkids, promoteYouth, makeYouth, REGIONS, getRegion, applyRegionalBoosts };

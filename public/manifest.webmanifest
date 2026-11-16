@@ -1,0 +1,31 @@
+{
+  "id": "./",
+  "name": "The Gaffer — Football Manager",
+  "short_name": "The Gaffer",
+  "description": "Football management: start at the bottom, climb every division, win the Golden Ball. Plays offline.",
+  "lang": "en",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "categories": ["games", "sports", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "screenshots": [
+    { "src": "icons/screen-phone.png", "sizes": "780x1688", "type": "image/png", "form_factor": "narrow", "label": "Your club at a glance" },
+    { "src": "icons/screen-wide.png", "sizes": "1366x900", "type": "image/png", "form_factor": "wide", "label": "Matchday in 3D" }
+  ],
+  "shortcuts": [
+    { "name": "Home", "url": "./?go=dash", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Squad", "url": "./?go=squad", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Transfers", "url": "./?go=transfers", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

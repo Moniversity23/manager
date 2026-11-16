@@ -1,0 +1,13 @@
+# Render.com blueprint: a public host where every visitor plays in their own browser.
+services:
+  - type: web
+    name: the-gaffer
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: GAFFER_PUBLIC
+        value: "1"
+      - key: NODE_VERSION
+        value: "22"
