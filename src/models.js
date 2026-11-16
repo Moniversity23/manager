@@ -8,10 +8,8 @@ const { clamp, POS_ALL, ATTR_KEYS, positionAbility, wageFor } = require('./utils
 
 const PERSONALITY = ['Professional', 'Ambitious', 'Lazy', 'Leader', 'Temperamental', 'Balanced', 'Determined', 'Model Pro'];
 
-const NAME_POOL = {
-  first: ['Ayo', 'Liam', 'Diego', 'Kenji', 'Musa', 'Noah', 'Rafa', 'Iker', 'Nico', 'Kofi', 'Omar', 'Leo', 'Javi', 'Kike', 'Tunde', 'Emeka', 'Sven', 'Lars', 'Paulo', 'Marco', 'Ahmed', 'Yuki', 'Carlos', 'Andres', 'Mike', 'Jake', 'James', 'Sam', 'Tom', 'Alex', 'Luis', 'Felipe', 'Rodrigo', 'Matheus', 'Takumi', 'Hiroshi', 'Kwame', 'Ekow', 'Seun', 'Bisi'],
-  last: ['Okoye', 'Garcia', 'Tanaka', 'Silva', 'Johnson', 'Ibrahim', 'Santos', 'Khan', 'Dubois', 'Rossi', 'Ali', 'Brown', 'Müller', 'Andersen', 'Osei', 'Mensah', 'Ferreira', 'Diaz', 'Nakamura', 'Kim', 'Schmidt', 'Fischer', 'Okonkwo', 'Adeyemi', 'Hernandez', 'Rodriguez', 'Yamamoto', 'Kobayashi', 'Williams', 'Jones', 'Taylor', 'Davies', 'Wilson', 'Evans'],
-};
+// Names come from the player's nation (src/names.js).
+const { poolFor } = require('./names');
 
 const POS_BOOSTS = {
   GK: ['strength', 'defending', 'vision'],
@@ -49,9 +47,10 @@ class Player {
   constructor(ctx, { age, nation, clubId, position = null, wonderkid = false, ability = null }) {
     const rng = ctx.rng;
     this.id = ctx.nextPlayerId();
-    this.name = `${rng.pick(NAME_POOL.first)} ${rng.pick(NAME_POOL.last)}`;
-    this.age = age;
     this.nation = nation || 'Unknown';
+    const pool = poolFor(this.nation);
+    this.name = `${rng.pick(pool.first)} ${rng.pick(pool.last)}`;
+    this.age = age;
     this.clubId = clubId ?? null;
     this.position = position || rng.pick(POS_ALL);
     this.personality = rng.pick(PERSONALITY);

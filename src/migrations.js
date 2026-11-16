@@ -1,9 +1,10 @@
 // src/migrations.js — save-schema migrations. Every schema change gets a step here; saves are
 // never silently dropped. A save from a newer version is refused with a clear message.
 
-const SAVE_VERSION = 9;
+const SAVE_VERSION = 10;
 const RENAMES = require('./data/renames.json');
-const { RNG } = require('./utils');
+const { RNG, hashString } = require('./utils');
+const { nameFromHash } = require('./names');
 const { generateClubStaff } = require('./engine/staffEngine');
 
 // v6 (server built for the old engine) → v7 (Phase 0 engine).
@@ -165,7 +166,35 @@ function v8to9(d) {
   return d;
 }
 
-const STEPS = { 6: v6to7, 7: v7to8, 8: v8to9 };
+// v9 → v10: players are renamed from their nation's own name pool (src/names.js). The new name
+// depends only on the player's id and nation, so it is the same on every load. Records that carry
+// a player's id next to his name (awards, transfers, bids, line-ups) are renamed with him; free
+// text written before the update (old inbox and news lines) keeps the name it was written with.
+function v9to10(d) {
+  const oldName = new Map(), newName = new Map();
+  for (const p of d.players || []) {
+    const n = nameFromHash(p.nation, hashString(`name:${p.id}:${p.name}`));
+    oldName.set(p.id, p.name); newName.set(p.id, n); p.name = n;
+  }
+  const NAME_KEYS = ['name', 'playerName'];
+  const walk = (o) => {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) walk(o[i]); return; }
+    for (const idKey of ['playerId', 'id']) {
+      const id = o[idKey];
+      if (typeof id !== 'number' || !oldName.has(id)) continue;
+      for (const k of NAME_KEYS) if (o[k] === oldName.get(id)) o[k] = newName.get(id);
+    }
+    for (const k in o) if (k !== 'players' || o !== d) walk(o[k]);
+  };
+  walk(d);
+  d.inbox = (d.inbox || []).concat([{ id: (d.inboxSeq || 0) + 1, season: d.season, week: d.currentWeek, type: 'system', text: 'Game updated: every player now has a name from his own country. Your squad is the same players under new names.' }]);
+  d.inboxSeq = (d.inboxSeq || 0) + 1;
+  d._v = 10;
+  return d;
+}
+
+const STEPS = { 6: v6to7, 7: v7to8, 8: v8to9, 9: v9to10 };
 
 function migrate(raw, deps) {
   let d = raw;

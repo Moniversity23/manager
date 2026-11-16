@@ -194,6 +194,23 @@ table{border-collapse:collapse;width:100%}
 .prow{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
 .pslot{flex:1;max-width:140px;background:rgba(8,12,20,.5);border:1px solid var(--bd2);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer}
 .pslot.manual{border-color:var(--ac)}.pslot.empty{border-style:dashed;opacity:.7}
+.pslot{color:inherit;font:inherit;min-width:0}.pslot:hover{border-color:var(--ac)}
+.pslot .pmeta{display:flex;gap:5px;align-items:center;justify-content:center;font-size:11px;font-family:var(--fm);margin-top:3px;flex-wrap:wrap}
+.lu-sum{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:10px}.lu-sum b{color:var(--tx)}
+.lu-row{display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid rgba(127,127,127,.12);cursor:pointer;min-height:48px}
+.lu-row:hover{background:rgba(0,229,204,.05)}.lu-row.lu-sub{background:rgba(0,229,204,.08)}
+.lu-n{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.lu-n b,.lu-n span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lu-act{font-size:11px;color:var(--ac);font-weight:600;white-space:nowrap}
+.pk{border:1px solid var(--bd2);border-radius:12px;padding:11px 12px;margin-bottom:8px;background:rgba(8,12,20,.35);cursor:pointer}
+.pk:hover{border-color:var(--ac)}.pk.pk-cur{border-color:var(--yw);background:rgba(255,215,64,.06);cursor:default}.pk.pk-out{opacity:.5;cursor:not-allowed}
+.pk-top{display:flex;align-items:center;gap:10px}.pk-n{flex:1;min-width:0}.pk-n b{font-size:15px}
+.pk-r{display:flex;align-items:center;gap:7px}.pk-d{font-family:var(--fm);font-weight:700;font-size:15px;min-width:30px;text-align:right}
+.pk-stats{display:flex;gap:6px;margin-top:9px}.pk-stats span{flex:1;min-width:0;background:var(--s2);border-radius:7px;padding:5px 4px;text-align:center;font-size:12px;font-family:var(--fm)}
+.pk-stats i{display:block;font-style:normal;font-family:var(--fb);font-size:9px;letter-spacing:.3px;text-transform:uppercase;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-attrs span{background:transparent;border:1px solid var(--bd)}
+.pk-foot{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:12px;flex-wrap:wrap}.pk-go{margin-left:auto;color:var(--ac);font-weight:700}
+.tb-back{font-size:13px;font-weight:600;color:var(--ac);padding:6px 10px;border:1px solid var(--bd2);border-radius:8px;white-space:nowrap}
+:root[data-theme="light"] .pk{background:rgba(255,255,255,.7)}
 .pslot .sl{font-family:var(--fm);font-size:9px;color:var(--ac)}.pslot .nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:100;display:flex;align-items:center;justify-content:center;padding:10px}
 .mbox{background:linear-gradient(180deg,#0f1d30,#0a1422);border:1px solid var(--bd2);border-radius:16px;padding:20px;width:min(620px,100%);max-height:92vh;overflow-y:auto}
@@ -259,6 +276,7 @@ table{border-collapse:collapse;width:100%}
 </div>
 
 <div class="mo hidden" id="genMo"><div class="mbox" id="genMoContent"></div></div>
+<div class="mo hidden" id="pickMo" style="z-index:120" onclick="if(event.target===this)closePicker()"><div class="mbox" id="pickMoContent"></div></div>
 
 <div id="app" class="hidden">
   <div class="sb-ov" id="sbOv" onclick="closeSb()"></div>
@@ -276,6 +294,7 @@ table{border-collapse:collapse;width:100%}
   </aside>
   <div class="mc">
     <div class="tb">
+      <button class="tb-back hidden" id="tbBack" onclick="goBack()" aria-label="Back">‹ Back</button>
       <button class="tb-mob" onclick="openSb()" aria-label="Menu">☰</button>
       <div class="tb-stats" id="tbStats"></div>
       <div id="winPill"></div>
@@ -418,7 +437,25 @@ function buildNav(){
   const by = Object.fromEntries(NAV.map(n => [n[0], n]));
   document.getElementById('sbNav').innerHTML = NAV_GROUPS.map(([g, secs]) => `<div class="nv-h">${g}</div>` + secs.map(k => by[k]).filter(Boolean).map(([s,i,l]) => `<button class="nv" data-sec="${s}" onclick="navTo('${s}')"><span class="nv-icon">${i}</span><span>${l}</span>${s==='inbox'?'<span class="cnt hidden" id="inboxCnt"></span>':''}</button>`).join('')).join('');
 }
-function navTo(sec){ currentSection = sec; renderSection(sec); if (window.innerWidth <= 768) closeSb(); }
+// Navigation keeps a trail so Back retraces your steps and always ends at Home. The browser's
+// own Back (and the Android back button in the installed app) follows the same trail.
+const NAV_TRAIL = [];
+function navTo(sec){
+  if (sec !== currentSection) { NAV_TRAIL.push(currentSection); if (NAV_TRAIL.length > 40) NAV_TRAIL.shift(); try { history.pushState({ gaffer: 1 }, ''); } catch {} }
+  showSection(sec); if (window.innerWidth <= 768) closeSb();
+}
+function showSection(sec){ currentSection = sec; renderSection(sec); updateTopbar(); const sc = document.getElementById('sc'); if (sc) sc.scrollTop = 0; }
+function goBack(){
+  if (!document.getElementById('pickMo').classList.contains('hidden')) return closePicker();
+  if (!document.getElementById('genMo').classList.contains('hidden')) { if (!VIEW && !(STATE && STATE.liveMatch)) closeMo('genMo'); return; }
+  if (document.getElementById('sb').classList.contains('open') && window.innerWidth <= 768) return closeSb();
+  let to = NAV_TRAIL.pop();
+  while (to === currentSection && NAV_TRAIL.length) to = NAV_TRAIL.pop();
+  if (!to || to === currentSection) to = 'dash';
+  if (to === 'dash') NAV_TRAIL.length = 0;
+  if (to !== currentSection) showSection(to);
+}
+window.addEventListener('popstate', () => { if (STATE && !document.getElementById('app').classList.contains('hidden')) goBack(); });
 function refresh(){ updateTopbar(); renderSection(currentSection); }
 
 function updateTopbar(){
@@ -440,6 +477,7 @@ function updateTopbar(){
   btn.textContent = busy ? 'Simulating…' : '▶ ' + (STATE.continueLabel || 'Continue');
   btn.disabled = busy;
   document.querySelectorAll('.nv').forEach(b => b.classList.toggle('act', b.dataset.sec === currentSection));
+  const back = document.getElementById('tbBack'); if (back) back.classList.toggle('hidden', currentSection === 'dash');
   const unread = (STATE.decisions || []).filter(d => ['bid', 'contract', 'unhappy', 'sponsor', 'job', 'national', 'sacked'].includes(d.type)).length || (STATE.pendingBids || []).length;
   const cnt = document.getElementById('inboxCnt');
   if (cnt) { cnt.textContent = unread; cnt.classList.toggle('hidden', !unread); }
@@ -823,19 +861,14 @@ function drawPitch(now){
 
 function showHalftime(h){
   const my = h.myKey;
-  const left = h.maxSubs - h.subsUsed;
-  const offOpts = h.onPitch.map(p => `<option value="${p.playerId}">${esc(p.slot)} · ${esc(p.name)} (${p.fit}%)</option>`).join('');
-  const onOpts = h.bench.filter(p => !p.injured).map(p => `<option value="${p.playerId}">${esc(p.position)} · ${esc(p.name)} ${p.ovr} (${p.fit}%)</option>`).join('');
-  const rows = Array.from({ length: Math.min(3, left) }, (_, i) => `<div class="row" style="margin-bottom:6px"><select class="htOff" style="flex:1"><option value="">— off —</option>${offOpts}</select><span class="dim">→</span><select class="htOn" style="flex:1"><option value="">— on —</option>${onOpts}</select></div>`).join('');
+  HT = { h, subs: [] };
   openMo('genMo');
   document.getElementById('genMoContent').innerHTML = `
     <div class="mo-title">⏸ Half-time · ${esc(h.compName)}</div>
     <div class="score">${esc(h.home.name)} ${h.home.goals} – ${h.away.goals} ${esc(h.away.name)}</div>
     <div class="small dim" style="text-align:center;margin-bottom:10px">xG ${h.home.xg} – ${h.away.xg} · Shots ${h.home.shots} – ${h.away.shots}</div>
     ${h.events.filter(e => e.type !== 'shot').length ? `<div class="card" style="padding:10px">${h.events.filter(e => e.type !== 'shot').map(e => `<div class="small">${e.min}' ${esc(e.text)} <span class="dim">(${e.side === my ? 'us' : 'them'})</span></div>`).join('')}</div>` : ''}
-    <div class="card" style="padding:10px"><div class="ch">Your players on the pitch</div>
-      ${h.onPitch.map(p => `<div class="sr"><span><b>${esc(p.slot)}</b> ${esc(p.name)}</span><span style="color:${fitColor(p.fit)};font-family:var(--fm)">${p.fit}%</span></div>`).join('')}
-    </div>
+    <div class="card" style="padding:0;overflow:hidden" id="htSubs"></div>
     <div class="g2">
       <div><label class="lbl">Tactic</label><select id="htTactic">${h.tactics.map(t => `<option value="${t}" ${t===h.tactic?'selected':''}>${t.replace('_',' ')}</option>`).join('')}</select></div>
       <div><label class="lbl">Formation</label><select id="htFormation">${h.formations.map(f => `<option ${f===h.formation?'selected':''}>${f}</option>`).join('')}</select></div>
@@ -843,11 +876,9 @@ function showHalftime(h){
     <label class="lbl mt12">Team talk</label>
     <div class="row" id="htTalk" style="margin-bottom:6px">${[['encourage', 'Encourage', 'Best when level or behind'], ['demand', 'Demand more', 'Fires them up when losing; can backfire when winning'], ['calm', 'Stay calm', 'Protects a lead'], ['praise', 'Praise', 'Good when winning, flat when losing']].map(([k, l, tip]) => `<button class="btn bsm bg" data-talk="${k}" title="${tip}" onclick="pickTalk(this)">${l}</button>`).join('')}</div>
     <div class="small dim" id="htTalkHint">Pick a team talk (optional). ${h.home.goals === h.away.goals ? 'It is level.' : (h.myKey === 'home' ? h.home.goals > h.away.goals : h.away.goals > h.home.goals) ? 'You are winning.' : 'You are losing.'}</div>
-    <label class="lbl mt12">Substitutions (${left} left)</label>
-    ${left > 0 ? rows : '<div class="small dim">No substitutions left.</div>'}
-    <div class="small dim mt4">If you make no changes, your assistant makes substitutions between the 60th and 75th minute.</div>
     <button class="btn bp fw mt12" onclick="resumeMatch(true)">▶ Second half with these changes</button>
     <button class="btn bg fw mt4" onclick="resumeMatch(false)">Let the assistant handle it</button>`;
+  renderHtSubs();
 }
 
 function pickTalk(btn){
@@ -861,9 +892,7 @@ async function resumeMatch(withChanges){
   if (withChanges) {
     body.tactic = document.getElementById('htTactic').value;
     body.formation = document.getElementById('htFormation').value;
-    const offs = [...document.querySelectorAll('.htOff')].map(s => s.value), ons = [...document.querySelectorAll('.htOn')].map(s => s.value);
-    body.subs = offs.map((o, i) => ({ offId: o, onId: ons[i] })).filter(s => s.offId && s.onId);
-    if (new Set(body.subs.map(s => s.offId)).size !== body.subs.length || new Set(body.subs.map(s => s.onId)).size !== body.subs.length) return notify('Each player can only be used once', 'w');
+    body.subs = HT.subs.slice();
   }
   closeMo('genMo');
   busy = true; updateTopbar();
@@ -1080,41 +1109,179 @@ async function releasePlayer(id){
 }
 
 // ── LINEUP ──────────────────────────────────────────────────────────
+// ── Lineup: tap a player, compare him with the alternatives, choose ──
+// The rating shown for a slot is the same sum the match engine uses: the mean of that position's
+// four key attributes, minus a penalty when it is not the player's natural position.
+const LU_ATTRS = { GK: ['strength', 'vision', 'workRate', 'defending'], CB: ['defending', 'strength', 'workRate', 'pace'], LB: ['pace', 'defending', 'passing', 'workRate'], RB: ['pace', 'defending', 'passing', 'workRate'],
+  CDM: ['defending', 'workRate', 'passing', 'strength'], CM: ['passing', 'vision', 'workRate', 'dribbling'], CAM: ['vision', 'passing', 'dribbling', 'finishing'], LW: ['pace', 'dribbling', 'finishing', 'vision'],
+  RW: ['pace', 'dribbling', 'finishing', 'vision'], ST: ['finishing', 'pace', 'strength', 'vision'], CF: ['finishing', 'vision', 'dribbling', 'pace'] };
+const LU_COMPAT = { GK: ['GK'], CB: ['CB', 'CDM'], LB: ['LB', 'CB', 'LW'], RB: ['RB', 'CB', 'RW'], CDM: ['CDM', 'CM', 'CB'], CM: ['CM', 'CDM', 'CAM'], CAM: ['CAM', 'CM', 'LW', 'RW'], LW: ['LW', 'CAM', 'LB', 'RW'], RW: ['RW', 'CAM', 'RB', 'LW'], ST: ['ST', 'CF', 'LW', 'RW'], CF: ['CF', 'ST', 'CAM'] };
+const LU_LABEL = { pace: 'Pace', finishing: 'Finishing', passing: 'Passing', dribbling: 'Dribbling', defending: 'Defending', strength: 'Strength', vision: 'Vision', workRate: 'Work rate' };
+const POS_NAME = { GK: 'goalkeeper', CB: 'centre-back', LB: 'left-back', RB: 'right-back', CDM: 'defensive midfielder', CM: 'central midfielder', CAM: 'attacking midfielder', LW: 'left winger', RW: 'right winger', ST: 'striker', CF: 'centre-forward' };
+function slotRating(p, slot){
+  const keys = LU_ATTRS[slot] || Object.keys(LU_LABEL), a = p.attrs || {};
+  let t = 0, n = 0;
+  for (const k of keys) if (a[k] != null) { t += a[k]; n++; }
+  let pen = 0;
+  if (p.position !== slot) pen = slot === 'GK' || p.position === 'GK' ? 30 : (LU_COMPAT[slot] || []).includes(p.position) ? 4 : 12;
+  return Math.max(1, Math.min(99, Math.round(t / Math.max(n, 1)) - pen));
+}
+function slotFit(p, slot){
+  if (!slot || p.position === slot) return ['Natural position', 'var(--gr)'];
+  if (slot === 'GK' || p.position === 'GK') return ['Wrong position (−30)', 'var(--rd)'];
+  return (LU_COMPAT[slot] || []).includes(p.position) ? ['Can play here (−4)', 'var(--or)'] : ['Out of position (−12)', 'var(--rd)'];
+}
+const sqById = id => (STATE.squad || []).find(p => p.id === id);
+const notFit = p => (p.injured ? 'Injured' : p.suspension ? `Suspended (${p.suspension} match${p.suspension > 1 ? 'es' : ''})` : '');
+
 function rLineup(){
-  const xi = STATE.currentXI || [], squad = STATE.squad || [];
-  const manual = new Map((STATE.manualXI || []).map(m => [m.slotKey, m.playerId]));
-  const benchIds = (STATE.bench || []).map(b => b.playerId);
+  const xi = STATE.currentXI || [], squad = STATE.squad || [], bench = STATE.bench || [];
+  const manual = new Set((STATE.manualXI || []).map(m => m.slotKey));
   const rowsOf = { GK: 0, CB: 1, LB: 1, RB: 1, CDM: 2, CM: 3, LW: 4, RW: 4, CAM: 4, ST: 5, CF: 5 };
   const lines = [[], [], [], [], [], []];
   xi.forEach(s => lines[rowsOf[s.slot] ?? 3].push(s));
-  const opt = (p, sel) => `<option value="${p.id}" ${sel ? 'selected' : ''} ${p.injured ? 'disabled' : ''}>${esc(p.position)} · ${esc(p.name)} ${p.ovr} · ${p.fit}%${p.injured ? ' (injured)' : ''}</option>`;
+  const filled = xi.filter(s => s.playerId), avg = a => (a.length ? Math.round(a.reduce((t, v) => t + v, 0) / a.length) : 0);
+  const tile = (s, _i, l) => {
+    const p = s.playerId ? sqById(s.playerId) : null;
+    return `<button class="pslot ${manual.has(s.slotKey) ? 'manual' : ''} ${p ? '' : 'empty'}" onclick="openPicker('xi','${s.slotKey}')">
+      <div class="sl">${esc(s.slot)}${manual.has(s.slotKey) ? ' · yours' : ''}</div><div class="nm" title="${esc(s.playerName || '')}">${esc(s.playerName ? (l.length > 3 ? s.playerName.split(' ').slice(1).join(' ') || s.playerName : s.playerName) : 'Empty')}</div>
+      ${p ? `<div class="pmeta">${rb(s.slotRating)}<span style="color:${fitColor(s.fit)}">${s.fit}%</span>${p.form != null ? rb10(p.form) : ''}</div>${p.position !== s.slot ? `<div class="small" style="color:var(--or)">plays ${esc(p.position)}</div>` : ''}` : '<div class="small dim">tap to pick</div>'}
+    </button>`;
+  };
+  const inSquad = new Set([...filled.map(s => s.playerId), ...bench.map(b => b.playerId)]);
+  const rest = squad.filter(p => !inSquad.has(p.id)).sort((a, b) => b.ovr - a.ovr);
+  const seat = i => {
+    const b = bench[i], p = b ? sqById(b.playerId) : null;
+    if (!p) return `<div class="lu-row" onclick="openPicker('bench','${i}')"><span class="pos pm" style="opacity:.4">–</span><span class="lu-n dim">Empty seat — tap to pick</span><span class="lu-act">Pick ›</span></div>`;
+    return `<div class="lu-row" onclick="openPicker('bench','${i}')">${posPill(p.position)}${rb(p.ovr)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${p.age} yrs · form ${p.form != null ? Number(p.form).toFixed(1) : '–'} · ${p.seasonStats.goals}G ${p.seasonStats.assists}A</span></span><span style="color:${fitColor(p.fit)};font-family:var(--fm);font-size:12px">${p.fit}%</span><span class="lu-act">Change ›</span></div>`;
+  };
   return `<div class="sct">Lineup <span class="scs">${esc(STATE.formation)} · ${STATE.manualLineupSet ? 'your picks + assistant' : 'assistant picks'}</span></div>
   <div class="g2">
-    <div class="card"><div class="ch">Who starts next match</div>
-      <div class="pitch">${lines.slice().reverse().filter(l => l.length).map(l => `<div class="prow">${l.map(s => `<div class="pslot ${manual.has(s.slotKey) ? 'manual' : ''} ${s.playerId ? '' : 'empty'}" onclick="document.getElementById('sel-${s.slotKey}').focus()"><div class="sl">${esc(s.slot)}</div><div class="nm">${esc(s.playerName || 'Empty')}</div><div class="small" style="color:${fitColor(s.fit)}">${s.fit != null ? s.fit + '%' : ''} ${s.slotRating != null ? '· ' + s.slotRating : ''}</div></div>`).join('')}</div>`).join('')}</div>
-      <div class="small dim mt8">Teal border = your pick. The assistant keeps a stable XI and only rotates for condition (under 75%), injury, or a clearly better option (max 2 a week).</div>
+    <div class="card"><div class="ch">Starting XI <span class="small dim">tap a player to change him</span></div>
+      <div class="pitch">${lines.slice().reverse().filter(l => l.length).map(l => `<div class="prow">${l.map(tile).join('')}</div>`).join('')}</div>
+      <div class="lu-sum"><span>Team rating <b>${avg(filled.map(s => s.slotRating))}</b></span><span>Average condition <b style="color:${fitColor(avg(filled.map(s => s.fit)))}">${avg(filled.map(s => s.fit))}%</b></span><span>${manual.size} of ${xi.length} picked by you</span></div>
+      <div class="small dim mt8">On each player: his rating in that position, his condition and his recent form. A teal border is your pick; the rest are chosen by your assistant, who rotates only for condition (under 75%), injury or a clearly better option.</div>
       ${(STATE.selectionChanges || []).length ? `<div class="card mt8" style="padding:9px"><div class="ch">Assistant's changes this week</div>${STATE.selectionChanges.map(c => `<div class="small">${esc(c.outName || '—')} → ${esc(c.inName || '—')} <span class="dim">(${esc(c.reason)})</span></div>`).join('')}</div>` : ''}
-      <div class="ch mt12">Bench</div>${(STATE.bench || []).map(b => `<div class="sr"><span>${esc(b.playerPos)} · ${esc(b.playerName)}</span><span style="color:${fitColor(b.fit)}">${b.fit}%</span></div>`).join('')}
+      <div class="row mt12"><button class="btn br bsm" onclick="clearLineup()">Reset everything to the assistant</button></div>
     </div>
-    <div class="card"><div class="ch">Set any slot</div>
-      ${xi.map(s => `<div class="lbr"><b style="width:52px;font-family:var(--fm);font-size:11px">${esc(s.slot)}</b><select id="sel-${s.slotKey}" class="lineup-select" data-slot-key="${s.slotKey}" style="flex:1"><option value="">Assistant picks${s.source !== 'manual' && s.playerName ? ` (${esc(s.playerName)})` : ''}</option>${squad.map(p => opt(p, manual.get(s.slotKey) === p.id)).join('')}</select></div>`).join('')}
-      <div class="ch mt12">Bench (7)</div>
-      ${Array.from({ length: 7 }, (_, i) => `<select class="bench-select mt4"><option value="">Assistant picks</option>${squad.map(p => opt(p, (STATE.manualBench || [])[i] === p.id)).join('')}</select>`).join('')}
-      <div class="row mt12"><button class="btn bp" onclick="applyLineup()">Save lineup</button><button class="btn br" onclick="clearLineup()">Reset to assistant</button></div>
-      <div class="small dim mt8">The players you set are exactly who start; your bench is exactly the bench. If a pick gets injured, the assistant replaces him and tells you.</div>
+    <div>
+      <div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">Bench <span class="small dim">${bench.length} of 7 · tap to change</span></div>${Array.from({ length: 7 }, (_, i) => seat(i)).join('')}</div>
+      <div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">Not in the matchday squad <span class="small dim">${rest.length}</span></div>
+        ${rest.length ? rest.map(p => `<div class="lu-row" onclick="showPlayer(${p.id})">${posPill(p.position)}${rb(p.ovr)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${p.age} yrs · form ${p.form != null ? Number(p.form).toFixed(1) : '–'}${notFit(p) ? ` · <span style="color:var(--rd)">${notFit(p)}</span>` : ''}</span></span><span style="color:${fitColor(p.fit)};font-family:var(--fm);font-size:12px">${p.fit}%</span></div>`).join('') : '<div class="small dim" style="padding:12px">Everyone is involved.</div>'}
+      </div>
     </div>
   </div>`;
 }
-async function applyLineup(){
-  const lineup = [...document.querySelectorAll('.lineup-select')].filter(s => s.value).map(s => ({ slotKey: s.dataset.slotKey, playerId: parseInt(s.value, 10) }));
-  const ids = lineup.map(l => l.playerId);
-  if (new Set(ids).size !== ids.length) return notify('A player is picked twice', 'w');
-  const bench = [...document.querySelectorAll('.bench-select')].map(s => s.value).filter(Boolean).map(Number);
-  if (bench.some(b => ids.includes(b))) return notify('A bench player is also in the XI', 'w');
-  const r = await post('/api/lineup', { lineup, bench });
-  applyCurrent(r); notify(r.ok ? 'Lineup saved' : r.error, r.ok ? 'g' : 'd'); refresh();
+
+// The chooser: the player you would replace is pinned on top; every alternative shows his rating
+// in this position, the difference, condition, morale, form, season output and the key attributes.
+let PICK = null, HT = { h: null, subs: [] };
+function openPicker(kind, key){ PICK = { kind, key: String(key), sort: 'rating' }; renderPicker(); openMo('pickMo'); }
+function closePicker(){ PICK = null; closeMo('pickMo'); }
+function pickerData(){
+  const k = PICK.kind, xi = STATE.currentXI || [], bench = STATE.bench || [];
+  if (k === 'xi') {
+    const s = xi.find(x => x.slotKey === PICK.key), cur = s && s.playerId ? sqById(s.playerId) : null;
+    const at = new Map(xi.filter(x => x.playerId).map(x => [x.playerId, x.slot])), onBench = new Set(bench.map(b => b.playerId));
+    const cands = (STATE.squad || []).filter(p => !cur || p.id !== cur.id).map(p => ({ p, r: slotRating(p, s.slot), out: notFit(p), where: at.has(p.id) ? `Starting at ${at.get(p.id)} — the two swap places` : onBench.has(p.id) ? 'On the bench' : 'Not in the matchday squad' }));
+    return { title: `Choose your ${POS_NAME[s.slot] || s.slot}`, slot: s.slot, cur, curR: cur ? slotRating(cur, s.slot) : null, cands, canAuto: (STATE.manualXI || []).some(m => m.slotKey === PICK.key) };
+  }
+  if (k === 'bench') {
+    const i = +PICK.key, b = bench[i], cur = b ? sqById(b.playerId) : null;
+    const starting = new Set(xi.map(x => x.playerId)), onBench = new Set(bench.map(x => x.playerId));
+    const cands = (STATE.squad || []).filter(p => !starting.has(p.id) && (!cur || p.id !== cur.id)).map(p => ({ p, r: p.ovr, out: notFit(p), where: onBench.has(p.id) ? 'Already on the bench — the two swap seats' : 'Not in the matchday squad' }));
+    return { title: `Bench seat ${i + 1}`, slot: null, cur, curR: cur ? cur.ovr : null, cands, note: 'Starters are not listed here. A good bench covers every line: a goalkeeper, defenders, midfielders and attackers.' };
+  }
+  const h = HT.h, on = h.onPitch.find(x => String(x.playerId) === PICK.key);
+  const blank = x => ({ id: x.playerId, name: x.name, position: x.position, ovr: x.ovr, attrs: {}, seasonStats: {} });
+  const cur = { ...(sqById(on.playerId) || blank(on)), fit: on.fit };
+  const used = new Set(HT.subs.map(s => s.onId));
+  const cands = h.bench.filter(b => !used.has(b.playerId)).map(b => { const p = { ...(sqById(b.playerId) || blank(b)), fit: b.fit }; return { p, r: slotRating(p, on.slot), out: b.injured ? 'Injured' : '', where: 'On the bench' }; });
+  return { title: `Replace ${on.name}`, slot: on.slot, cur, curR: slotRating(cur, on.slot), cands, note: `He is playing as your ${POS_NAME[on.slot] || on.slot}. Condition is as it stands at half-time.` };
+}
+function pickVerdict(c, cur, curR){
+  if (c.out) return [c.out, 'var(--rd)'];
+  if (!cur) return ['Fills the gap', 'var(--gr)'];
+  const d = c.r - curR, tired = c.p.fit < 75, fresher = c.p.fit - cur.fit >= 12;
+  if (d >= 3) return tired ? [`Better (+${d}) but tired`, 'var(--or)'] : [`Better choice (+${d})`, 'var(--gr)'];
+  if (d <= -3) return fresher && cur.fit < 75 ? [`Weaker (${d}) but much fresher`, 'var(--or)'] : [`Weaker (${d})`, 'var(--rd)'];
+  return fresher ? ['About the same, and fresher', 'var(--gr)'] : tired && cur.fit >= 75 ? ['About the same, but tired', 'var(--or)'] : ['About the same', 'var(--dim)'];
+}
+function pickCard(c, d, isCur){
+  const p = c.p, slot = d.slot, ss = p.seasonStats || {}, cur = isCur ? null : d.cur;
+  const [fitTxt, fitCol] = slotFit(p, slot);
+  const diff = !isCur && d.cur ? c.r - d.curR : null;
+  const attrs = (LU_ATTRS[slot || p.position] || []).map(k => {
+    const v = (p.attrs || {})[k], o = cur && cur.attrs ? cur.attrs[k] : null;
+    const col = v == null || o == null || Math.abs(v - o) < 2 ? 'var(--tx)' : v > o ? 'var(--gr)' : 'var(--rd)';
+    return `<span><i>${LU_LABEL[k]}</i><b style="color:${col}">${v ?? '–'}${v != null && o != null && Math.abs(v - o) >= 2 ? (v > o ? ' ▲' : ' ▼') : ''}</b></span>`;
+  }).join('');
+  const [vt, vc] = isCur ? ['', ''] : pickVerdict(c, d.cur, d.curR);
+  return `<div class="pk ${isCur ? 'pk-cur' : ''} ${c.out ? 'pk-out' : ''}" ${isCur || c.out ? '' : `onclick="choosePick(${p.id})"`}>
+    <div class="pk-top">${posPill(p.position)}<div class="pk-n"><b>${esc(p.name)}</b><div class="small" style="color:${fitCol}">${p.age != null ? `<span class="dim">${p.age} yrs · </span>` : ''}${fitTxt}</div></div>
+      <div class="pk-r"><span class="rb big ${tier(c.r)}">${c.r}</span>${diff != null ? `<span class="pk-d" style="color:${diff > 0 ? 'var(--gr)' : diff < 0 ? 'var(--rd)' : 'var(--dim)'}">${diff > 0 ? '+' + diff : diff === 0 ? '=' : diff}</span>` : ''}</div></div>
+    <div class="pk-stats"><span><i>Condition</i><b style="color:${fitColor(p.fit)}">${p.fit}%</b></span><span><i>Morale</i><b style="color:${p.mor >= 65 ? 'var(--gr)' : p.mor >= 45 ? 'var(--or)' : 'var(--rd)'}">${p.mor ?? '–'}</b></span><span><i>Form</i>${p.form != null ? rb10(p.form) : '<b class="dim">–</b>'}</span><span><i>Season</i><b>${ss.goals || 0}G ${ss.assists || 0}A</b></span><span><i>Games</i><b>${ss.apps || 0}</b></span></div>
+    <div class="pk-stats pk-attrs">${attrs}</div>
+    ${isCur ? '' : `<div class="pk-foot"><b style="color:${vc}">${vt}</b><span class="small dim">${esc(c.where)}</span>${c.out ? '' : '<span class="pk-go">Choose ›</span>'}</div>`}
+  </div>`;
+}
+function renderPicker(){
+  if (!PICK) return;
+  const d = pickerData();
+  const by = { rating: (a, b) => b.r - a.r || b.p.fit - a.p.fit, fit: (a, b) => b.p.fit - a.p.fit || b.r - a.r, form: (a, b) => (b.p.form || 0) - (a.p.form || 0) || b.r - a.r }[PICK.sort];
+  const cands = d.cands.slice().sort((a, b) => (a.out ? 1 : 0) - (b.out ? 1 : 0) || by(a, b));
+  document.getElementById('pickMoContent').innerHTML = `
+    <div class="row" style="margin-bottom:10px"><button class="btn bg bsm" onclick="closePicker()">‹ Back</button><div class="mo-title" style="margin:0;flex:1">${esc(d.title)}</div></div>
+    ${d.cur ? `<div class="small dim" style="margin-bottom:4px">${PICK.kind === 'sub' ? 'COMING OFF' : 'THERE NOW'}</div>${pickCard({ p: d.cur, r: d.curR }, d, true)}` : '<div class="small dim" style="margin-bottom:8px">Nobody is here yet.</div>'}
+    ${d.canAuto ? '<button class="btn bg bsm fw" style="margin-bottom:8px" onclick="autoSlot()">Let the assistant choose this position</button>' : ''}
+    <div class="chips" style="margin:10px 0 6px"><span class="small dim">Order by</span>${[['rating', d.slot ? 'Best here' : 'Best rated'], ['fit', 'Freshest'], ['form', 'In form']].map(([k, l]) => `<button class="chip ${PICK.sort === k ? 'on' : ''}" onclick="PICK.sort='${k}';renderPicker()">${l}</button>`).join('')}</div>
+    <div class="small dim" style="margin-bottom:8px">The big number is his rating ${d.slot ? 'in this position' : 'in his own position'}; the number beside it is the difference from the player above. Green ▲ and red ▼ compare each key attribute with him too. ${esc(d.note || '')}</div>
+    ${cands.length ? cands.map(c => pickCard(c, d, false)).join('') : '<div class="small dim">Nobody else is available.</div>'}`;
+  document.getElementById('pickMoContent').scrollTop = 0;
+}
+async function sendLineup(manual, bench, msg){
+  const r = await post('/api/lineup', { lineup: [...manual].map(([slotKey, playerId]) => ({ slotKey, playerId })), ...(bench ? { bench } : {}) });
+  applyCurrent(r); notify(r.ok ? msg : r.error, r.ok ? 'g' : 'd'); refresh();
+}
+async function choosePick(id){
+  const k = PICK.kind, key = PICK.key;
+  if (k === 'sub') { HT.subs = HT.subs.filter(s => s.offId !== +key); HT.subs.push({ offId: +key, onId: id }); closePicker(); renderHtSubs(); return; }
+  const xi = STATE.currentXI || [];
+  const manual = new Map((STATE.manualXI || []).map(m => [m.slotKey, m.playerId]));
+  let bench = STATE.manualBench ? (STATE.bench || []).map(b => b.playerId) : null;
+  if (k === 'xi') {
+    const here = xi.find(s => s.slotKey === key), there = xi.find(s => s.playerId === id);
+    for (const [sk, pid] of manual) if (pid === id) manual.delete(sk);
+    manual.set(key, id);
+    if (there && there.slotKey !== key) { if (here.playerId) manual.set(there.slotKey, here.playerId); else manual.delete(there.slotKey); }
+    else if (bench && here.playerId) bench = bench.map(b => (b === id ? here.playerId : b));
+  } else {
+    bench = (STATE.bench || []).map(b => b.playerId);
+    const i = Math.min(+key, bench.length), j = bench.indexOf(id);
+    if (j >= 0) bench[j] = bench[i];
+    bench[i] = id; bench = bench.filter(x => x != null);
+  }
+  closePicker();
+  await sendLineup(manual, bench, 'Lineup updated');
+}
+async function autoSlot(){
+  const manual = new Map((STATE.manualXI || []).map(m => [m.slotKey, m.playerId]));
+  manual.delete(PICK.key); closePicker();
+  await sendLineup(manual, null, 'The assistant picks that position again');
 }
 async function clearLineup(){ const r = await post('/api/lineup/clear'); applyCurrent(r); notify('The assistant picks the team again', 'i'); refresh(); }
+
+// Half-time substitutions: tap a player on the pitch, compare the bench, choose.
+function renderHtSubs(){
+  const el = document.getElementById('htSubs'), h = HT.h; if (!el || !h) return;
+  const left = h.maxSubs - h.subsUsed - HT.subs.length;
+  el.innerHTML = `<div class="ch">Your players <span class="small dim">tap one to take him off · ${Math.max(0, left)} change${left === 1 ? '' : 's'} left</span></div>` + h.onPitch.map(p => {
+    const sub = HT.subs.find(s => s.offId === p.playerId), on = sub && h.bench.find(b => b.playerId === sub.onId);
+    const act = sub ? `cancelSub(${p.playerId})` : left > 0 ? `openPicker('sub','${p.playerId}')` : `notify('No substitutions left', 'w')`;
+    return `<div class="lu-row ${sub ? 'lu-sub' : ''}" onclick="${act}"><span class="pos pm" style="background:var(--s3);color:var(--ac)">${esc(p.slot)}</span>${rb(p.rating)}<span class="lu-n">${sub ? `<span><s class="dim">${esc(p.name)}</s> → <b>${esc(on ? on.name : '')}</b></span>` : `<b>${esc(p.name)}</b>`}</span><span style="color:${fitColor(p.fit)};font-family:var(--fm);font-size:12px">${p.fit}%</span><span class="lu-act">${sub ? '✕ Undo' : 'Sub ›'}</span></div>`;
+  }).join('') + '<div class="small dim" style="padding:8px 12px">The number is his rating where he is playing; the percentage is his condition right now. If you make no changes, your assistant makes substitutions between the 60th and 75th minute.</div>';
+}
+function cancelSub(offId){ HT.subs = HT.subs.filter(s => s.offId !== offId); renderHtSubs(); }
 
 // ── TACTICS ─────────────────────────────────────────────────────────
 function rTactics(){
@@ -1841,12 +2008,14 @@ async function switchMode(target, carry){
 }
 
 // ── keyboard ──
-const SHORTCUTS = [['Space', 'Continue / play the week'], ['Esc', 'Close the window'], ['H', 'Home'], ['I', 'Inbox'], ['N', 'News'], ['S', 'Squad'], ['D', 'Dressing room'], ['L', 'Lineup'], ['T', 'Tactics'], ['M', 'Transfer market'], ['F', 'Finances'], ['C', 'Career'], ['X', 'Sound on/off']];
+const SHORTCUTS = [['Space', 'Continue / play the week'], ['Esc', 'Close the window'], ['Backspace', 'Go back'], ['H', 'Home'], ['I', 'Inbox'], ['N', 'News'], ['S', 'Squad'], ['D', 'Dressing room'], ['L', 'Lineup'], ['T', 'Tactics'], ['M', 'Transfer market'], ['F', 'Finances'], ['C', 'Career'], ['X', 'Sound on/off']];
 function onKey(e){
   const tag = (e.target && e.target.tagName) || '';
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag) || e.ctrlKey || e.metaKey || e.altKey || !STATE) return;
   const moOpen = !document.getElementById('genMo').classList.contains('hidden');
-  if (e.key === 'Escape') { if (moOpen && !VIEW && !STATE.liveMatch) closeMo('genMo'); return; }
+  if (e.key === 'Escape') { if (PICK) closePicker(); else if (moOpen && !VIEW && !STATE.liveMatch) closeMo('genMo'); return; }
+  if (e.key === 'Backspace') { e.preventDefault(); goBack(); return; }
+  if (PICK) return;
   if (moOpen) return;
   if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); advance(); return; }
   const map = { h: 'dash', i: 'inbox', n: 'news', s: 'squad', d: 'dressing', l: 'lineup', t: 'tactics', m: 'transfers', f: 'finances', c: 'career' };
