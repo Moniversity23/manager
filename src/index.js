@@ -526,29 +526,11 @@ class GameWorld {
       const p = this.players.get(x.playerId);
       if (p && p.clubId === me.id) p.ratings = [...(p.ratings || []), x.rating].slice(-5);
     }
-    // Challenges and match XP (for the rewards screen after the match)
+    // Challenges (paid in prize money)
     const myReport = ws.reports.find(r => r.myKey);
-    // XP for every match you played this week (league and cup), in the order they were played.
-    const score0 = this.flags.lastScore ?? CH.score(this);
-    const mine = ws.reports.filter(r => r.myKey && r.result);
-    let mx = null;
-    for (const rep of mine) {
-      const x = CH.matchXp(this, rep);
-      if (!x) continue;
-      const tag = mine.length > 1 ? `${rep.compName}: ` : '';
-      mx = { ...x, parts: [...(mx ? mx.parts : []), ...x.parts.map(([l, n]) => [tag + l, n])] };
-    }
     const wkc = CH.settleWeekly(this, myReport);
-    if (wkc && wkc.status === 'done') this.notify('challenge', `✅ Weekly challenge complete: ${wkc.text} (+${wkc.pts} pts, $${Math.round(wkc.cash / 1000)}K).`);
-    const seasonDone = CH.weeklySeason(this, ws.reports);
-    for (const c of seasonDone) this.notify('challenge', `🏁 Season challenge complete: ${c.text} (+${c.pts} pts, $${Math.round(c.cash / 1000)}K).`);
-    let rewards = null;
-    if (mx) {
-      const parts = [...mx.parts];
-      if (wkc) parts.push(wkc.status === 'done' ? [`✅ Challenge: ${wkc.text}`, wkc.pts] : [`❌ Challenge missed: ${wkc.text}`, 0]);
-      for (const c of seasonDone) parts.push([`🏁 ${c.text}`, c.pts]);
-      rewards = { parts, streak: mx.streak, unbeaten: mx.unbeaten, best: mx.best, cash: (wkc && wkc.status === 'done' ? wkc.cash : 0) + seasonDone.reduce((t, c) => t + (c.cash || 0), 0), score0 };
-    }
+    if (wkc && wkc.status === 'done') this.notify('challenge', `✅ Weekly challenge complete: ${wkc.text} (+$${Math.round(wkc.cash / 1000)}K).`);
+    for (const c of CH.weeklySeason(this, ws.reports)) this.notify('challenge', `🏁 Season challenge complete: ${c.text} (+$${Math.round(c.cash / 1000)}K).`);
     // International break
     const intl = INTL.weekly(this, week);
     if (intl) {
@@ -576,21 +558,10 @@ class GameWorld {
     if (me.finance.balance >= 10_000_000) AW.unlock(this, 'millionaire');
 
     this._weeklyNews();
-    const lvl = CH.level(CH.score(this));
-    if (lvl.level > (this.flags.level || 1)) this.notify('career', `⭐ Level up! You are now a level ${lvl.level} ${lvl.title}.`);
-    this.flags.level = lvl.level;
     this.currentWeek = week;
     const reports = ws.reports;
     if (reports.length) this.lastMatch = reports[reports.length - 1];
     const out = { seasonComplete: false, week, totalWeeks: this.totalWeeks, events: ws.events, matchReport: reports[reports.length - 1] || null, reports };
-    if (rewards) {
-      const s1 = CH.score(this);
-      const known = rewards.parts.reduce((t, [, n]) => t + n, 0), other = s1 - rewards.score0 - known;
-      if (other) rewards.parts.push([other > 0 ? 'Reputation' : 'Reputation lost', other]);
-      out.rewards = { ...rewards, xp: s1 - rewards.score0, before: CH.level(rewards.score0), after: lvl };
-      delete out.rewards.score0;
-    }
-    this.flags.lastScore = CH.score(this);
     if (this.currentWeek >= this.totalWeeks) {
       out.endSummary = this._endSeason();
       out.seasonComplete = true;
@@ -885,7 +856,7 @@ class GameWorld {
       if (seasonTrophies && b.trophy) { pay += b.trophy * seasonTrophies; why.push(`${seasonTrophies} troph${seasonTrophies > 1 ? 'ies' : 'y'}`); }
       if (pay) { FIN.post(me, 'Sponsor bonus', pay, `${me.sponsor.name}: ${why.join(' + ')}`); this.notify('finance', `🤝 ${me.sponsor.name} paid a $${Math.round(pay / 1000)}K bonus for ${why.join(' and ')}.`); summary.sponsorBonus = pay; }
     }
-    for (const c of CH.endSeason(this, myIdx + 1, myTable.length)) this.notify('challenge', `🏁 Season challenge complete: ${c.text} (+${c.pts} pts).`);
+    for (const c of CH.endSeason(this, myIdx + 1, myTable.length)) this.notify('challenge', `🏁 Season challenge complete: ${c.text}.`);
     summary.score = CH.score(this);
     // Champions and promotions in the paper
     for (const pyr of this.pyramids) {

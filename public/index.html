@@ -79,19 +79,6 @@ html[data-size="large"]{font-size:16px}
 .mv3d:fullscreen{aspect-ratio:auto;border-radius:0;width:100%;height:100%}
 .mv-label{background:linear-gradient(180deg,#1b2436,#0b1120);border:1px solid rgba(255,255,255,.25);font-family:var(--fn);font-size:13px;letter-spacing:.04em}
 @media(max-width:640px){.mv-radar{width:92px;height:59px}.mv-bug{height:22px;font-size:13px}.mv-bug .bs{font-size:14px;min-width:38px}.mv-bug .bc{font-size:10px}.mi-t{min-width:84px;padding:7px 9px}.mi-t b{font-size:24px}.mi-vs{font-size:22px}}
-.res{text-align:center;margin:-4px 0 10px}.res b{display:inline-block;font-family:var(--fn);font-weight:900;font-size:34px;letter-spacing:.12em;padding:2px 18px;border-radius:8px;animation:goalpop .6s cubic-bezier(.2,1.6,.4,1)}
-.res-W b{color:#04261a;background:linear-gradient(90deg,#00e676,#a6ff6b)}.res-D b{color:#1a2030;background:linear-gradient(90deg,#c7d3e3,#eef3f9)}.res-L b{color:#fff;background:linear-gradient(90deg,#ff5252,#c2185b)}
-.rw{position:relative;overflow:hidden;border:1px solid var(--bd2);border-radius:12px;padding:12px;margin-bottom:12px;background:linear-gradient(180deg,rgba(0,229,204,.08),rgba(0,0,0,0))}
-.rw-h{display:flex;align-items:baseline;gap:8px}.rw-lv{font-family:var(--fn);font-size:13px;letter-spacing:.14em;color:var(--dim)}.rw-lv b{font-size:24px;color:var(--ac)}
-.rw-ti{font-weight:700;flex:1}.rw-xp{font-family:var(--fn);font-size:24px;font-weight:900;color:var(--yw)}
-.rw-bar{height:12px;border-radius:7px;background:var(--s3);overflow:hidden;margin:8px 0 10px}.rw-bar span{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,var(--ac),var(--gr));transition:width .9s cubic-bezier(.3,.8,.3,1);box-shadow:0 0 12px rgba(0,229,204,.6)}
-.rw-p{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;opacity:0;animation:rwin .35s ease forwards}.rw-p b{font-family:var(--fm)}.rw-p b.up{color:var(--gr)}.rw-p b.dn{color:var(--rd)}
-@keyframes rwin{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
-.rw-streak{text-align:center;margin-top:8px;font-weight:700;color:var(--or);font-size:14px;animation:goalpop .6s .8s both}
-.rw-up{display:none;text-align:center;margin-top:10px;font-family:var(--fn);font-size:28px;font-weight:900;color:var(--yw);text-shadow:0 0 18px rgba(255,215,64,.6)}.rw-up.on{display:block;animation:goalpop .7s cubic-bezier(.2,1.6,.4,1)}
-.rw-up small{display:block;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--tx);text-shadow:none}
-.cf{position:absolute;top:-10px;width:7px;height:11px;border-radius:2px;pointer-events:none;animation:cffall linear forwards}
-@keyframes cffall{to{top:110%;transform:translateX(30px) rotate(540deg);opacity:.2}}
 
 .ac-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(127,127,127,.14);flex-wrap:wrap}
 .ac-item:last-child{border-bottom:none}
@@ -214,8 +201,6 @@ table{border-collapse:collapse;width:100%}
 .up-a{color:var(--gr);font-size:11px;font-weight:700}.dn-a{color:var(--rd);font-size:11px;font-weight:700}
 .show-m{display:none}
 .nv-h{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:12px 14px 4px}
-.sb-lvl{padding:8px 14px;border-bottom:1px solid var(--bd);font-size:11px}
-.xp{height:6px;border-radius:4px;background:var(--s3);overflow:hidden;margin-top:4px}.xp span{display:block;height:100%;background:linear-gradient(90deg,var(--ac),var(--bl))}
 .hero{border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid var(--bd2);background:radial-gradient(120% 140% at 0% 0%,rgba(0,229,204,.16),transparent 55%),linear-gradient(135deg,#0d1b2e,#101f38)}
 :root[data-theme="light"] .hero{background:linear-gradient(135deg,#e6f7f5,#eaf1fb)}
 .hero-club{font-family:var(--fn);font-size:30px;font-weight:900;line-height:1}
@@ -331,7 +316,6 @@ table{border-collapse:collapse;width:100%}
   <aside class="sb" id="sb">
     <div class="sb-head"><span class="sb-logo">THE GAFFER</span></div>
     <div class="sb-club"><div class="sb-badge" id="sbBadge">?</div><div style="min-width:0"><div class="sb-cname" id="sbName">–</div><div class="sb-div" id="sbLeague">–</div></div></div>
-    <div class="sb-lvl" id="sbLvl"></div>
     <nav class="sb-nav" id="sbNav"></nav>
     <div class="sb-bottom">
       <div class="sb-stat" id="sbWeek">–</div>
@@ -512,9 +496,6 @@ function updateTopbar(){
   document.getElementById('sbName').textContent = STATE.club;
   document.getElementById('sbLeague').textContent = `${STATE.leagueName} · Div ${STATE.division}`;
   document.getElementById('sbWeek').textContent = `${STATE.seasonLabel} · Week ${STATE.week}/${STATE.totalWeeks}`;
-  const lv = STATE.challenges && STATE.challenges.level;
-  const stk = STATE.challenges && STATE.challenges.streak;
-  if (lv) document.getElementById('sbLvl').innerHTML = `<b>Level ${lv.level}</b> · ${esc(lv.title)}${stk >= 2 ? ` · <span style="color:var(--or)">🔥${stk}</span>` : ''}<div class="xp"><span style="width:${lv.pct}%"></span></div>`;
   document.getElementById('tbStats').innerHTML = `
     <div class="tbi"><span class="tbl">Balance</span><span class="tbv ${STATE.finances>=0?'up':'dn'}">${money(STATE.finances)}</span></div>
     <div class="tbi"><span class="tbl">Position</span><span class="tbv">${STATE.position ? ordinal(STATE.position) : '–'} · ${STATE.points}pt</span></div>
@@ -562,17 +543,15 @@ function afterWeek(out, viewed){
   weekEvents = (out && out.events) || [];
   refresh();
   if (out && out.seasonComplete) return showSeasonEnd(out.endSummary);
-  if (!viewed && out && out.matchReport) showMatchReport(out.matchReport, out.rewards);
-  if (!(out && out.rewards) && weekEvents.some(e => /Level up/.test(e.text || ''))) sfx('levelup');
+  if (!viewed && out && out.matchReport) showMatchReport(out.matchReport);
   weekEvents.filter(e => ['bid','injury','contract','trophy','board','squad','cup','career','achievement'].includes(e.type)).slice(0, 3)
     .forEach(e => notify(e.text, e.type === 'injury' ? 'd' : e.type === 'bid' || e.type === 'trophy' || e.type === 'achievement' ? 'g' : 'w'));
 }
 
-function showFullTime(m, next, rw){
+function showFullTime(m, next){
   openMo('genMo');
   document.getElementById('genMoContent').classList.remove('mvx');
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${resultHero(m)}${rewardsHTML(rw)}${matchReportHTML(m)}<button class="btn bp fw" id="ftNext">Continue</button>`;
-  animateRewards(rw);
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}<button class="btn bp fw" id="ftNext">Continue</button>`;
   document.getElementById('ftNext').onclick = () => { closeMo('genMo'); next(); };
 }
 
@@ -689,54 +668,6 @@ function replayFrame(v, t){
   for (const side of ['home', 'away']) dots[side] = v.dots[side].map((d0, i) => { const p = a.d[side][i] || [d0.x, d0.y, 0], q = b.d[side][i] || p; return { id: d0.id, name: d0.name, x: L(p[0], q[0]), y: L(p[1], q[1]), off: !!p[2] }; });
   return { m: v.m, dots, ball: { x: L(a.b[0], b.b[0]), y: L(a.b[1], b.b[1]), z: L(a.b[2], b.b[2]) }, replay: v.replay, score: v.score,
     sim: { t, phase: a.phase === 'celebrate' ? 'play' : a.phase, strike: a.strike, tackle: a.tackle, dive: a.dive, net: a.net, poss: a.poss, holder: a.holder, pass: a.pass ? {} : null, attack: a.atk ? { side: a.atk } : null, goalKick: true, celebrate: null } };
-}
-
-// ── Rewards after the final whistle: XP counts up, the level bar fills, streaks and level-ups ──
-function resultHero(m){
-  if (!m || !m.result) return '';
-  const t = { W: 'VICTORY', D: 'DRAW', L: 'DEFEAT' }[m.result];
-  return `<div class="res res-${m.result}"><b>${t}</b></div>`;
-}
-function rewardsHTML(rw){
-  if (!rw) return '';
-  const b = rw.before;
-  return `<div class="rw">
-    <div class="rw-h"><span class="rw-lv">LEVEL <b id="rwLv">${b.level}</b></span><span class="rw-ti" id="rwTi">${esc(b.title)}</span><span class="rw-xp">+<b id="rwXp">0</b> XP</span></div>
-    <div class="rw-bar"><span id="rwFill" style="width:${Math.min(100, b.pct)}%"></span></div>
-    <div class="rw-parts">${rw.parts.map(([l, n], i) => `<div class="rw-p" style="animation-delay:${0.2 + i * 0.16}s"><span>${esc(l)}</span><b class="${n > 0 ? 'up' : n < 0 ? 'dn' : ''}">${n > 0 ? '+' + n : n}</b></div>`).join('')}</div>
-    ${rw.streak >= 2 ? `<div class="rw-streak">🔥 ${rw.streak} wins in a row${rw.best > rw.streak ? ` <span class="small dim">· best ${rw.best}</span>` : rw.streak >= 3 ? ' <span class="small">· your best yet!</span>' : ''}</div>` : rw.unbeaten >= 3 ? `<div class="rw-streak">🛡 ${rw.unbeaten} games unbeaten</div>` : ''}
-    ${rw.cash ? `<div class="small" style="text-align:center;margin-top:6px">💰 ${money(rw.cash)} prize money added to your balance</div>` : ''}
-    <div class="rw-up" id="rwUp"></div>
-  </div>`;
-}
-function confettiBurst(el){
-  if (!el) return;
-  const cols = ['#ffd740', '#00e5cc', '#ff5252', '#4da6ff', '#ffffff', '#00e676'];
-  for (let i = 0; i < 46; i++) {
-    const c = document.createElement('i'); c.className = 'cf';
-    c.style.cssText = `left:${Math.random() * 100}%;background:${cols[i % cols.length]};animation-duration:${1.2 + Math.random() * 1.3}s;animation-delay:${Math.random() * 0.25}s;transform:rotate(${Math.random() * 360}deg)`;
-    el.appendChild(c); setTimeout(() => c.remove(), 2900);
-  }
-}
-function animateRewards(rw){
-  if (!rw) return;
-  const xpEl = document.getElementById('rwXp'), fill = document.getElementById('rwFill');
-  const t0 = performance.now(), dur = 1300;
-  const count = now => { const k = Math.min(1, (now - t0) / dur); if (xpEl && document.body.contains(xpEl)) { xpEl.textContent = Math.round(rw.xp * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(count); } };
-  requestAnimationFrame(count);
-  if (!fill) return;
-  setTimeout(() => {
-    if (rw.after.level > rw.before.level) {
-      fill.style.width = '100%';
-      setTimeout(() => {
-        if (!document.body.contains(fill)) return;
-        document.getElementById('rwLv').textContent = rw.after.level; document.getElementById('rwTi').textContent = rw.after.title;
-        const up = document.getElementById('rwUp'); up.innerHTML = `⭐ LEVEL UP! <small>You are now a level ${rw.after.level} ${esc(rw.after.title)}</small>`; up.classList.add('on');
-        confettiBurst(up.parentElement); sfx('levelup');
-        fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = ''; fill.style.width = Math.min(100, rw.after.pct) + '%';
-      }, 950);
-    } else fill.style.width = Math.min(100, rw.after.pct) + '%';
-  }, 350);
 }
 
 // ── 2D match viewer ─────────────────────────────────────────────────
@@ -1125,15 +1056,14 @@ async function resumeMatch(withChanges){
   const next = () => { if (r.halftime) playHalf(r.halftime, 0, 45, () => showHalftime(r.halftime)); else afterWeek(r.out, true); };
   if (!finished) return next();
   const end = finished.events.some(e => e.min > 90) ? 120 : 90;
-  playHalf(finished, 45, end, () => showFullTime(finished, next, r.out && r.out.rewards));
+  playHalf(finished, 45, end, () => showFullTime(finished, next));
 }
 
 function matchReportHTML(m){
-  const tag = m.result === 'W' ? '<span class="tag tg">WIN</span>' : m.result === 'L' ? '<span class="tag tr">LOSS</span>' : '<span class="tag dim">DRAW</span>';
   return `<div class="small dim" style="text-align:center">${esc(m.compName)} · week ${m.week}</div>
     <div class="score">${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</div>
     ${m.pens ? `<div style="text-align:center" class="small">Penalties ${m.pens.home}–${m.pens.away}</div>` : ''}
-    <div style="text-align:center;margin:6px 0 10px">${tag}</div>
+    <div style="margin-bottom:10px"></div>
     <div class="g4" style="margin-bottom:10px">
       ${[['xG', `${m.hx} – ${m.ax}`], ['Shots', `${m.hs} – ${m.as}`], ['Possession', `${m.pos}% – ${100 - m.pos}%`], ['Venue', m.myKey === 'home' ? 'Home' : 'Away']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:16px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}
     </div>
@@ -1143,11 +1073,10 @@ function matchReportHTML(m){
     <div class="card" style="padding:10px;max-height:260px;overflow-y:auto">${m.events.filter(e => e.type !== 'shot').length ? m.events.filter(e => e.type !== 'shot').map(e => `<div class="small" style="padding:3px 0">${e.min}' ${esc(e.text)} <span class="dim">· ${esc(e.club)}</span></div>`).join('') : '<div class="small dim">A quiet game.</div>'}</div>`;
 }
 function rb10(r){ return `<b style="color:${r >= 8 ? 'var(--gold)' : r >= 7 ? 'var(--gr)' : r >= 6 ? 'var(--tx)' : 'var(--rd)'}">${Number(r).toFixed(1)}</b>`; }
-function showMatchReport(m, rw){
+function showMatchReport(m){
   openMo('genMo');
   document.getElementById('genMoContent').classList.remove('mvx');
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${resultHero(m)}${rewardsHTML(rw)}${matchReportHTML(m)}<button class="btn bp fw" onclick="closeMo('genMo')">Continue</button>`;
-  animateRewards(rw);
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}<button class="btn bp fw" onclick="closeMo('genMo')">Continue</button>`;
 }
 
 function showSeasonEnd(s, m){
@@ -1930,7 +1859,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) naviga
 </script>
 <script>
 // ── Next-level screens: action centre, negotiation, dressing room, scouting, international,
-//    news, challenges & leaderboard, budget, delegation, offline mode, sound and shortcuts ──
+//    news, challenges, budget, delegation, offline mode, sound and shortcuts ──
 
 // ── sound (public/sound.js synthesises everything with WebAudio; nothing is downloaded) ──
 function sfx(name){ try { if (PREFS.sound !== false && window.GafferSound) window.GafferSound.play(name, PREFS.volume ?? 0.6); } catch {} }
@@ -1975,12 +1904,11 @@ function installBanner(){
 
 // ── home hero, radar chart, Golden Ball ──
 function heroCard(){
-  const nf = STATE.nextFixture, lv = (STATE.challenges || {}).level, recent = (STATE.recentResults || []).slice().reverse();
+  const nf = STATE.nextFixture, recent = (STATE.recentResults || []).slice().reverse();
   const tip = STATE.completedSeasons === 0 && STATE.week <= 1 && !PREFS.tipDone;
   return `<div class="hero"><div class="hero-row">
       <div><div class="hero-club">${esc(STATE.club)}</div><div class="small dim">${esc(STATE.seasonLabel)} · Week ${STATE.week} of ${STATE.totalWeeks} · ${esc(STATE.leagueName)} · ${STATE.position ? ordinal(STATE.position) : '–'}</div>
         <div class="row mt8">${recent.map(m => `<span class="fw-${m.result}" title="${esc(m.opponent)} ${m.gf}-${m.ga}">${m.result}</span>`).join('') || '<span class="small dim">No results yet</span>'}</div></div>
-      ${lv ? `<div style="min-width:150px"><div class="small"><b>Level ${lv.level}</b> · ${esc(lv.title)}</div><div class="xp"><span style="width:${lv.pct}%"></span></div><div class="small dim">${lv.xp} / ${lv.next} to the next level</div></div>` : ''}
     </div>
     <div class="hero-match">${nf ? `<div><div class="small dim">NEXT MATCH · ${esc(nf.comp)} · ${nf.venue === 'H' ? 'Home' : nf.venue === 'N' ? 'Neutral' : 'Away'}</div><div class="hero-vs">${esc(nf.home)} <span class="dim">vs</span> ${esc(nf.away)}</div></div>` : '<div class="small dim">No match this week — a rest week.</div>'}
       <button class="btn bp bm" onclick="advance()">▶ ${esc(STATE.continueLabel || 'Continue')}</button></div>
@@ -2039,8 +1967,7 @@ function actionCentre(){
 function dashExtras(){
   const ch = STATE.challenges || {}, wk = ch.weekly, news = (STATE.news || []).slice(0, 3);
   return `<div class="card"><div class="ch">This week <button class="btn bg bxs" onclick="navTo('challenges')">Challenges</button></div>
-    ${wk && wk.season === (STATE.season) ? `<div class="sr"><span>🏁 ${esc(wk.text)}</span><span class="small">${wk.status === 'open' ? `+${wk.pts} pts · ${money(wk.cash)}` : wk.status === 'done' ? '<b style="color:var(--gr)">Done</b>' : '<span class="dim">Missed</span>'}</span></div>` : '<div class="small dim">No weekly challenge (no match).</div>'}
-    <div class="sr"><span>Manager score</span><b style="color:var(--ac)">${ch.score ?? 0}</b></div>
+    ${wk && wk.season === (STATE.season) ? `<div class="sr"><span>🏁 ${esc(wk.text)}</span><span class="small">${wk.status === 'open' ? money(wk.cash) : wk.status === 'done' ? '<b style="color:var(--gr)">Done</b>' : '<span class="dim">Missed</span>'}</span></div>` : '<div class="small dim">No weekly challenge (no match).</div>'}
     ${((STATE.awardsRace || {}).league || []).length ? `<div class="ch mt8">Player of the season race <button class="btn bg bxs" onclick="navTo('awards')">Awards</button></div>${STATE.awardsRace.league.slice(0, 3).map((x, i) => `<div class="small" style="padding:2px 0;${x.clubId === STATE.clubId ? 'color:var(--ac)' : ''}">${i + 1}. ${esc(x.name)} <span class="dim">${esc(x.club)} · ${x.goals}G ${x.assists}A</span></div>`).join('')}` : ''}
     ${news.length ? `<div class="ch mt8">Headlines <button class="btn bg bxs" onclick="navTo('news')">Paper</button></div>${news.map(n => `<div class="small" style="padding:3px 0">📰 ${esc(n.headline)}</div>`).join('')}` : ''}</div>`;
 }
@@ -2218,30 +2145,18 @@ function rInternational(){
 function natToggle(id, on){ if (!NAT_PICK) NAT_PICK = new Set(); if (on) NAT_PICK.add(id); else NAT_PICK.delete(id); }
 async function saveNatSquad(){ const r = await post('/api/national/squad', { playerIds: [...(NAT_PICK || [])] }); applyCurrent(r); notify(r.ok ? (r.picked ? `Squad saved (${r.picked})` : 'The federation will pick the squad') : r.error, r.ok ? 'g' : 'd'); NAT_PICK = null; refresh(); }
 
-// ── challenges & leaderboard ──
+// ── challenges (prize money) ──
 function rChallenges(){
   const ch = STATE.challenges || {};
   const st = s => s === 'done' ? '<span class="tag tg">DONE</span>' : s === 'failed' ? '<span class="tag tr">MISSED</span>' : s === 'void' ? '<span class="tag dim">NO MATCH</span>' : '<span class="tag to">OPEN</span>';
-  setTimeout(loadLeaderboard, 0);
-  return `<div class="sct">Challenges & Leaderboard <span class="scs">${ch.completed || 0} completed · ${ch.points || 0} challenge points</span></div>
+  return `<div class="sct">Challenges <span class="scs">${ch.completed || 0} completed · prize money paid automatically</span></div>
   <div class="g2"><div>
-    <div class="card"><div class="ch">Manager score</div><div class="kpi-v" style="font-size:40px;color:var(--ac)">${ch.score ?? 0}</div><div class="small dim">Trophies ×150 · promotions ×80 · top-flight seasons ×30 · achievements ×25 · challenge points · reputation ×4 · seasons ×10 · sackings −40.</div></div>
-    <div class="card"><div class="ch">This week</div>${ch.weekly ? `<div class="sr"><span>${esc(ch.weekly.text)}</span>${st(ch.weekly.status)}</div><div class="small dim">Reward +${ch.weekly.pts} points and ${money(ch.weekly.cash)} — paid automatically.</div>` : '<div class="small dim">No match this week.</div>'}</div>
-    <div class="card"><div class="ch">This season</div>${(ch.season || []).map(c => `<div class="sr"><span>${esc(c.text)} <span class="small dim">+${c.pts} pts · ${money(c.cash)}</span></span>${st(c.status)}</div>`).join('') || '<div class="small dim">Set at the start of each season.</div>'}</div>
-    <div class="card"><div class="ch">Challenge a friend</div><div class="small dim" style="margin-bottom:6px">Your code starts the exact same world at the same club. Share it; whoever scores higher wins.</div>
-      <div class="row"><input readonly value="${esc(ch.code || '—')}" id="myCode" style="flex:1;font-family:var(--fm)"><button class="btn bs bsm" onclick="copyCode()">Copy</button></div></div>
+    <div class="card"><div class="ch">This week</div>${ch.weekly ? `<div class="sr"><span>${esc(ch.weekly.text)}</span>${st(ch.weekly.status)}</div><div class="small dim">Prize ${money(ch.weekly.cash)} — paid automatically.</div>` : '<div class="small dim">No match this week.</div>'}</div>
+    <div class="card"><div class="ch">This season</div>${(ch.season || []).map(c => `<div class="sr"><span>${esc(c.text)}${c.cash ? ` <span class="small dim">${money(c.cash)}</span>` : ''}</span>${st(c.status)}</div>`).join('') || '<div class="small dim">Set at the start of each season.</div>'}</div>
   </div><div>
-    <div class="card"><div class="ch">Leaderboard <span class="small dim">${MODE === 'offline' ? 'this browser' : 'this server'}</span></div><div id="lbBox" class="small dim">Loading…</div></div>
     <div class="card"><div class="ch">Recent</div>${(ch.history || []).slice(0, 10).map(c => `<div class="sr small"><span>${esc(c.text)} <span class="dim">S${c.season}${c.week ? ' W' + c.week : ''}</span></span>${st(c.status)}</div>`).join('') || '<div class="small dim">Nothing yet.</div>'}</div>
   </div></div>`;
 }
-async function loadLeaderboard(){
-  const el = document.getElementById('lbBox'); if (!el) return;
-  const r = await api('/api/leaderboard');
-  if (!r || !r.ok) { el.textContent = 'Leaderboard unavailable.'; return; }
-  el.innerHTML = r.entries.length ? `<table class="st"><thead><tr><th>#</th><th>Manager · club</th><th class="tc">Season</th><th class="tc">🏆</th><th class="tc">Score</th></tr></thead><tbody>${r.entries.slice(0, 20).map((e, i) => `<tr class="${e.careerId === r.mine ? 'hlr' : ''}"><td>${i + 1}</td><td>${esc(e.manager)} · ${esc(e.club)} <span class="dim">D${e.division} ${esc(e.country)}</span>${e.code ? `<div class="dim" style="font-family:var(--fm);font-size:10px">${esc(e.code)}</div>` : ''}</td><td class="tc">${esc(e.season)}</td><td class="tc">${e.trophies}</td><td class="tc"><b>${e.score}</b></td></tr>`).join('')}</tbody></table>` : 'No careers yet.';
-}
-function copyCode(){ const el = document.getElementById('myCode'); if (!el) return; el.select(); try { navigator.clipboard.writeText(el.value); notify('Challenge code copied', 'g'); } catch { notify('Select and copy the code', 'i'); } }
 
 // ── finances: season budget ──
 function budgetCard(){

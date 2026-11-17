@@ -40,16 +40,13 @@ MongoDB saves with a gzip-file fallback.
   renewals on the agent's terms, unhappy players, sponsor, jobs, scout reports, lineup problems);
   keyboard shortcuts (Space plays on); delegation of key contracts and bids to the assistant.
 - **News and challenges:** the Gaffer Gazette (transfers, title races, giant-killings, sackings, champions,
-  re-election, international results); weekly and season challenges paid automatically; a manager score and a
-  leaderboard; **challenge codes** start a friend in exactly the same world to compare scores.
+  re-election, international results); weekly and season challenges that pay prize money automatically.
 - **Match realism:** the match view runs a possession-and-passing simulation (dribbles, passes, interceptions,
   pressing, keeper dives); every shot is built up to and struck on its minute; goals end in the conceding
   side's net, followed by a celebration and a kick-off. Player ratings and a man of the match after every game.
 - **Golden Ball:** a live race for the world's player of the year, a top ten, Golden Boot, Golden Boy and a
   team of the season; a player-of-the-season race in your own league.
-- **Progress:** manager levels and titles from your score; XP for every match (result, goals, clean sheets, win
-  streaks, challenges) shown on an animated rewards screen at full time; player form (last five ratings) and ▲ growth this
-  season, a sortable squad list (position, rating, potential, value, age, wage, form, goals, condition).
+- **Progress:** player form (last five ratings) and ▲ growth this season, a sortable squad list (position, rating, potential, value, age, wage, form, goals, condition).
 - **Play anywhere:** installs as a PWA; **offline mode** runs the whole game in the browser (Web Worker,
   saves in IndexedDB) and starts by itself when the server is unreachable; careers move between modes.
 - **Look:** dark and light themes, larger text option, mobile bottom bar. All names are fictional; Settings
