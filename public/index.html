@@ -38,7 +38,7 @@ html[data-size="large"]{font-size:16px}
 .mv-stats .l{text-align:right}.mv-stats .c{color:var(--dim);text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
 .meter{height:8px;background:var(--s3);border-radius:5px;overflow:hidden}.meter>span{display:block;height:100%}
 .mv3d{position:relative;width:100%;aspect-ratio:16/9;background:#0b2a18;border-radius:12px;overflow:hidden}
-.mv3d canvas{display:block;width:100%!important;height:100%!important}
+.mv3d canvas:not(.mv-radar){display:block;width:100%!important;height:100%!important}
 @media(max-width:640px){.mv3d{aspect-ratio:3/2}}
 .mv-flash{position:absolute;left:0;right:0;top:8%;text-align:center;font-family:var(--fn);font-size:52px;font-weight:900;line-height:1;color:#ffd740;text-shadow:0 4px 18px rgba(0,0,0,.7);pointer-events:none;opacity:0;transition:opacity .25s;z-index:2}
 .mv-flash small{display:block;font-family:var(--fb);font-size:15px;font-weight:600;color:#fff;margin-top:4px}
@@ -46,6 +46,53 @@ html[data-size="large"]{font-size:16px}
 .mv-flash.on{opacity:1}
 .mv-cam{position:absolute;right:8px;top:8px;display:flex;gap:4px}
 .mv-cam button{background:rgba(0,0,0,.45);color:#fff;font-size:11px;padding:4px 8px;border-radius:6px}
+.mvx .mv-bar{display:none}
+.mv3d{cursor:default}
+.mv-bug{position:absolute;left:8px;top:8px;display:flex;align-items:stretch;height:26px;border-radius:5px;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,.45);font-family:var(--fn);font-weight:800;font-size:16px;z-index:3;pointer-events:none}
+.mv-bug .bt{display:flex;align-items:center;gap:6px;padding:0 8px;background:linear-gradient(180deg,#1b2436,#0b1120);color:#fff;letter-spacing:.05em}
+.mv-bug .bt i{width:4px;height:16px;border-radius:2px;background:var(--k)}
+.mv-bug .bs{display:flex;align-items:center;justify-content:center;padding:0 9px;background:#fff;color:#0b1220;font-size:17px;min-width:46px}
+.mv-bug .bs.pop{animation:bugpop .6s ease}
+.mv-bug .bc{display:flex;align-items:center;padding:0 8px;background:var(--ac);color:#04221d;font-family:var(--fm);font-size:12px;font-weight:700}
+@keyframes bugpop{0%{transform:scale(1)}30%{transform:scale(1.35);background:#ffd740}100%{transform:scale(1)}}
+.mv-radar{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:126px;height:81px;border-radius:6px;background:rgba(14,48,26,.6);border:1px solid rgba(255,255,255,.3);z-index:2;pointer-events:none}
+.mv-replay{position:absolute;left:10px;bottom:10px;padding:4px 10px 4px 22px;background:#d61f2c;color:#fff;font-family:var(--fn);font-weight:900;letter-spacing:.14em;font-size:14px;border-radius:4px;opacity:0;transition:opacity .2s;z-index:3;pointer-events:none}
+.mv-replay::before{content:'';position:absolute;left:8px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#fff;animation:blink 1s steps(2) infinite}
+.mv-replay.on{opacity:1}
+@keyframes blink{50%{opacity:0}}
+.mv-intro{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:linear-gradient(180deg,rgba(4,8,18,.15),rgba(4,8,18,.55));opacity:0;pointer-events:none;transition:opacity .4s;z-index:4}
+.mv-intro.on{opacity:1}
+.mi-comp{font-family:var(--fn);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:#cfe;background:rgba(0,0,0,.45);padding:3px 12px;border-radius:12px}
+.mi-row{display:flex;align-items:center;gap:14px}
+.mi-t{display:flex;flex-direction:column;align-items:center;min-width:110px;padding:10px 14px;background:rgba(8,12,24,.82);border-bottom:4px solid var(--k);border-radius:8px;animation:mislide .7s cubic-bezier(.2,1.3,.4,1) both}
+.mi-t:last-child{animation-name:mislider}
+.mi-t b{font-family:var(--fn);font-size:34px;line-height:1;color:#fff;letter-spacing:.05em}.mi-t span{font-size:11px;color:#bcd;max-width:130px;text-align:center}
+.mi-vs{font-family:var(--fn);font-weight:900;font-size:30px;color:#ffd740;text-shadow:0 3px 12px rgba(0,0,0,.6);animation:goalpop .7s .25s both}
+.mi-tap{font-size:10px;color:rgba(255,255,255,.7);margin-top:4px}
+@keyframes mislide{from{transform:translateX(-60px);opacity:0}}@keyframes mislider{from{transform:translateX(60px);opacity:0}}
+.mv-flash.on{animation:goalpop .65s cubic-bezier(.2,1.6,.4,1)}
+.mv-flash{background:linear-gradient(180deg,#fff6b0,#ffc400 55%,#ff8a00);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 4px 10px rgba(0,0,0,.7))}
+.mv-flash small{-webkit-text-fill-color:#fff}
+@keyframes goalpop{0%{transform:scale(.2) rotate(-8deg);opacity:0}60%{transform:scale(1.15) rotate(2deg);opacity:1}100%{transform:scale(1)}}
+.mv-cam button{min-height:30px}
+.mv3d.mv-max{position:fixed;inset:0;z-index:300;aspect-ratio:auto;border-radius:0;width:100vw;height:100vh;height:100dvh}
+.mv3d:fullscreen{aspect-ratio:auto;border-radius:0;width:100%;height:100%}
+.mv-label{background:linear-gradient(180deg,#1b2436,#0b1120);border:1px solid rgba(255,255,255,.25);font-family:var(--fn);font-size:13px;letter-spacing:.04em}
+@media(max-width:640px){.mv-radar{width:92px;height:59px}.mv-bug{height:22px;font-size:13px}.mv-bug .bs{font-size:14px;min-width:38px}.mv-bug .bc{font-size:10px}.mi-t{min-width:84px;padding:7px 9px}.mi-t b{font-size:24px}.mi-vs{font-size:22px}}
+.res{text-align:center;margin:-4px 0 10px}.res b{display:inline-block;font-family:var(--fn);font-weight:900;font-size:34px;letter-spacing:.12em;padding:2px 18px;border-radius:8px;animation:goalpop .6s cubic-bezier(.2,1.6,.4,1)}
+.res-W b{color:#04261a;background:linear-gradient(90deg,#00e676,#a6ff6b)}.res-D b{color:#1a2030;background:linear-gradient(90deg,#c7d3e3,#eef3f9)}.res-L b{color:#fff;background:linear-gradient(90deg,#ff5252,#c2185b)}
+.rw{position:relative;overflow:hidden;border:1px solid var(--bd2);border-radius:12px;padding:12px;margin-bottom:12px;background:linear-gradient(180deg,rgba(0,229,204,.08),rgba(0,0,0,0))}
+.rw-h{display:flex;align-items:baseline;gap:8px}.rw-lv{font-family:var(--fn);font-size:13px;letter-spacing:.14em;color:var(--dim)}.rw-lv b{font-size:24px;color:var(--ac)}
+.rw-ti{font-weight:700;flex:1}.rw-xp{font-family:var(--fn);font-size:24px;font-weight:900;color:var(--yw)}
+.rw-bar{height:12px;border-radius:7px;background:var(--s3);overflow:hidden;margin:8px 0 10px}.rw-bar span{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,var(--ac),var(--gr));transition:width .9s cubic-bezier(.3,.8,.3,1);box-shadow:0 0 12px rgba(0,229,204,.6)}
+.rw-p{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;opacity:0;animation:rwin .35s ease forwards}.rw-p b{font-family:var(--fm)}.rw-p b.up{color:var(--gr)}.rw-p b.dn{color:var(--rd)}
+@keyframes rwin{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+.rw-streak{text-align:center;margin-top:8px;font-weight:700;color:var(--or);font-size:14px;animation:goalpop .6s .8s both}
+.rw-up{display:none;text-align:center;margin-top:10px;font-family:var(--fn);font-size:28px;font-weight:900;color:var(--yw);text-shadow:0 0 18px rgba(255,215,64,.6)}.rw-up.on{display:block;animation:goalpop .7s cubic-bezier(.2,1.6,.4,1)}
+.rw-up small{display:block;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--tx);text-shadow:none}
+.cf{position:absolute;top:-10px;width:7px;height:11px;border-radius:2px;pointer-events:none;animation:cffall linear forwards}
+@keyframes cffall{to{top:110%;transform:translateX(30px) rotate(540deg);opacity:.2}}
+
 .ac-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(127,127,127,.14);flex-wrap:wrap}
 .ac-item:last-child{border-bottom:none}
 .ac-ico{font-size:17px;width:24px;text-align:center}
@@ -201,6 +248,7 @@ table{border-collapse:collapse;width:100%}
 .lu-row:hover{background:rgba(0,229,204,.05)}.lu-row.lu-sub{background:rgba(0,229,204,.08)}
 .lu-n{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.lu-n b,.lu-n span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lu-act{font-size:11px;color:var(--ac);font-weight:600;white-space:nowrap}
+.lw-st{display:flex;flex-direction:column;align-items:center;min-width:38px;font-family:var(--fm);font-size:14px}.lw-st i{font-style:normal;font-family:var(--fb);font-size:9px;color:var(--dim);text-transform:uppercase}
 .pk{border:1px solid var(--bd2);border-radius:12px;padding:11px 12px;margin-bottom:8px;background:rgba(8,12,20,.35);cursor:pointer}
 .pk:hover{border-color:var(--ac)}.pk.pk-cur{border-color:var(--yw);background:rgba(255,215,64,.06);cursor:default}.pk.pk-out{opacity:.5;cursor:not-allowed}
 .pk-top{display:flex;align-items:center;gap:10px}.pk-n{flex:1;min-width:0}.pk-n b{font-size:15px}
@@ -465,7 +513,8 @@ function updateTopbar(){
   document.getElementById('sbLeague').textContent = `${STATE.leagueName} · Div ${STATE.division}`;
   document.getElementById('sbWeek').textContent = `${STATE.seasonLabel} · Week ${STATE.week}/${STATE.totalWeeks}`;
   const lv = STATE.challenges && STATE.challenges.level;
-  if (lv) document.getElementById('sbLvl').innerHTML = `<b>Level ${lv.level}</b> · ${esc(lv.title)}<div class="xp"><span style="width:${lv.pct}%"></span></div>`;
+  const stk = STATE.challenges && STATE.challenges.streak;
+  if (lv) document.getElementById('sbLvl').innerHTML = `<b>Level ${lv.level}</b> · ${esc(lv.title)}${stk >= 2 ? ` · <span style="color:var(--or)">🔥${stk}</span>` : ''}<div class="xp"><span style="width:${lv.pct}%"></span></div>`;
   document.getElementById('tbStats').innerHTML = `
     <div class="tbi"><span class="tbl">Balance</span><span class="tbv ${STATE.finances>=0?'up':'dn'}">${money(STATE.finances)}</span></div>
     <div class="tbi"><span class="tbl">Position</span><span class="tbv">${STATE.position ? ordinal(STATE.position) : '–'} · ${STATE.points}pt</span></div>
@@ -513,16 +562,181 @@ function afterWeek(out, viewed){
   weekEvents = (out && out.events) || [];
   refresh();
   if (out && out.seasonComplete) return showSeasonEnd(out.endSummary);
-  if (!viewed && out && out.matchReport) showMatchReport(out.matchReport);
-  if (weekEvents.some(e => /Level up/.test(e.text || ''))) sfx('levelup');
+  if (!viewed && out && out.matchReport) showMatchReport(out.matchReport, out.rewards);
+  if (!(out && out.rewards) && weekEvents.some(e => /Level up/.test(e.text || ''))) sfx('levelup');
   weekEvents.filter(e => ['bid','injury','contract','trophy','board','squad','cup','career','achievement'].includes(e.type)).slice(0, 3)
     .forEach(e => notify(e.text, e.type === 'injury' ? 'd' : e.type === 'bid' || e.type === 'trophy' || e.type === 'achievement' ? 'g' : 'w'));
 }
 
-function showFullTime(m, next){
+function showFullTime(m, next, rw){
   openMo('genMo');
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}<button class="btn bp fw" id="ftNext">Continue</button>`;
+  document.getElementById('genMoContent').classList.remove('mvx');
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${resultHero(m)}${rewardsHTML(rw)}${matchReportHTML(m)}<button class="btn bp fw" id="ftNext">Continue</button>`;
+  animateRewards(rw);
   document.getElementById('ftNext').onclick = () => { closeMo('genMo'); next(); };
+}
+
+// ── Broadcast layer for the 3D match: score bug, radar, pre-match fly-over, goal replays ──
+const INTRO_LEN = 3.4;
+const CAMS = [['tv', 'TV'], ['close', 'Close'], ['high', 'Tactical'], ['goal', 'Goal']];
+function abbr(name, other){
+  const w = String(name || '').replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean);
+  let a = (w[0] || '???').slice(0, 3).toUpperCase();
+  const b = String(other || '').split(/\s+/)[0].slice(0, 3).toUpperCase();
+  if (a === b && w[1]) a = (w[0][0] + w[1].slice(0, 2)).toUpperCase();
+  return a;
+}
+function matchNight(m){
+  if (PREFS.light === 'day') return false;
+  if (PREFS.light === 'night') return true;
+  let h = 7; for (const c of `${m.home}|${m.away}|${m.compName || ''}`) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return /cup|champions|nations/i.test(m.compName || '') || h % 5 < 2;
+}
+function cycleCam(){
+  const i = CAMS.findIndex(c => c[0] === (PREFS.cam || 'tv'));
+  PREFS.cam = CAMS[(i + 1) % CAMS.length][0]; savePrefs();
+  const b = document.getElementById('mvCamBtn'); if (b) b.textContent = '🎥 ' + CAMS[(i + 1) % CAMS.length][1];
+}
+function toggleFull(){
+  const el = document.getElementById('mv3d'); if (!el) return;
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+  if (el.classList.contains('mv-max')) { el.classList.remove('mv-max'); return; }
+  const go = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (go) Promise.resolve(go.call(el)).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch {} }).catch(() => el.classList.add('mv-max'));
+  else el.classList.add('mv-max');
+}
+function hudInit(v){
+  const hue = { home: v.m.lineups.homeHue ?? 210, away: v.m.lineups.awayHue ?? 0 };
+  v.hud = { hue, home: abbr(v.m.home, v.m.away), away: abbr(v.m.away, v.m.home), clk: '', sc: '' };
+  const bug = document.getElementById('mvBug');
+  if (bug) bug.innerHTML = `<span class="bt" style="--k:hsl(${hue.home},78%,50%)"><i></i>${esc(v.hud.home)}</span><span class="bs" id="bugS">0 - 0</span><span class="bt" style="--k:hsl(${hue.away},78%,50%)">${esc(v.hud.away)}<i></i></span><span class="bc" id="bugC">00:00</span>`;
+  const cb = document.getElementById('mvCamBtn'); if (cb) cb.textContent = '🎥 ' + (CAMS.find(c => c[0] === (PREFS.cam || 'tv')) || CAMS[0])[1];
+}
+function hudRender(v){
+  if (!v.hud) return;
+  const mm = Math.floor(v.minute), ss = Math.floor((v.minute - mm) * 60);
+  const clk = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`, sc = `${v.score.home} - ${v.score.away}`;
+  if (clk !== v.hud.clk) { v.hud.clk = clk; const e = document.getElementById('bugC'); if (e) e.textContent = clk; }
+  if (sc !== v.hud.sc) { v.hud.sc = sc; const e = document.getElementById('bugS'); if (e) { e.textContent = sc; e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); } }
+  const cv = document.getElementById('mvRadar'); if (!cv) return;
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height, src = v.replayView || v;
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 1;
+  g.strokeRect(2.5, 2.5, W - 5, H - 5); g.beginPath(); g.moveTo(W / 2, 3); g.lineTo(W / 2, H - 3); g.stroke();
+  g.beginPath(); g.arc(W / 2, H / 2, H * 0.13, 0, Math.PI * 2); g.stroke();
+  g.strokeRect(2.5, H * 0.3, W * 0.14, H * 0.4); g.strokeRect(W - 2.5 - W * 0.14, H * 0.3, W * 0.14, H * 0.4);
+  const s = src.sim || {}, hold = s.poss && !s.pass ? (src.dots[s.poss] || [])[s.holder] : null;
+  for (const k of ['home', 'away']) {
+    g.fillStyle = `hsl(${v.hud.hue[k]},80%,${k === 'home' ? 58 : 50}%)`;
+    for (const d of src.dots[k]) { if (d.off) continue; g.beginPath(); g.arc(3 + d.x * (W - 6), 3 + d.y * (H - 6), d === hold ? 3.6 : 2.6, 0, Math.PI * 2); g.fill(); }
+  }
+  if (hold && !hold.off) { g.strokeStyle = '#ffe14d'; g.lineWidth = 1.5; g.beginPath(); g.arc(3 + hold.x * (W - 6), 3 + hold.y * (H - 6), 5, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(3 + src.ball.x * (W - 6), 3 + src.ball.y * (H - 6), 2.2, 0, Math.PI * 2); g.fill();
+}
+function showIntroCard(v){
+  const el = document.getElementById('mvIntro'); if (!el) return;
+  const h = v.hud.hue;
+  el.innerHTML = `<div class="mi-comp">${esc(v.m.compName || '')}</div><div class="mi-row"><div class="mi-t" style="--k:hsl(${h.home},78%,50%)"><b>${esc(v.hud.home)}</b><span>${esc(v.m.home)}</span></div><div class="mi-vs">VS</div><div class="mi-t" style="--k:hsl(${h.away},78%,50%)"><b>${esc(v.hud.away)}</b><span>${esc(v.m.away)}</span></div></div><div class="mi-tap">Tap to skip</div>`;
+  el.classList.add('on');
+}
+function endCinema(){
+  const a = document.getElementById('mvIntro'); if (a) a.classList.remove('on');
+  const b = document.getElementById('mvReplay'); if (b) b.classList.remove('on');
+}
+function skipCinema(){ const v = VIEW; if (!v) return; if (v.intro != null) v.intro = 0.0001; if (v.replay) v.replay.t = v.replay.to; }
+// Runs the fly-over or a replay instead of the live match. Returns false when there is nothing to show.
+function cinematic(v, now, dt){
+  if (v.skip) { v.intro = null; v.replay = null; v.replayView = null; endCinema(); return false; }
+  if (v.intro != null) {
+    if (!v.paused) v.intro -= dt;
+    if (v.intro <= 0) { v.intro = null; endCinema(); sfx('whistle'); return false; }
+    const k = 1 - v.intro / INTRO_LEN;
+    v.three.render({ ...v, introT: k, sim: { ...v.sim, t: (v.sim.t || 0) + k * INTRO_LEN } }, now);
+    hudRender(v);
+    requestAnimationFrame(viewTick); return true;
+  }
+  const R = v.replay;
+  if (!v.paused) R.t += dt * R.rate;
+  if (R.t >= R.to) { v.replay = null; v.replayView = null; endCinema(); return false; }
+  v.replayView = replayFrame(v, R.t);
+  v.three.render(v.replayView, now);
+  hudRender(v);
+  requestAnimationFrame(viewTick); return true;
+}
+// Recording: the last eight seconds of play, so a goal can be shown again in slow motion.
+function recFrame(v){
+  const s = v.sim; if (!s) return;
+  const R = v.rec || (v.rec = []);
+  if (!R.length || s.t > R[R.length - 1].t + 1e-4) {
+    const pack = side => v.dots[side].map(d => [d.x, d.y, d.off ? 1 : 0]);
+    R.push({ t: s.t, b: [v.ball.x, v.ball.y, v.ball.z || 0], d: { home: pack('home'), away: pack('away') }, phase: s.phase, strike: s.strike, tackle: s.tackle, dive: s.dive, net: s.net, poss: s.poss, holder: s.holder, pass: !!s.pass, atk: s.attack ? s.attack.side : null });
+    while (R.length && R[0].t < s.t - 8) R.shift();
+  }
+  if (s.phase === 'celebrate' && v.lastPhase !== 'celebrate' && s.celebrate) v.goalAt = { t: s.t, side: s.celebrate.side };
+  if (v.lastPhase === 'celebrate' && s.phase !== 'celebrate' && v.goalAt && (PREFS.speed || 2) <= 4 && PREFS.replays !== false && R.length > 10) {
+    const from = Math.max(R[0].t, v.goalAt.t - 3.4);
+    v.replay = { t: from, to: v.goalAt.t + 0.6, rate: 0.6, side: v.goalAt.side === 'home' ? 1 : -1, cut: true };
+    const b = document.getElementById('mvReplay'); if (b) b.classList.add('on');
+    v.goalAt = null;
+  }
+  v.lastPhase = s.phase;
+}
+function replayFrame(v, t){
+  const R = v.rec; let lo = 0, hi = R.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (R[mid].t <= t) lo = mid; else hi = mid; }
+  const a = R[lo], b = R[hi] || a, k = b.t > a.t ? Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t))) : 0, L = (x, y) => x + (y - x) * k;
+  const dots = {};
+  for (const side of ['home', 'away']) dots[side] = v.dots[side].map((d0, i) => { const p = a.d[side][i] || [d0.x, d0.y, 0], q = b.d[side][i] || p; return { id: d0.id, name: d0.name, x: L(p[0], q[0]), y: L(p[1], q[1]), off: !!p[2] }; });
+  return { m: v.m, dots, ball: { x: L(a.b[0], b.b[0]), y: L(a.b[1], b.b[1]), z: L(a.b[2], b.b[2]) }, replay: v.replay, score: v.score,
+    sim: { t, phase: a.phase === 'celebrate' ? 'play' : a.phase, strike: a.strike, tackle: a.tackle, dive: a.dive, net: a.net, poss: a.poss, holder: a.holder, pass: a.pass ? {} : null, attack: a.atk ? { side: a.atk } : null, goalKick: true, celebrate: null } };
+}
+
+// ── Rewards after the final whistle: XP counts up, the level bar fills, streaks and level-ups ──
+function resultHero(m){
+  if (!m || !m.result) return '';
+  const t = { W: 'VICTORY', D: 'DRAW', L: 'DEFEAT' }[m.result];
+  return `<div class="res res-${m.result}"><b>${t}</b></div>`;
+}
+function rewardsHTML(rw){
+  if (!rw) return '';
+  const b = rw.before;
+  return `<div class="rw">
+    <div class="rw-h"><span class="rw-lv">LEVEL <b id="rwLv">${b.level}</b></span><span class="rw-ti" id="rwTi">${esc(b.title)}</span><span class="rw-xp">+<b id="rwXp">0</b> XP</span></div>
+    <div class="rw-bar"><span id="rwFill" style="width:${Math.min(100, b.pct)}%"></span></div>
+    <div class="rw-parts">${rw.parts.map(([l, n], i) => `<div class="rw-p" style="animation-delay:${0.2 + i * 0.16}s"><span>${esc(l)}</span><b class="${n > 0 ? 'up' : n < 0 ? 'dn' : ''}">${n > 0 ? '+' + n : n}</b></div>`).join('')}</div>
+    ${rw.streak >= 2 ? `<div class="rw-streak">🔥 ${rw.streak} wins in a row${rw.best > rw.streak ? ` <span class="small dim">· best ${rw.best}</span>` : rw.streak >= 3 ? ' <span class="small">· your best yet!</span>' : ''}</div>` : rw.unbeaten >= 3 ? `<div class="rw-streak">🛡 ${rw.unbeaten} games unbeaten</div>` : ''}
+    ${rw.cash ? `<div class="small" style="text-align:center;margin-top:6px">💰 ${money(rw.cash)} prize money added to your balance</div>` : ''}
+    <div class="rw-up" id="rwUp"></div>
+  </div>`;
+}
+function confettiBurst(el){
+  if (!el) return;
+  const cols = ['#ffd740', '#00e5cc', '#ff5252', '#4da6ff', '#ffffff', '#00e676'];
+  for (let i = 0; i < 46; i++) {
+    const c = document.createElement('i'); c.className = 'cf';
+    c.style.cssText = `left:${Math.random() * 100}%;background:${cols[i % cols.length]};animation-duration:${1.2 + Math.random() * 1.3}s;animation-delay:${Math.random() * 0.25}s;transform:rotate(${Math.random() * 360}deg)`;
+    el.appendChild(c); setTimeout(() => c.remove(), 2900);
+  }
+}
+function animateRewards(rw){
+  if (!rw) return;
+  const xpEl = document.getElementById('rwXp'), fill = document.getElementById('rwFill');
+  const t0 = performance.now(), dur = 1300;
+  const count = now => { const k = Math.min(1, (now - t0) / dur); if (xpEl && document.body.contains(xpEl)) { xpEl.textContent = Math.round(rw.xp * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(count); } };
+  requestAnimationFrame(count);
+  if (!fill) return;
+  setTimeout(() => {
+    if (rw.after.level > rw.before.level) {
+      fill.style.width = '100%';
+      setTimeout(() => {
+        if (!document.body.contains(fill)) return;
+        document.getElementById('rwLv').textContent = rw.after.level; document.getElementById('rwTi').textContent = rw.after.title;
+        const up = document.getElementById('rwUp'); up.innerHTML = `⭐ LEVEL UP! <small>You are now a level ${rw.after.level} ${esc(rw.after.title)}</small>`; up.classList.add('on');
+        confettiBurst(up.parentElement); sfx('levelup');
+        fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = ''; fill.style.width = Math.min(100, rw.after.pct) + '%';
+      }, 950);
+    } else fill.style.width = Math.min(100, rw.after.pct) + '%';
+  }, 350);
 }
 
 // ── 2D match viewer ─────────────────────────────────────────────────
@@ -543,6 +757,8 @@ function normalizeMatch(x){
 }
 function playHalf(match, fromMin, toMin, done){
   const mode = PREFS.viewMode || '3d';
+  document.getElementById('genMoContent').classList.remove('mvx');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   const m = normalizeMatch(match);
   if (mode === 'instant' || !m.lineups.home.length) return done();
   openMo('genMo');
@@ -550,7 +766,7 @@ function playHalf(match, fromMin, toMin, done){
   document.getElementById('genMoContent').innerHTML = `
     <div class="small dim" style="text-align:center">${esc(m.compName || '')}</div>
     <div class="mv-bar"><div class="mv-score" id="mvScore"></div><div class="mv-clock" id="mvClock"></div></div>
-    ${mode === 'commentary' ? '' : use3d ? `<div class="mv3d" id="mv3d"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam">${[['tv', 'TV'], ['close', 'Close'], ['high', 'Tactical'], ['goal', 'Goal']].map(([c, l]) => `<button onclick="PREFS.cam='${c}';savePrefs()">${l}</button>`).join('')}</div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas></div>'}
+    ${mode === 'commentary' ? '' : use3d ? `<div class="mv3d" id="mv3d" onclick="skipCinema()"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam"><button id="mvCamBtn" onclick="event.stopPropagation();cycleCam()">🎥 TV</button><button onclick="event.stopPropagation();toggleFull()" title="Full screen" aria-label="Full screen">⛶</button></div><div class="mv-bug" id="mvBug"></div><canvas class="mv-radar" id="mvRadar" width="168" height="108"></canvas><div class="mv-replay" id="mvReplay">REPLAY</div><div class="mv-intro" id="mvIntro"></div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas></div>'}
     <div class="row mt8">${[1, 2, 4, 8].map(s => `<button class="btn bsm ${((PREFS.speed || 2) === s) ? 'bact' : 'bg'}" onclick="setSpeed(${s})">${s}×</button>`).join('')}
       <button class="btn bsm bg" id="mvPause" onclick="togglePause()">⏸ Pause</button><button class="btn bsm bs" onclick="skipHalf()">Skip ⏭</button>
       <select onchange="PREFS.viewMode=this.value;savePrefs()" style="width:auto;padding:4px 6px;font-size:11px">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -574,9 +790,13 @@ async function start3D(v){
   try {
     const mod = await import('./match3d.js');
     if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'] });
+    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m) });
+    document.getElementById('genMoContent').classList.add('mvx');
+    hudInit(v);
+    if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
   } catch (e) {
     console.warn('3D unavailable, using 2D', e);
+    document.getElementById('genMoContent').classList.remove('mvx');
     const box = document.getElementById('mv3d');
     if (box) box.outerHTML = '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas></div>';
   }
@@ -622,6 +842,7 @@ function statsRender(){
 function viewTick(now){
   const v = VIEW; if (!v || v.finished) return;
   const dt = Math.min(0.1, (now - v.last) / 1000); v.last = now;
+  if (v.three && (v.intro != null || v.replay) && cinematic(v, now, dt)) return;
   const nextEv = v.m.events[v.idx];
   if (!v.paused) {
     let rate = (PREFS.speed || 2) * 1.5;
@@ -634,7 +855,7 @@ function viewTick(now){
   if (changed) { feedRender(); statsRender(); }
   const clock = document.getElementById('mvClock'); if (clock) clock.textContent = `${Math.floor(v.minute)}'`;
   stepPositions(now, v.paused ? 0 : dt);
-  if (v.three) v.three.render(v, now); else drawPitch(now);
+  if (v.three) { recFrame(v); v.three.render(v, now); hudRender(v); } else drawPitch(now);
   if (v.minute >= v.to && !(v.hold > 0)) {
     v.finished = true;
     const done = v.done;
@@ -904,7 +1125,7 @@ async function resumeMatch(withChanges){
   const next = () => { if (r.halftime) playHalf(r.halftime, 0, 45, () => showHalftime(r.halftime)); else afterWeek(r.out, true); };
   if (!finished) return next();
   const end = finished.events.some(e => e.min > 90) ? 120 : 90;
-  playHalf(finished, 45, end, () => showFullTime(finished, next));
+  playHalf(finished, 45, end, () => showFullTime(finished, next, r.out && r.out.rewards));
 }
 
 function matchReportHTML(m){
@@ -922,9 +1143,11 @@ function matchReportHTML(m){
     <div class="card" style="padding:10px;max-height:260px;overflow-y:auto">${m.events.filter(e => e.type !== 'shot').length ? m.events.filter(e => e.type !== 'shot').map(e => `<div class="small" style="padding:3px 0">${e.min}' ${esc(e.text)} <span class="dim">· ${esc(e.club)}</span></div>`).join('') : '<div class="small dim">A quiet game.</div>'}</div>`;
 }
 function rb10(r){ return `<b style="color:${r >= 8 ? 'var(--gold)' : r >= 7 ? 'var(--gr)' : r >= 6 ? 'var(--tx)' : 'var(--rd)'}">${Number(r).toFixed(1)}</b>`; }
-function showMatchReport(m){
+function showMatchReport(m, rw){
   openMo('genMo');
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}<button class="btn bp fw" onclick="closeMo('genMo')">Continue</button>`;
+  document.getElementById('genMoContent').classList.remove('mvx');
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${resultHero(m)}${rewardsHTML(rw)}${matchReportHTML(m)}<button class="btn bp fw" onclick="closeMo('genMo')">Continue</button>`;
+  animateRewards(rw);
 }
 
 function showSeasonEnd(s, m){
@@ -999,6 +1222,7 @@ function rInbox(){
   const bids = STATE.pendingBids || [];
   return `<div class="sct">Inbox</div>
     ${bids.length ? `<div class="card"><div class="ch">Offers for your players</div>${bids.map(bidRow).join('')}</div>` : ''}
+    ${(STATE.loanedOut || []).length ? loanWatchCard(true) : ''}
     ${STATE.expiringContracts.length ? `<div class="card"><div class="ch">Contracts in their final year</div>${STATE.expiringContracts.map(p => `<div class="lbr"><div style="flex:1">${esc(p.name)} <span class="dim small">age ${p.age} · ${p.ovr} · ${money(p.weeklyWage)}/wk</span></div><button class="btn bac bxs" onclick="openRenew(${p.id})">Renew</button></div>`).join('')}</div>` : ''}
     <div class="card"><div class="ch">Messages</div>${(STATE.inbox || []).map(inboxRow).join('') || '<div class="small dim">Nothing yet.</div>'}</div>`;
 }
@@ -1053,6 +1277,7 @@ function rSquad(){
   <div class="card" style="padding:0;overflow:hidden" id="sqList">
     <div class="pl pl-h hide-m"><span>Pos</span><span>Rating</span><span>Player</span><span>Condition · morale</span><span>Form · season</span><span>Potential</span><span style="text-align:right">Value</span></div>
     ${body}</div>
+  ${loanWatchCard()}
   <div class="small dim">Tap a player for his profile, talks, contract and transfer options. Rating colours: <span class="rb q1">35</span> <span class="rb q2">45</span> <span class="rb q3">55</span> <span class="rb q4">65</span> <span class="rb q5">75</span> <span class="rb q6">85</span> · ▲ shows improvement this season.</div>`;
 }
 function filterSquad(){
@@ -1079,7 +1304,7 @@ async function showPlayer(id){
     <div class="g4" style="margin-bottom:12px">${[['Condition', p.fit + '%'], ['Morale', p.mor], ['Contract', p.contractYears + ' yr'], ['Value', money(p.marketValue)], ['Career apps', p.apps + (p.subApps ? '+' + p.subApps : '')], ['Goals', p.goals], ['Assists', p.assists], ['Wage', money(p.weeklyWage) + '/wk']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
     <div class="small dim" style="margin-bottom:12px">Development outlook: <b style="color:var(--tx)">${esc(p.hint)}</b></div>
     ${mine && !p.loan ? `<div class="row" style="margin-bottom:8px"><span class="small dim">Talk:</span>${[['praise', 'Praise'], ['demand', 'Demand more'], ['promise', 'Promise games'], ...(p.wantsOut ? [['stay', 'Persuade to stay']] : [])].map(([k, l]) => `<button class="btn bg bxs" onclick="talkTo(${p.id},'${k}')">${l}</button>`).join('')}</div>` : ''}
-    <div class="row">${mine && !p.loan ? `<button class="btn bac bsm" onclick="openRenew(${p.id})">Renew</button><button class="btn bo bsm" onclick="listPlayer(${p.id})">${p.listedForSale ? 'Unlist' : 'List for sale'}</button><button class="btn br bsm" onclick="sellPlayer(${p.id})">Sell to best bidder</button><button class="btn bg bsm" onclick="releasePlayer(${p.id})">Release</button>` : ''}
+    <div class="row">${mine && !p.loan ? `<button class="btn bac bsm" onclick="openRenew(${p.id})">Renew</button><button class="btn bo bsm" onclick="listPlayer(${p.id})">${p.listedForSale ? 'Unlist' : 'List for sale'}</button><button class="btn br bsm" onclick="sellPlayer(${p.id})">Sell to best bidder</button><button class="btn bg bsm" onclick="releasePlayer(${p.id})">Release</button><button class="btn bs bsm" onclick="openLoanOut(${p.id})">🔁 Loan out</button>` : ''}
     ${!mine ? `<button class="btn bp bsm" onclick="openBid(${p.id})">${p.fromClubId ? 'Make offer' : 'Sign free agent'}</button>${p.loanAvailable && p.fromClubId ? `<button class="btn bs bsm" onclick="openLoan(${p.id})">Loan</button>` : ''}${p.fog && !(extra && extra.scouting) ? `<button class="btn bs bsm" onclick="scoutPlayer(${p.id})">🔭 Scout</button>` : ''}` : ''}
     <button class="btn bg bsm" onclick="promptRename('player', ${p.id}, '${esc(p.name).replace(/'/g, "\'")}')">Rename</button>
     <button class="btn bg bsm" onclick="closeMo('genMo')">Close</button></div>`;
@@ -1109,6 +1334,58 @@ async function releasePlayer(id){
 }
 
 // ── LINEUP ──────────────────────────────────────────────────────────
+
+// ── Loans out ───────────────────────────────────────────────────────
+// Offers come from clubs that would play him; you see his expected role, the fee, how much of
+// his wage they cover and what that saves you each week.
+async function openLoanOut(id){
+  const r = await api('/api/loan-out/' + id);
+  if (!r || !r.ok) return notify((r && r.error) || 'No loan offers', 'w');
+  const role = o => o.role === 'starter' ? '<span class="tag tg">EXPECTED TO START</span>' : '<span class="tag tb2">ROTATION</span>';
+  openMo('genMo');
+  document.getElementById('genMoContent').innerHTML = `
+    <div class="row" style="margin-bottom:8px"><button class="btn bg bsm" onclick="showPlayer(${id})">‹ Back</button><div class="mo-title" style="margin:0;flex:1">Loan out ${esc(r.name)}</div></div>
+    <div class="small dim" style="margin-bottom:10px">Season-long loan: he plays for them and comes back at the end of the season with a report on how he did. Regular games help young players improve. You keep paying the part of his wage (${money(r.weeklyWage)}/wk) that they do not cover. ${r.windowOpen ? 'You can recall him while a window is open.' : ''}</div>
+    ${r.windowOpen ? '' : '<div class="banner or">The transfer window is closed. You can look at the offers now and send him when it opens.</div>'}
+    ${r.offers.length ? r.offers.map(o => `<div class="pk" ${r.windowOpen ? `onclick="confirmLoanOut(${id},${o.clubId})"` : ''}>
+      <div class="pk-top"><div class="pk-n"><b>${esc(o.club)}</b><div class="small dim">${esc(o.league)} · ${esc(o.country)} · team rating ${o.clubRating}</div></div>${role(o)}</div>
+      <div class="pk-stats"><span><i>They pay</i><b>${o.wageShare}%</b></span><span><i>You save</i><b style="color:var(--gr)">${money(o.wagePaid)}/wk</b></span><span><i>Loan fee</i><b>${o.fee ? money(o.fee) : '–'}</b></span></div>
+      ${r.windowOpen ? '<div class="pk-foot"><span class="small dim">Tap to agree</span><span class="pk-go">Send on loan ›</span></div>' : ''}
+    </div>`).join('') : '<div class="small dim">No club wants him right now: clubs borrow players who would get games for them. Try again later, or when he improves.</div>'}`;
+}
+async function confirmLoanOut(id, clubId){
+  const r = await post('/api/loan-out', { playerId: id, clubId });
+  applyCurrent(r);
+  if (!r.ok) return notify(r.error || 'Loan failed', 'd');
+  closeMo('genMo'); sfx('click');
+  notify(`${r.player} joins ${r.club} on loan`, 'g'); refresh();
+}
+async function recallLoan(id){
+  if (!confirm('End his loan and bring him back now?')) return;
+  const r = await post('/api/loan-recall', { playerId: id });
+  applyCurrent(r); notify(r.ok ? `${r.player} is back` : r.error, r.ok ? 'g' : 'd'); refresh();
+}
+function loanWatchCard(compact){
+  const L = STATE.loanedOut || [];
+  if (!L.length) return compact ? '' : '<div class="small dim" style="margin:-4px 0 12px">Nobody is out on loan. Open a player and choose 🔁 Loan out to give him games elsewhere.</div>';
+  return `<div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">🔁 Out on loan <span class="small dim">${L.length} player${L.length > 1 ? 's' : ''} · how they are doing</span></div>
+    ${L.map(p => { const st = p.loanStats || {}, d = (st.ovr || 0) - (st.ovrFrom || 0);
+      return `<div class="lu-row" onclick="showLoanee(${p.id})">${posPill(p.position)}${rb(p.ovr)}<span class="lu-n"><b>${esc(p.name)} ${d > 0 ? `<span class="up-a">▲${d}</span>` : d < 0 ? `<span class="dn-a">▼${-d}</span>` : ''}</b><span class="small dim">${esc(p.loanClub)} · ${esc(p.loanLeague)}</span></span>
+        <span class="lw-st"><b>${st.apps || 0}</b><i>games</i></span><span class="lw-st"><b>${st.goals || 0}</b><i>goals</i></span><span class="lw-st hide-m"><b>${st.assists || 0}</b><i>assists</i></span>
+        ${compact ? '' : `<button class="btn bg bxs" onclick="event.stopPropagation();recallLoan(${p.id})">Recall</button>`}</div>`; }).join('')}</div>`;
+}
+function showLoanee(id){
+  const p = (STATE.loanedOut || []).find(x => x.id === id); if (!p) return;
+  const st = p.loanStats || {};
+  openMo('genMo');
+  document.getElementById('genMoContent').innerHTML = `
+    <div class="mo-title">${esc(p.name)} <span class="small dim">on loan</span></div>
+    <div class="small dim" style="margin-bottom:10px">${esc(p.position)} · age ${p.age} · at ${esc(p.loanClub)} (${esc(p.loanLeague)}) until the end of the season${p.loanRole ? ` · went as ${p.loanRole === 'starter' ? 'a starter' : 'a rotation player'}` : ''}</div>
+    <div class="g4" style="margin-bottom:10px">${[['Games', st.apps || 0], ['Goals', st.goals || 0], ['Assists', st.assists || 0], ['Ability', `${st.ovrFrom}${st.ovr !== st.ovrFrom ? ' → ' + st.ovr : ''}`]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:18px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+    <div class="card small"><div class="sr"><span>They cover</span><b>${money(p.wagePaid)}/wk of ${money(p.weeklyWage)}/wk</b></div><div class="sr"><span>Loan fee received</span><b>${p.loanFee ? money(p.loanFee) : '–'}</b></div><div class="sr"><span>Potential</span><span class="stars">${stars(p.pot)}</span></div><div class="sr"><span>Contract</span><span>${p.contractYears} yr${p.contractYears === 1 ? '' : 's'} left</span></div></div>
+    <button class="btn br fw" onclick="recallLoan(${p.id})">Recall him now</button><button class="btn bg fw mt4" onclick="closeMo('genMo')">Close</button>`;
+}
+
 // ── Lineup: tap a player, compare him with the alternatives, choose ──
 // The rating shown for a slot is the same sum the match engine uses: the mean of that position's
 // four key attributes, minus a penalty when it is not the player's natural position.

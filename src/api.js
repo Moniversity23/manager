@@ -204,6 +204,9 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
 
   route('POST', '/api/transfer', action(b => world.buyPlayer(b.playerId, b.fromClubId || null, b.fee || 0)), { world: true });
   route('POST', '/api/loan', action(b => world.loanIn(b.playerId, b.fromClubId, b.loanFee, b.wageContribution)), { world: true });
+  route('GET', /^\/api\/loan-out\/(\d+)$/, read((b, m) => world.loanOutOptions(Number(m[1]))), { world: true });
+  route('POST', '/api/loan-out', action(b => world.loanOut(Number(b.playerId), Number(b.clubId))), { world: true });
+  route('POST', '/api/loan-recall', action(b => world.recallLoan(Number(b.playerId))), { world: true });
   route('POST', '/api/release', async (m, b, q) => (b.dryRun ? world.releasePlayer(b.playerId, true) : action(x => world.releasePlayer(x.playerId))(m, b, q)), { world: true });
   route('POST', /^\/api\/bids\/([\w-]+)\/counter$/, action((b, m) => world.counterBid(m[1], b.fee)), { world: true });
   route('POST', /^\/api\/bids\/([\w-]+)\/accept$/, action((b, m) => world.acceptBid(m[1])), { world: true });

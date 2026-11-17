@@ -57,6 +57,28 @@ function settleWeekly(world, report) {
   return w;
 }
 
+// Match XP: every game you manage moves you towards the next manager level, so each result
+// counts for something. Wins in a row add a growing streak bonus (capped at five).
+function matchXp(world, report) {
+  const ch = ensure(world);
+  if (!report || !report.result || !report.myKey) return null;
+  const home = report.myKey === 'home', gf = home ? report.hg : report.ag, ga = home ? report.ag : report.hg;
+  const parts = [['Match played', 3]];
+  if (report.result === 'W') parts.push(['Win', 10]); else if (report.result === 'D') parts.push(['Draw', 4]);
+  if (gf > 0) parts.push([`${Math.min(gf, 5)} goal${gf > 1 ? 's' : ''} scored`, Math.min(gf, 5)]);
+  if (ga === 0) parts.push(['Clean sheet', 4]);
+  if (gf - ga >= 3) parts.push(['Big win', 5]);
+  ch.streak = report.result === 'W' ? (ch.streak || 0) + 1 : 0;
+  ch.unbeaten = report.result === 'L' ? 0 : (ch.unbeaten || 0) + 1;
+  ch.bestStreak = Math.max(ch.bestStreak || 0, ch.streak);
+  if (ch.streak >= 2) parts.push([`🔥 ${ch.streak} wins in a row`, 2 * Math.min(ch.streak, 5)]);
+  const motm = report.motm && report.ratings && report.ratings[report.myKey].some(x => x.playerId === report.motm.playerId);
+  if (motm) parts.push(['Man of the match is yours', 2]);
+  const xp = parts.reduce((t, [, n]) => t + n, 0);
+  ch.points += xp;
+  return { xp, parts, streak: ch.streak, unbeaten: ch.unbeaten, best: ch.bestStreak };
+}
+
 function reward(world, c) {
   const ch = ensure(world);
   ch.points += c.pts;
@@ -138,4 +160,4 @@ function decodeCode(code) {
   return { seed: parseInt(m[1], 36) >>> 0, countryIdx: parseInt(m[2], 36), clubIdx: club === 'Z' ? null : parseInt(club, 36) };
 }
 
-module.exports = { setWeekly, settleWeekly, startSeason, weeklySeason, endSeason, score, level, encodeCode, decodeCode, ensure, WEEKLY, SEASON };
+module.exports = { matchXp, setWeekly, settleWeekly, startSeason, weeklySeason, endSeason, score, level, encodeCode, decodeCode, ensure, WEEKLY, SEASON };

@@ -55,11 +55,12 @@ function netTexture() {
   return t;
 }
 
-function skyTexture() {
+function skyTexture(night) {
   const c = document.createElement('canvas'); c.width = 8; c.height = 256;
   const g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#1f5fc4'); gr.addColorStop(0.38, '#4f95e6'); gr.addColorStop(0.5, '#bfe0fb'); gr.addColorStop(1, '#bfe0fb');
+  if (night) { gr.addColorStop(0, '#02040a'); gr.addColorStop(0.38, '#08142b'); gr.addColorStop(0.5, '#1a2c4a'); gr.addColorStop(1, '#1a2c4a'); }
+  else { gr.addColorStop(0, '#1f5fc4'); gr.addColorStop(0.38, '#4f95e6'); gr.addColorStop(0.5, '#bfe0fb'); gr.addColorStop(1, '#bfe0fb'); }
   g.fillStyle = gr; g.fillRect(0, 0, 8, 256);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -175,13 +176,29 @@ function buildStands(scene, homeHue, awayHue, low) {
   return { crowds, flashSpots };
 }
 
-function buildFloodlights(scene) {
+function glowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 2, 64, 64, 62);
+  gr.addColorStop(0, 'rgba(255,255,245,1)'); gr.addColorStop(0.18, 'rgba(255,248,215,.75)'); gr.addColorStop(0.45, 'rgba(255,240,190,.18)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+
+// Four floodlight towers. At night each one lights the pitch (and casts its own shadow under every
+// player, the X of shadows you see at a floodlit match) and wears a glowing halo.
+const TOWERS = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => [x * (PX / 2 + 16), 36, z * (PZ / 2 + 16)]);
+function buildFloodlights(scene, night) {
   const mat = new THREE.MeshLambertMaterial({ color: 0xb9c2ce });
-  const lamp = new THREE.MeshBasicMaterial({ color: 0xfffbe8 });
-  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const px = x * (PX / 2 + 16), pz = z * (PZ / 2 + 16);
+  const lamp = new THREE.MeshBasicMaterial({ color: night ? 0xffffff : 0xfffbe8 });
+  const glow = night ? new THREE.SpriteMaterial({ map: glowTexture(), color: 0xfff6dc, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }) : null;
+  for (const [px, py, pz] of TOWERS) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 36, 8), mat); pole.position.set(px, 18, pz); scene.add(pole);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(6, 3.4, 0.6), lamp); head.position.set(px, 36, pz); head.lookAt(0, 0, 0); scene.add(head);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(6, 3.4, 0.6), lamp); head.position.set(px, py, pz); head.lookAt(0, 0, 0); scene.add(head);
+    if (glow) {
+      const sp = new THREE.Sprite(glow); sp.scale.set(34, 34, 1); sp.position.set(px * 0.985, py, pz * 0.985); scene.add(sp);
+      const l = new THREE.DirectionalLight(0xfff4e0, 0.62); l.position.set(px, py + 6, pz); scene.add(l);
+    }
   }
 }
 
@@ -260,7 +277,7 @@ function playerGeometry() {
     shin: cyl(0.057, 0.04, 0.4, -0.2, 8), sock: cyl(0.062, 0.047, 0.3, -0.24, 8), boot,
     shoulder: new THREE.SphereGeometry(0.07, 8, 6), upper: cyl(0.055, 0.045, 0.27, -0.135, 8), sleeve: cyl(0.066, 0.062, 0.15, -0.07, 8),
     fore: cyl(0.044, 0.034, 0.25, -0.125, 8), hand,
-    blob: new THREE.PlaneGeometry(1.5, 1.5),
+    blob: new THREE.PlaneGeometry(1.5, 1.5), streak: new THREE.PlaneGeometry(2.4, 0.62),
   };
 }
 
@@ -300,7 +317,18 @@ function makePlayer(geo, m) {
     return { sh, el };
   };
   const blob = new THREE.Mesh(geo.blob, m.blob); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.03; blob.renderOrder = 1; g.add(blob);
-  g.userData = { rig, hips, torso, chest, head, blob, legL: leg(0.096), legR: leg(-0.096), armL: arm(0.245), armR: arm(-0.245), sy: S * build.h,
+  // Night: one shadow from each floodlight. They sit in a group that cancels the player's turn,
+  // so they always point away from the towers.
+  let shadows = null;
+  if (m.streak) {
+    shadows = new THREE.Group(); g.add(shadows);
+    for (const [tx, , tz] of TOWERS) {
+      const len = Math.hypot(tx, tz), dx = -tx / len, dz = -tz / len;
+      const st = new THREE.Mesh(geo.streak, m.streak);
+      st.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx)); st.position.set(dx * 1.05, 0.025, dz * 1.05); st.renderOrder = 1; shadows.add(st);
+    }
+  }
+  g.userData = { rig, hips, torso, chest, head, blob, shadows, legL: leg(0.096), legR: leg(-0.096), armL: arm(0.245), armR: arm(-0.245), sy: S * build.h,
     face: 0, ph: Math.random() * 6, spd: 0, mv: 0, lx: null, lz: 0, bank: 0, acc: 0, look: 0, lastSpd: 0, fwd: 1, side: 0 };
   return g;
 }
@@ -380,12 +408,12 @@ function pose(u, a, dt, t, i) {
   u.blob.scale.setScalar(1 - Math.min(0.6, y * 0.9));
 }
 
-export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'] } = {}) {
+export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false } = {}) {
   if (!container) throw new Error('no container');
   const low = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(low ? 1.75 : 2, window.devicePixelRatio || 1));
-  renderer.shadowMap.enabled = !low;
+  renderer.shadowMap.enabled = !low && !night;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -393,21 +421,22 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   container.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xbfe0fb);
-  scene.fog = new THREE.Fog(0xbfe0fb, 220, 560);
+  const fogCol = night ? 0x16243b : 0xbfe0fb;
+  scene.background = new THREE.Color(fogCol);
+  scene.fog = new THREE.Fog(fogCol, 220, 560);
   const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.5, 900);
   camera.position.set(0, 17, 40);
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 16, 12), new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 16, 12), new THREE.MeshBasicMaterial({ map: skyTexture(night), side: THREE.BackSide, fog: false, depthWrite: false }));
   scene.add(sky);
 
-  scene.add(new THREE.HemisphereLight(0xdcecff, 0x3d6b3a, 1.25));
-  const sun = new THREE.DirectionalLight(0xfff1d6, 2.1);
+  scene.add(new THREE.HemisphereLight(night ? 0x9fb4d8 : 0xdcecff, night ? 0x1d3a22 : 0x3d6b3a, night ? 0.7 : 1.25));
+  const sun = new THREE.DirectionalLight(0xfff1d6, night ? 0 : 2.1);
   sun.position.set(-45, 85, 40);
-  sun.castShadow = !low;
+  sun.castShadow = !low && !night;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 50, bottom: -50, near: 10, far: 240 });
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xcfe0ff, 0.55); fill.position.set(50, 60, -40); scene.add(fill);
+  const fill = new THREE.DirectionalLight(0xcfe0ff, night ? 0.2 : 0.55); fill.position.set(50, 60, -40); scene.add(fill);
 
   const pitch = new THREE.Mesh(new THREE.PlaneGeometry(PX, PZ), new THREE.MeshLambertMaterial({ map: pitchTexture() }));
   pitch.rotation.x = -Math.PI / 2; pitch.receiveShadow = true; scene.add(pitch);
@@ -415,7 +444,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; scene.add(ground);
   const nets = { '-1': buildGoal(scene, -1), '1': buildGoal(scene, 1) };
   const { crowds, flashSpots } = buildStands(scene, homeHue, awayHue, low);
-  buildFloodlights(scene);
+  buildFloodlights(scene, night);
   const boardMat = buildBoards(scene, boards);
   const flags = buildCornerFlags(scene);
 
@@ -427,7 +456,8 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const skins = skinCols.map(lam), faces = skinCols.map(c => new THREE.MeshLambertMaterial({ map: faceTexture(c) }));
   const hairs = [0x1a1410, 0x3b2a1a, 0x0c0c0c, 0xc9a45a, 0x6b3a1c].map(lam);
   const boots = [0x15181d, 0xf2f2f2, 0xff5a1f, 0x21d07a, 0x2aa7ff].map(lam);
-  const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false });
+  const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: night ? 0.55 : 1 });
+  const streakMat = night ? new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.4 }) : null;
   const kitCol = h => new THREE.Color().setHSL(h / 360, 0.78, 0.48);
   const team = {
     home: { hue: homeHue, pattern: Math.round(homeHue / 7) % 4, sleeve: lam(kitCol(homeHue)), shorts: lam(0xf4f4f4), sock: lam(kitCol(homeHue)) },
@@ -495,7 +525,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         const mats = gk
           ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
           : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
-        Object.assign(mats, { skin: skins[n % skins.length], face: faces[n % skins.length], hair: hairs[(n >> 2) % hairs.length], hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat,
+        Object.assign(mats, { skin: skins[n % skins.length], face: faces[n % skins.length], hair: hairs[(n >> 2) % hairs.length], hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat,
           build: { h: 0.95 + (n % 7) * 0.017 + (gk ? 0.03 : 0), w: 0.96 + ((n >> 3) % 5) * 0.024 } });   // no two players are the same size
         const p = makePlayer(geo, mats);
         p.userData.face = side === 'home' ? 0 : Math.PI;
@@ -552,6 +582,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           if (a.cel === 'sad' && speed < 0.9) want = u.face;
           const turned = turn(u, want, dt * (a.strike != null ? 22 : 9));
           p.rotation.y = u.face;
+          if (u.shadows) u.shadows.rotation.y = -u.face;
           a.turn = turned / dt; a.rel = speed > 0.5 ? wrap(moveAng - u.face) : 0; a.look = wrap(ballAng - u.face); a.near = ballDist < 7 && by < 1.2; a.dribble = dribble;
           pose(u, a, dt, t, i);
         });
@@ -639,7 +670,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         pointer.position.set(hx, 2.75 + up + Math.sin(t * 5) * 0.08, hz); pointer.rotation.y = t * 2.5;
         if (label) {
           tmp.set(hx, 3.25 + up, hz).project(camera);
-          label.style.display = tmp.z < 1 && !cel ? 'block' : 'none';      // the GOAL banner already names the scorer
+          label.style.display = tmp.z < 1 && !cel && v.introT == null ? 'block' : 'none';      // the GOAL banner already names the scorer
           label.style.left = `${(tmp.x * 0.5 + 0.5) * 100}%`; label.style.top = `${(-tmp.y * 0.5 + 0.5) * 100}%`;
           const nm = (hd.name || '').split(' ').slice(-1)[0]; if (label.textContent !== nm) label.textContent = nm;
         }
@@ -647,8 +678,15 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
 
       // Cameras (smoothing is frame-rate independent)
       const mode = cam(), ease = r => 1 - Math.exp(-dt * r);
-      const near = Math.max(0.74, Math.min(1, viewW / 760));      // small screens sit closer to the action
-      if (cel) {                                   // close-up on the scorer
+      const near = Math.max(0.78, Math.min(1, viewW / 760));      // small screens sit closer to the action
+      if (v.introT != null) {                       // pre-match: sweep round the stadium and settle behind the centre circle
+        const k = v.introT, ang = -2.4 + k * 2.1, r = lerp(95, 40, k * k), h = lerp(46, 13, k);
+        camera.position.set(Math.sin(ang) * r, h, Math.cos(ang) * r); look.set(0, lerp(4, 0.5, k), 0);
+      } else if (v.replay) {                        // replay: low, beside the goal it went into
+        const gs = v.replay.side, cx = gs * (L / 2 - 9), cz = bz > 0 ? bz - 15 : bz + 15;
+        camTarget.set(cx, 3.2, cz); tmp.set(bx, Math.max(0.6, by * 0.7), bz); look.lerp(tmp, ease(9));
+        camera.position.lerp(camTarget, ease(v.replay.cut ? 60 : 4)); v.replay.cut = false;
+      } else if (cel) {                                   // close-up on the scorer
         const sc = v.dots[cel.side][cel.scorer]; const sx = (sc.x - 0.5) * L, sz = (sc.y - 0.5) * W;
         camTarget.set(sx * 0.86, 4.6, sz + (sz > 0 ? -13 : 13)); tmp.set(sx, 1.5, sz); look.lerp(tmp, ease(6));
         camera.position.lerp(camTarget, ease(2.6));
@@ -656,11 +694,11 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         if (mode === 'high') { camTarget.set(bx * 0.25, 88, 36); tmp.set(bx * 0.3, 0, 0); look.lerp(tmp, ease(5)); }
         else if (mode === 'goal') { const s = bx >= 0 ? 1 : -1; camTarget.set(s * (L / 2 + 15), 10, bz * 0.25); tmp.set(bx - s * 6, 1, bz * 0.6); look.lerp(tmp, ease(5)); }
         else if (mode === 'close') { camTarget.set(bx * 0.93, 8.5, bz + 23); tmp.set(bx, 1.1, bz * 0.92); look.lerp(tmp, ease(6)); }
-        else { const zoom = (Math.abs(bx) > 30 ? 0.9 : 1) * near; camTarget.set(bx * 0.86, 15 * zoom, 34 * zoom + bz * 0.38); tmp.set(bx * 0.94, 0.8, bz * 0.6); look.lerp(tmp, ease(4.5)); }
+        else { const zoom = (Math.abs(bx) > 30 ? 0.92 : 1) * near; camTarget.set(bx * 0.88, 12 * zoom, 28 * zoom + bz * 0.42); tmp.set(bx * 0.95, 0.6, bz * 0.66); look.lerp(tmp, ease(4.5)); }
         camera.position.lerp(camTarget, ease(3));
       }
       camera.lookAt(look);
-      if (sim.net) { const age = sim.t - sim.net.t0; if (age < 0.55) { const k = (1 - age / 0.55) * 0.3; camera.position.y += Math.sin(age * 46) * k; camera.position.x += Math.cos(age * 39) * k * 0.6; } }
+      if (sim.net && v.introT == null) { const age = sim.t - sim.net.t0; if (age < 0.55) { const k = (1 - age / 0.55) * 0.3; camera.position.y += Math.sin(age * 46) * k; camera.position.x += Math.cos(age * 39) * k * 0.6; } }
       renderer.render(scene, camera);
     },
     dispose() {

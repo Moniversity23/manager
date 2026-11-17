@@ -526,11 +526,29 @@ class GameWorld {
       const p = this.players.get(x.playerId);
       if (p && p.clubId === me.id) p.ratings = [...(p.ratings || []), x.rating].slice(-5);
     }
-    // Challenges
+    // Challenges and match XP (for the rewards screen after the match)
     const myReport = ws.reports.find(r => r.myKey);
+    // XP for every match you played this week (league and cup), in the order they were played.
+    const score0 = this.flags.lastScore ?? CH.score(this);
+    const mine = ws.reports.filter(r => r.myKey && r.result);
+    let mx = null;
+    for (const rep of mine) {
+      const x = CH.matchXp(this, rep);
+      if (!x) continue;
+      const tag = mine.length > 1 ? `${rep.compName}: ` : '';
+      mx = { ...x, parts: [...(mx ? mx.parts : []), ...x.parts.map(([l, n]) => [tag + l, n])] };
+    }
     const wkc = CH.settleWeekly(this, myReport);
     if (wkc && wkc.status === 'done') this.notify('challenge', `✅ Weekly challenge complete: ${wkc.text} (+${wkc.pts} pts, $${Math.round(wkc.cash / 1000)}K).`);
-    for (const c of CH.weeklySeason(this, ws.reports)) this.notify('challenge', `🏁 Season challenge complete: ${c.text} (+${c.pts} pts, $${Math.round(c.cash / 1000)}K).`);
+    const seasonDone = CH.weeklySeason(this, ws.reports);
+    for (const c of seasonDone) this.notify('challenge', `🏁 Season challenge complete: ${c.text} (+${c.pts} pts, $${Math.round(c.cash / 1000)}K).`);
+    let rewards = null;
+    if (mx) {
+      const parts = [...mx.parts];
+      if (wkc) parts.push(wkc.status === 'done' ? [`✅ Challenge: ${wkc.text}`, wkc.pts] : [`❌ Challenge missed: ${wkc.text}`, 0]);
+      for (const c of seasonDone) parts.push([`🏁 ${c.text}`, c.pts]);
+      rewards = { parts, streak: mx.streak, unbeaten: mx.unbeaten, best: mx.best, cash: (wkc && wkc.status === 'done' ? wkc.cash : 0) + seasonDone.reduce((t, c) => t + (c.cash || 0), 0), score0 };
+    }
     // International break
     const intl = INTL.weekly(this, week);
     if (intl) {
@@ -565,6 +583,14 @@ class GameWorld {
     const reports = ws.reports;
     if (reports.length) this.lastMatch = reports[reports.length - 1];
     const out = { seasonComplete: false, week, totalWeeks: this.totalWeeks, events: ws.events, matchReport: reports[reports.length - 1] || null, reports };
+    if (rewards) {
+      const s1 = CH.score(this);
+      const known = rewards.parts.reduce((t, [, n]) => t + n, 0), other = s1 - rewards.score0 - known;
+      if (other) rewards.parts.push([other > 0 ? 'Reputation' : 'Reputation lost', other]);
+      out.rewards = { ...rewards, xp: s1 - rewards.score0, before: CH.level(rewards.score0), after: lvl };
+      delete out.rewards.score0;
+    }
+    this.flags.lastScore = CH.score(this);
     if (this.currentWeek >= this.totalWeeks) {
       out.endSummary = this._endSeason();
       out.seasonComplete = true;
@@ -896,7 +922,10 @@ class GameWorld {
       if (c.sponsor) c.sponsor.years -= 1;
     }
 
-    // Loans end
+    // Loans end. Your own players come home with a report on how they did.
+    for (const p of this.players.values()) {
+      if (p.loan && p.loan.parentClubId === this.manager.clubId && p.clubId !== this.manager.clubId && !p.retired) this.notify('squad', `↩️ ${p.name} returns from his loan at ${this.clubById(p.clubId)?.name || 'his club'}: ${this._loanLine(p)}.`, { playerId: p.id });
+    }
     for (const p of this.players.values()) {
       if (!p.loan) continue;
       const parent = this.clubById(p.loan.parentClubId);
@@ -1396,6 +1425,111 @@ class GameWorld {
     return { ok: true, player: p.name, loanFee: fee, wageContribution: wage, action: 'loaned' };
   }
 
+  // ── loaning your own players out ──────────────────────────────────
+  // Interested clubs are sides no stronger than yours where he would get games. The terms depend
+  // only on the player and the club (no RNG), so the list is stable while you think it over:
+  // a loan fee (paid by richer clubs for better players) and the share of his wages they cover.
+  _loanRole(p, club) {
+    const mine = positionAbility(p, p.position);
+    const rivals = club.squad.filter(x => !x.retired && x.id !== p.id && x.position === p.position && positionAbility(x, p.position) >= mine).length;
+    const need = { GK: 1, CB: 2, LB: 1, RB: 1, CDM: 1, CM: 2, CAM: 1, LW: 1, RW: 1, ST: 2, CF: 1 }[p.position] || 1;
+    return rivals < need ? 'starter' : rivals < need + 2 ? 'rotation' : 'backup';
+  }
+
+  loanOutOptions(playerId) {
+    const me = this.club();
+    const p = [...me.squad, ...me.youth].find(x => x.id === playerId && !x.retired);
+    if (!p) return { ok: false, error: 'He is not in your squad' };
+    if (p.loan) return { ok: false, error: 'He is on loan here from another club' };
+    if (p.age < 17) return { ok: false, error: 'Players must be 17 or older to go out on loan' };
+    if (p.isInjured()) return { ok: false, error: 'Clubs will not take an injured player on loan' };
+    const avg = c => { const a = c.squad.filter(x => !x.retired); return a.length ? a.reduce((t, x) => t + x.currentAbility, 0) / a.length : 40; };
+    const myAvg = avg(me), base = TR.playerValue(p, this.econ);
+    const roleRank = { starter: 0, rotation: 1, backup: 2 };
+    const cands = [];
+    for (const c of this.clubs) {
+      if (c.id === me.id || c.squad.length >= 32) continue;
+      const ca = avg(c);
+      if (ca > myAvg + 1 || p.currentAbility < ca - 7) continue;           // stronger clubs do not borrow; weak loans are not wanted
+      const role = this._loanRole(p, c);
+      if (role === 'backup') continue;
+      const h = hashString(`loan:${p.id}:${c.id}:${this.season}`);
+      const div = clamp(c.division, 1, 4);
+      const share = clamp(0.4 + (4 - div) * 0.12 + (role === 'starter' ? 0.1 : 0) + (h % 11) / 100, 0.35, 1);
+      const fee = c.finance.balance > 300_000 ? Math.round(base * (0.015 + (4 - div) * 0.012 + (h % 7) / 1000) / 1000) * 1000 : 0;
+      const lg = this.leagueOf(c.id);
+      cands.push({ clubId: c.id, club: c.name, country: c.country, league: lg ? lg.name : '', division: c.division, role,
+        fee, wageShare: Math.round(share * 100), wagePaid: Math.round(p.weeklyWage * share), clubRating: Math.round(ca),
+        sameCountry: c.country === me.country, score: roleRank[role] * 10 + Math.abs(ca - p.currentAbility) / 4 + (c.country === me.country ? 0 : 3) - share * 4 + (h % 5) / 10 });
+    }
+    cands.sort((a, b) => a.score - b.score);
+    const offers = cands.slice(0, 8).map(({ score, ...o }) => o);
+    return { ok: true, playerId: p.id, name: p.name, weeklyWage: p.weeklyWage, ovr: p.currentAbility, offers,
+      windowOpen: this.isWindowOpen(), squadSize: me.squad.filter(x => !x.retired).length };
+  }
+
+  loanOut(playerId, toClubId) {
+    const guard = this._windowGuard();
+    if (guard) return guard;
+    const me = this.club();
+    const opts = this.loanOutOptions(playerId);
+    if (!opts.ok) return opts;
+    const o = opts.offers.find(x => x.clubId === Number(toClubId));
+    if (!o) return { ok: false, error: 'That club is no longer interested' };
+    const p = this.players.get(playerId), to = this.clubById(o.clubId);
+    const youth = me.youth.includes(p);
+    if (!youth && me.squad.filter(x => !x.retired && !x.isInjured()).length <= 16) return { ok: false, error: 'You need at least 16 fit players left in the first-team squad' };
+    if (p.position === 'GK' && !youth && me.squad.filter(x => !x.retired && x.position === 'GK').length <= 2) return { ok: false, error: 'Keep at least two goalkeepers' };
+    me.squad = me.squad.filter(x => x.id !== p.id);
+    me.youth = me.youth.filter(x => x.id !== p.id);
+    to.squad.push(p);
+    p.clubId = to.id;
+    p.listedForSale = false;
+    if (me.captainId === p.id) me.captainId = null;
+    if (me.manualXI) { me.manualXI = me.manualXI.filter(m => m.playerId !== p.id); if (!me.manualXI.length) me.manualXI = null; }
+    if (me.manualBench) { me.manualBench = me.manualBench.filter(id => id !== p.id); if (!me.manualBench.length) me.manualBench = null; }
+    this.pendingBids = (this.pendingBids || []).filter(b => b.playerId !== p.id);
+    p.loan = { parentClubId: me.id, fee: o.fee, wageContribution: o.wagePaid, startSeason: this.season, endSeason: this.season + 1, role: o.role,
+      start: { apps: p.seasonStats.apps, subApps: p.seasonStats.subApps || 0, goals: p.seasonStats.goals, assists: p.seasonStats.assists, ovr: p.currentAbility, week: this.currentWeek } };
+    if (o.fee) { FIN.post(me, 'Loan fees', o.fee, `${p.name} loaned to ${to.name}`); FIN.post(to, 'Loan fees', -o.fee, `${p.name} on loan from ${me.name}`); }
+    this.notify('squad', `🔁 ${p.name} joins ${to.name} on loan until the end of the season (${o.role === 'starter' ? 'expected to start' : 'squad rotation'}). They cover ${o.wageShare}% of his wages${o.fee ? ` and paid a $${Math.round(o.fee / 1000)}K fee` : ''}.`, { playerId: p.id });
+    return { ok: true, action: 'loaned_out', player: p.name, club: to.name, fee: o.fee, wageShare: o.wageShare };
+  }
+
+  recallLoan(playerId) {
+    if (!this.isWindowOpen()) return { ok: false, error: `Loans can only be ended while the window is open. ${this.transferWindow().label}` };
+    const me = this.club();
+    const p = this.players.get(playerId);
+    if (!p || !p.loan || p.loan.parentClubId !== me.id || p.clubId === me.id) return { ok: false, error: 'He is not out on loan from your club' };
+    const at = this.clubById(p.clubId);
+    if (at) at.squad = at.squad.filter(x => x.id !== p.id);
+    const line = this._loanLine(p);
+    me.squad.push(p); p.clubId = me.id; p.loan = null;
+    this.notify('squad', `↩️ ${p.name} is back from ${at ? at.name : 'his loan'}: ${line}.`, { playerId: p.id });
+    return { ok: true, action: 'recalled', player: p.name };
+  }
+
+  _loanStats(p) {
+    const st = p.loan.start || { apps: 0, subApps: 0, goals: 0, assists: 0, ovr: p.currentAbility };
+    const ss = p.seasonStats, same = p.loan.startSeason === this.season;
+    return { apps: ss.apps + (ss.subApps || 0) - (same ? st.apps + st.subApps : 0), goals: ss.goals - (same ? st.goals : 0), assists: ss.assists - (same ? st.assists : 0), ovrFrom: st.ovr, ovr: p.currentAbility };
+  }
+  _loanLine(p) {
+    const s = this._loanStats(p);
+    return `${s.apps} game${s.apps === 1 ? '' : 's'}, ${s.goals} goal${s.goals === 1 ? '' : 's'}, ${s.assists} assist${s.assists === 1 ? '' : 's'}, ability ${s.ovrFrom}${s.ovr !== s.ovrFrom ? ` → ${s.ovr}` : ' (unchanged)'}`;
+  }
+  _loanedOutView() {
+    const me = this.club();
+    const out = [];
+    for (const p of this.players.values()) {
+      if (!p.loan || p.loan.parentClubId !== me.id || p.clubId === me.id || p.retired) continue;
+      const c = this.clubById(p.clubId), lg = c ? this.leagueOf(c.id) : null;
+      out.push({ ...this._playerRow(p), loanClub: c ? c.name : '?', loanClubId: p.clubId, loanLeague: lg ? lg.name : '', loanRole: p.loan.role || null,
+        loanFee: p.loan.fee || 0, wagePaid: p.loan.wageContribution || 0, loanStats: this._loanStats(p) });
+    }
+    return out.sort((a, b) => b.ovr - a.ovr);
+  }
+
   // Mutual termination: the player is paid half of the wages left on his contract.
   releaseTerms(p) {
     const weeksLeftThisSeason = Math.max(0, this.totalWeeks - this.currentWeek);
@@ -1817,6 +1951,7 @@ class GameWorld {
       table, market, topScorers: topScorers.slice(0, 25),
       allLeagues: this.leagues.map(l => ({ id: l.id, name: l.name, country: l.country, level: l.level, clubs: l.clubIds.map(id => { const x = this.clubById(id); return { id: x.id, name: x.name, prestige: x.prestige, division: x.division }; }) })),
       squad: sq.map(p => this._playerRow(p)),
+      loanedOut: this._loanedOutView(),
       youth: c.youth.filter(p => !p.retired).map(p => this._playerRow(p)),
       expiringContracts: finalYear.map(p => ({ id: p.id, name: p.name, age: p.age, ovr: p.currentAbility, contractYears: p.contractYears, weeklyWage: p.weeklyWage })),
       contractAlerts: finalYear.length,

@@ -17,8 +17,10 @@ MongoDB saves with a gzip-file fallback.
   15 achievements.
 - **International football:** national teams pick their best 23; Nations League every season (two groups, five
   matchdays, a final), World Nations Cup every second summer, Elo world rankings, caps and international goals.
-- **Matchday:** **3D stadium view** (three.js: floodlights, stands and crowd, TV / tactical / behind-goal cameras),
-  full 2D, key moments, commentary or instant; 1×–8×. **Sound** (crowd, whistles, goal roars, near-miss "ooh"s),
+- **Matchday:** **3D stadium view** (three.js: day games and floodlit night games, stands and crowd, TV / close /
+  tactical / behind-goal cameras, full-screen landscape on phones) with a broadcast score bug and clock, a radar
+  minimap, a pre-match fly-over and slow-motion goal replays; or full 2D, key moments, commentary or instant;
+  1×–8×. **Sound** (crowd, whistles, goal roars, near-miss "ooh"s),
   synthesised in the browser. A half-time dressing room with **team talks**,
   subs, tactic and formation; assistant subs; cards and bans.
 - **Dressing room:** morale from playing time against expected or promised roles, wage fairness and leaders;
@@ -30,7 +32,10 @@ MongoDB saves with a gzip-file fallback.
   Cheap release clauses get triggered by other clubs.
 - **Market and money:** bids for your players (accept, counter, reject), an itemised weekly ledger, a **season
   budget** (projected income — TV, shirt sponsor with performance bonuses, merchandise, gates, prize money — and
-  costs, transfer and wage budgets), ticket prices, facilities, the debt rule, a second club.
+  costs, transfer and wage budgets), ticket prices, facilities, the debt rule, a second club. **Loans both
+  ways:** borrow players, or send your own out to clubs that will play them (see the expected role, fee and wage
+  share first), follow them in the "Out on loan" list, recall them while a window is open; they return at
+  season end with a report.
 - **One-click decisions:** the dashboard's action centre lists every pending decision with its buttons (bids,
   renewals on the agent's terms, unhappy players, sponsor, jobs, scout reports, lineup problems);
   keyboard shortcuts (Space plays on); delegation of key contracts and bids to the assistant.
@@ -42,7 +47,8 @@ MongoDB saves with a gzip-file fallback.
   side's net, followed by a celebration and a kick-off. Player ratings and a man of the match after every game.
 - **Golden Ball:** a live race for the world's player of the year, a top ten, Golden Boot, Golden Boy and a
   team of the season; a player-of-the-season race in your own league.
-- **Progress:** manager levels and titles from your score, player form (last five ratings) and ▲ growth this
+- **Progress:** manager levels and titles from your score; XP for every match (result, goals, clean sheets, win
+  streaks, challenges) shown on an animated rewards screen at full time; player form (last five ratings) and ▲ growth this
   season, a sortable squad list (position, rating, potential, value, age, wage, form, goals, condition).
 - **Play anywhere:** installs as a PWA; **offline mode** runs the whole game in the browser (Web Worker,
   saves in IndexedDB) and starts by itself when the server is unreachable; careers move between modes.
@@ -156,6 +162,7 @@ All endpoints answer `{ ok, error?, ... }`.
 | POST | `/api/step` | Simulate the rest of the season |
 | POST | `/api/tactics`, `/api/lineup`, `/api/lineup/clear` | Tactics, manual XI + bench |
 | POST | `/api/transfer`, `/api/loan`, `/api/sell`, `/api/release`, `/api/list-player` | Market |
+| GET / POST | `/api/loan-out/:id`, `/api/loan-out`, `/api/loan-recall` | Loan your players out (offers, agree, recall) |
 | POST | `/api/bids/:id/accept`, `/api/bids/:id/reject` | Offers for your players |
 | POST | `/api/renew-contract` | `{playerId, years, dryRun?}` |
 | POST | `/api/upgrade`, `/api/promote-youth`, `/api/scout` | Club |
