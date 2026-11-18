@@ -23,11 +23,53 @@ const DECLINE_TECHNICAL = ['finishing', 'dribbling', 'passing', 'defending'];
 
 function peakEnd(position) { return PEAK_END[position] || 29; }
 
+// Share of the gap to potential closed per season at each age. Players keep improving into their
+// mid-twenties and can still add a little until their positional peak.
 function growthRate(age, pe) {
-  if (age <= 21) return 0.16;
-  if (age <= 25) return 0.09;
-  if (age <= pe) return 0.03;
+  if (age <= 20) return 0.2;
+  if (age <= 23) return 0.16;
+  if (age <= 26) return 0.1;
+  if (age <= pe) return 0.05;
   return 0;
+}
+
+// Everything that speeds up or slows down a player's development, as multipliers. One source for
+// training and for the profile screen ("what drives his development").
+function growthFactors(p, club) {
+  const f = [];
+  const mins = p.recentMinutes || 0;
+  // Playing time matters most for young players, still a lot up to 27.
+  f.push(['Playing time', p.age <= 23 ? clamp(0.55 + mins / 180, 0.55, 1.25) : p.age <= 27 ? clamp(0.75 + mins / 400, 0.75, 1.15) : clamp(0.85 + mins / 600, 0.85, 1.05)]);
+  const r = p.ratings && p.ratings.length ? p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length : (p.seasonStats && p.seasonStats.rn ? p.seasonStats.rs / p.seasonStats.rn : null);
+  if (r != null) f.push(['Match form', clamp(1 + (r - 6.6) * 0.18, 0.85, 1.25)]);
+  f.push(['Personality', PERSONALITY_GROWTH[p.personality] || 1]);
+  f.push(['Morale', clamp(0.9 + (p.morale - 40) / 250, 0.9, 1.1)]);
+  f.push(['Training facilities', 1 + 0.05 * ((club.facilities.training || 1) - 1)]);
+  f.push(['Coaches', staffMod(club, 'coach', 0.02) * (p.age <= 21 ? staffMod(club, 'youth', 0.02) : 1) * (1 + (club.badgeBonus || 0))]);
+  f.push(['Training intensity', 1 + (clamp(club.trainingIntensity || 3, 1, 5) - 3) * 0.05]);
+  const key = POS_ATTRS[p.position] || ATTR_KEYS, focus = FOCUS_ATTRS[club.trainingFocus] || ATTR_KEYS;
+  if (focus !== ATTR_KEYS && key.filter(k => focus.includes(k)).length >= 2) f.push(['Training focus suits his position', 1.06]);
+  if (p.fitness < 60) f.push(['Low condition', 0.9]);
+  return f.map(([k, m]) => [k, Math.round(m * 100) / 100]);
+}
+// The same multipliers as growthFactors, computed without building lists (this runs for every
+// player every week). Club-wide parts are worked out once per club per week.
+function clubGrowth(club) {
+  return { facilities: 1 + 0.05 * ((club.facilities.training || 1) - 1), coach: staffMod(club, 'coach', 0.02) * (1 + (club.badgeBonus || 0)), youth: staffMod(club, 'youth', 0.02),
+    intensity: 1 + (clamp(club.trainingIntensity || 3, 1, 5) - 3) * 0.05, focus: FOCUS_ATTRS[club.trainingFocus] || ATTR_KEYS };
+}
+function growthMultiplier(p, cg) {
+  const mins = p.recentMinutes || 0;
+  let m = p.age <= 23 ? clamp(0.55 + mins / 180, 0.55, 1.25) : p.age <= 27 ? clamp(0.75 + mins / 400, 0.75, 1.15) : clamp(0.85 + mins / 600, 0.85, 1.05);
+  let r = null;
+  if (p.ratings && p.ratings.length) { r = 0; for (const x of p.ratings) r += x; r /= p.ratings.length; }
+  else if (p.seasonStats && p.seasonStats.rn) r = p.seasonStats.rs / p.seasonStats.rn;
+  if (r != null) m *= clamp(1 + (r - 6.6) * 0.18, 0.85, 1.25);
+  m *= (PERSONALITY_GROWTH[p.personality] || 1) * clamp(0.9 + (p.morale - 40) / 250, 0.9, 1.1);
+  m *= cg.facilities * cg.coach * (p.age <= 21 ? cg.youth : 1) * cg.intensity;
+  if (cg.focus !== ATTR_KEYS) { const key = POS_ATTRS[p.position] || ATTR_KEYS; let n = 0; for (const k of key) if (cg.focus.includes(k)) n++; if (n >= 2) m *= 1.06; }
+  if (p.fitness < 60) m *= 0.9;
+  return m;
 }
 
 // Weekly condition recovery. Rises with medical level and the physical attributes (stamina proxies).
@@ -40,19 +82,14 @@ function weeklyRecovery(p, club) {
 }
 
 // Training gains for one player for one week. Returns the attribute points added (always >= 0).
-function trainPlayer(p, club, rng) {
+function trainPlayer(p, club, rng, cg = clubGrowth(club)) {
   if (p.retired || (p.injury && p.injury.weeks > 0)) return 0;
   const pe = peakEnd(p.position);
   const rate = growthRate(p.age, pe);
   const gap = p.hiddenPotential - p.currentAbility;
   if (rate <= 0 || gap <= 0) return 0;
-  const pers = PERSONALITY_GROWTH[p.personality] || 1;
-  // Facilities, first-team coach, head of youth (for 21 and under) and the manager's licence.
-  const train = (1 + 0.05 * ((club.facilities.training || 1) - 1)) * staffMod(club, 'coach', 0.02)
-    * (p.age <= 21 ? staffMod(club, 'youth', 0.02) : 1) * (1 + (club.badgeBonus || 0));
-  const mins = p.recentMinutes || 0;
-  const minutesFactor = p.age <= 23 ? clamp(0.6 + mins / 150, 0.6, 1.15) : clamp(0.85 + mins / 600, 0.85, 1.05);
-  const weeklyOvr = gap * rate / WEEKS_PER_SEASON * pers * train * minutesFactor * rng.float(0.6, 1.4);
+  // Playing time, form, personality, morale, facilities, coaches, intensity and focus (growthFactors).
+  const weeklyOvr = gap * rate / WEEKS_PER_SEASON * growthMultiplier(p, cg) * rng.float(0.6, 1.4);
   const points = Math.max(0, weeklyOvr * ATTR_KEYS.length);
   if (points <= 0) return 0;
   const keyAttrs = POS_ATTRS[p.position] || ATTR_KEYS;
@@ -82,6 +119,7 @@ function ageDecline(p, rng) {
 function trainWeek(club, rng, events) {
   const intensity = clamp(club.trainingIntensity || 3, 1, 5);
   const med = club.facilities.medical || 1;
+  const cg = clubGrowth(club);
   for (const p of [...club.squad, ...club.youth]) {
     if (p.retired) continue;
     if (p.injury && p.injury.weeks > 0) {
@@ -96,15 +134,40 @@ function trainWeek(club, rng, events) {
       p.seasonStats.inj = (p.seasonStats.inj || 0) + 1; p.history.injuries = (p.history.injuries || 0) + 1;
       if (events) events.push({ type: 'knock', playerId: p.id, weeks: p.injury.weeks });
     }
-    trainPlayer(p, club, rng);
+    trainPlayer(p, club, rng, cg);
     ageDecline(p, rng);
     p.recentMinutes = (p.recentMinutes || 0) * 0.6;
   }
 }
 
 // Season end: ages players and decides retirements. No attribute growth happens here.
+// Potential is not fixed: a young player who plays a lot and plays well can raise his ceiling (more
+// so with a good attitude); one who hardly plays in his early twenties can lose some of it.
+function potentialShift(p, rng) {
+  p.potChange = 0;
+  if (p.retired || p.age > 27) return 0;
+  const ss = p.seasonStats || {};
+  const games = (ss.apps || 0) + (ss.subApps || 0) * 0.5;
+  const form = ss.rn ? ss.rs / ss.rn : (p.ratings && p.ratings.length ? p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length : null);
+  const near = p.hiddenPotential - p.currentAbility <= 3;
+  const contributions = (ss.goals || 0) + (ss.assists || 0);
+  let d = 0;
+  if (games >= 16 && ((form != null && form >= 7.2) || (near && (form == null || form >= 6.8)) || contributions >= 15)) {
+    d = rng.int(1, 3) + (p.age <= 21 ? 1 : 0);
+    if (['Professional', 'Model Pro', 'Determined'].includes(p.personality)) d += 1;
+  } else if (games >= 24 && near) d = rng.int(1, 2);
+  if (d <= 0 && p.age <= 23 && games < 4 && !p.loan && rng.chance(0.6)) d = -rng.int(1, 2);
+  if (d > 0 && p.personality === 'Lazy') d = Math.max(0, d - 1);
+  const cap = p.wonderkid ? 96 : 92;
+  const before = p.hiddenPotential;
+  p.hiddenPotential = clamp(p.hiddenPotential + d, Math.ceil(p.currentAbility), Math.max(cap, before));
+  p.potChange = p.hiddenPotential - before;
+  return p.potChange;
+}
+
 function seasonAgeing(p, rng) {
   if (p.retired) return false;
+  potentialShift(p, rng);
   p.age += 1;
   p.seasonStats = { apps: 0, subApps: 0, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0 };
   if (p.age >= 40) { p.retired = true; return true; }
@@ -125,4 +188,4 @@ function resetCondition(p) {
   p.yellowAcc = 0;
 }
 
-module.exports = { trainWeek, trainPlayer, ageDecline, seasonAgeing, resetCondition, weeklyRecovery, peakEnd, WEEKS_PER_SEASON };
+module.exports = { trainWeek, trainPlayer, ageDecline, seasonAgeing, growthFactors, growthRate, potentialShift, resetCondition, weeklyRecovery, peakEnd, WEEKS_PER_SEASON };

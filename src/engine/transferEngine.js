@@ -14,14 +14,35 @@ const FREE_AGENT_CAP = 0.03;
 const MAX_PENDING_BIDS = 5;
 const BID_LIFETIME_WEEKS = 2;
 
+// Market value: ability first, then age, the potential still to come (counted for as long as he
+// has time to reach it, not cut off at 24), contract length, and how he is playing.
+// The age curve holds through the prime (24–28) and only falls gradually from 29.
+function ageMultiplier(age) {
+  if (age <= 19) return 1.3;
+  if (age <= 23) return 1.2;
+  if (age <= 27) return 1.15;
+  if (age <= 29) return 1.15 - (age - 27) * 0.06;            // 28: 1.09 · 29: 1.03
+  return Math.max(0.35, 1.03 - (age - 29) * 0.11);           // 30: 0.92 · 32: 0.70 · 34: 0.48
+}
+// Share of his remaining potential the market pays for: all of it at 21, tapering to nothing by 31.
+function potentialRunway(age) {
+  if (age <= 21) return 1;
+  if (age <= 27) return 1 - (age - 21) * 0.12;                // 24: 0.64 · 27: 0.28
+  return Math.max(0, 0.28 - (age - 27) * 0.09);               // 29: 0.10 · 31: 0
+}
 function playerValue(p, econ = 1) {
   const ca = p.currentAbility;
   const base = 40_000 * Math.pow(1.085, ca - 40);
-  const potBonus = p.age < 24 ? base * Math.max(0, p.hiddenPotential - ca) * 0.025 : 0;
-  const ageMult = p.age < 20 ? 1.3 : p.age < 24 ? 1.15 : p.age < 28 ? 1.05 : p.age < 31 ? 0.9 : p.age < 34 ? 0.65 : 0.4;
+  const gap = Math.max(0, (p.hiddenPotential ?? ca) - ca);
+  const potBonus = base * gap * 0.03 * potentialRunway(p.age);
+  // Regular football and good form add a little; it does not swing on one game.
+  const mins = p.recentMinutes || 0;
+  let perf = 1 + Math.max(-0.03, Math.min(0.08, (mins - 60) / 2000));
+  const r = p.ratings && p.ratings.length ? p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length : null;
+  if (r != null) perf *= Math.max(0.93, Math.min(1.1, 1 + (r - 6.6) * 0.06));
   const cy = p.contractYears ?? 2;
   const contract = cy <= 0 ? 0.5 : cy === 1 ? 0.8 : cy >= 4 ? 1.1 : 1;
-  const v = (base + potBonus) * ageMult * contract * econ;
+  const v = (base + potBonus) * ageMultiplier(p.age) * perf * contract * econ;
   return Math.max(10_000, Math.round(v / 1000) * 1000);
 }
 

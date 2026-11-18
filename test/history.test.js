@@ -28,10 +28,12 @@ describe('history archive', () => {
   it('keeps a career line for players who played, and records your matches and stint', () => {
     const played = [...w.players.values()].filter(p => (p.career || []).some(r => r[0] === firstSeason));
     expect(played.length).toBeGreaterThan(3000);
-    const st = w.archive.stints[w.archive.stints.length - 1];
-    expect(st.p).toBeGreaterThan(20);
-    expect(st.p).toBe(st.w + st.d + st.l);
-    expect(w.archive.matches.length).toBeGreaterThanOrEqual(st.p);
+    // The manager may have changed clubs at the end of the season: count every stint.
+    const stints = w.archive.stints;
+    for (const st of stints) expect(st.p).toBe(st.w + st.d + st.l);
+    const total = stints.reduce((t, st) => t + st.p, 0);
+    expect(total).toBeGreaterThan(20);
+    expect(w.archive.matches.length).toBe(total);
     const m = w.archive.matches[0];
     expect(m.xi[0].length).toBe(11);
     expect(m.f && m.f[0]).toBeTruthy();
@@ -45,7 +47,8 @@ describe('history archive', () => {
     expect(comp.seasons[0].winner).toBeTruthy();
     expect(comp.seasons[0].table.length).toBeGreaterThan(10);
     expect(w.competitionHistory('GB').seasons[0].goldenBall.name).toBeTruthy();
-    const club = w.clubHistory(w.manager.clubId);
+    const firstClub = w.archive.stints.find(st => st.p > 0).clubId;
+    const club = w.clubHistory(firstClub);
     expect(club.seasons.length).toBe(1);
     expect(club.topApps.length).toBeGreaterThan(0);
     const pid = club.topApps[0].id;

@@ -1,5 +1,14 @@
 # Match audio — architecture and asset register
 
+> **2026-11-18 update:** the crowd, whistle and ball sounds were restored to the original engine,
+> which has more football feel and did not crackle. The layered version (two crowd sections, sung
+> chants, player shouts, chimes) was removed. The match still sends structured events, but only key
+> ones make a sound: kick-off, passes and shots (timed to the moment the ball leaves the boot),
+> goals (home and away crowds react differently), saves, misses, cards, injuries, the restart after
+> a goal, half-time and full-time. Commentary and the announcer stay, without added-time and
+> line-up announcements. Volume groups now: crowd, referee, ball, commentary, announcer. The
+> sections below describe the earlier design where they differ.
+
 ## How it fits together
 
 ```

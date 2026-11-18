@@ -125,7 +125,6 @@
     if (!opts.announcer) return;
     const bank = (PA[opts.lang] || PA.en);
     if (!bank[kind]) return;
-    if (window.GafferSound && window.GafferSound.event) window.GafferSound.event('CHIME', {});
     const extra = kind === 'goal' && data.assistName ? fill(bank.assist, { who: data.assistName }) : '';
     push({ kind: 'pa-' + kind, pa: true, prio: 1, text: fill(bank[kind], { ...data, assist: extra }) });
   }

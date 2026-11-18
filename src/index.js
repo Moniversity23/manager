@@ -930,6 +930,12 @@ class GameWorld {
 
     // Ageing and retirement (no growth here)
     for (const p of this.players.values()) DEV.seasonAgeing(p, this.rng);
+    // Your players whose ceiling moved this summer
+    { const mine = [...me.squad, ...me.youth].filter(p => !p.retired && p.potChange);
+      const up = mine.filter(p => p.potChange > 0), down = mine.filter(p => p.potChange < 0);
+      if (up.length) this.notify('squad', `📈 Development: a strong season raised the potential of ${up.map(p => `${p.name} (+${p.potChange})`).join(', ')}.`);
+      if (down.length) this.notify('squad', `📉 Development: too little football lowered the potential of ${down.map(p => `${p.name} (${p.potChange})`).join(', ')}. Young players need games — consider a loan.`);
+      for (const p of this.players.values()) delete p.potChange; }
     for (const c of this.clubs) {
       const gone = c.squad.filter(p => p.retired);
       if (c.id === me.id && gone.length) this.notify('squad', `Retired: ${gone.map(p => p.name).join(', ')}.`);
@@ -2109,7 +2115,7 @@ class GameWorld {
       facilities: c.facilities, facilityCosts: this._facilityCosts(c), facilityMax: FIN.FACILITY_MAX,
       table, market, topScorers: topScorers.slice(0, 25),
       allLeagues: this.leagues.map(l => ({ id: l.id, name: l.name, country: l.country, level: l.level, clubs: l.clubIds.map(id => { const x = this.clubById(id); return { id: x.id, name: x.name, prestige: x.prestige, division: x.division }; }) })),
-      squad: sq.map(p => this._playerRow(p)),
+      squad: sq.map(p => this._playerRow(p, { growth: p.age <= 30 ? DEV.growthFactors(p, c) : null })),
       loanedOut: this._loanedOutView(),
       youth: c.youth.filter(p => !p.retired).map(p => this._playerRow(p)),
       expiringContracts: finalYear.map(p => ({ id: p.id, name: p.name, age: p.age, ovr: p.currentAbility, contractYears: p.contractYears, weeklyWage: p.weeklyWage })),
