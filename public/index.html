@@ -233,6 +233,13 @@ table{border-collapse:collapse;width:100%}
 .lu-row:hover{background:rgba(0,229,204,.05)}.lu-row.lu-sub{background:rgba(0,229,204,.08)}
 .lu-n{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px}.lu-n b,.lu-n span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lu-act{font-size:11px;color:var(--ac);font-weight:600;white-space:nowrap}
+.pt{display:inline-block;flex-shrink:0;border-radius:10px;overflow:hidden;background:var(--s3);vertical-align:middle}.pt svg{display:block;width:100%;height:100%}
+.pl-np{display:flex;align-items:center;gap:9px}
+a.hl{color:var(--bl);text-decoration:none}a.hl:hover{text-decoration:underline}
+.hs-stint{padding:9px 0;border-bottom:1px solid rgba(127,127,127,.12)}
+.hs-grid{display:flex;flex-wrap:wrap;gap:6px}
+.hs-cab{display:flex;gap:8px}.hs-cab span{display:flex;flex-direction:column;align-items:center;background:var(--s2);border-radius:8px;padding:5px 9px}.hs-cab b{font-size:15px}.hs-cab i{font-style:normal;font-size:9px;color:var(--dim);text-transform:uppercase}
+
 .lw-st{display:flex;flex-direction:column;align-items:center;min-width:38px;font-family:var(--fm);font-size:14px}.lw-st i{font-style:normal;font-family:var(--fb);font-size:9px;color:var(--dim);text-transform:uppercase}
 .pk{border:1px solid var(--bd2);border-radius:12px;padding:11px 12px;margin-bottom:8px;background:rgba(8,12,20,.35);cursor:pointer}
 .pk:hover{border-color:var(--ac)}.pk.pk-cur{border-color:var(--yw);background:rgba(255,215,64,.06);cursor:default}.pk.pk-out{opacity:.5;cursor:not-allowed}
@@ -472,7 +479,10 @@ function buildNav(){
 // Navigation keeps a trail so Back retraces your steps and always ends at Home. The browser's
 // own Back (and the Android back button in the installed app) follows the same trail.
 const NAV_TRAIL = [];
+let HIST_KEEP = false;
 function navTo(sec){
+  if (sec === 'history' && currentSection !== 'history' && !HIST_KEEP) HIST = { tab: 'career' };
+  HIST_KEEP = false;
   if (sec !== currentSection) { NAV_TRAIL.push(currentSection); if (NAV_TRAIL.length > 40) NAV_TRAIL.shift(); try { history.pushState({ gaffer: 1 }, ''); } catch {} }
   showSection(sec); if (window.innerWidth <= 768) closeSb();
 }
@@ -482,7 +492,9 @@ function goBack(){
   if (!document.getElementById('genMo').classList.contains('hidden')) { if (!VIEW && !(STATE && STATE.liveMatch)) closeMo('genMo'); return; }
   if (document.getElementById('sb').classList.contains('open') && window.innerWidth <= 768) return closeSb();
   let to = NAV_TRAIL.pop();
+  if (to && typeof to === 'object') { HIST = to.h; showSection('history'); return; }
   while (to === currentSection && NAV_TRAIL.length) to = NAV_TRAIL.pop();
+  if (to && typeof to === 'object') { HIST = to.h; showSection('history'); return; }
   if (!to || to === currentSection) to = 'dash';
   if (to === 'dash') NAV_TRAIL.length = 0;
   if (to !== currentSection) showSection(to);
@@ -557,7 +569,7 @@ function showFullTime(m, next){
 
 // ── Broadcast layer for the 3D match: score bug, radar, pre-match fly-over, goal replays ──
 const INTRO_LEN = 3.4;
-const CAMS = [['tv', 'TV'], ['close', 'Close'], ['high', 'Tactical'], ['goal', 'Goal']];
+const CAMS = [['tv', 'TV'], ['close', 'Close'], ['wide', 'Wide'], ['high', 'Tactical'], ['goal', 'Goal']];
 function abbr(name, other){
   const w = String(name || '').replace(/[^\p{L}\s]/gu, '').split(/\s+/).filter(Boolean);
   let a = (w[0] || '???').slice(0, 3).toUpperCase();
@@ -721,7 +733,7 @@ async function start3D(v){
   try {
     const mod = await import('./match3d.js');
     if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m) });
+    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto' });
     document.getElementById('genMoContent').classList.add('mvx');
     hudInit(v);
     if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
@@ -870,7 +882,10 @@ function simShoot(v, secs){
   s.shot = { from: [v.ball.x, v.ball.y], to, z1, t0: s.t + 0.12, dur: Math.max(0.25, secs - 0.12), type, side: a.side };
   s.strike = { side: a.side, idx: a.shooter, t0: s.t, power: 1, dir: [to[0] - d.x, to[1] - d.y] };
   const def = otherSide(a.side);
-  s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t };
+  s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t,
+    kind: type === 'saved' ? (z1 > 0.22 ? 'punch' : Math.abs(to[1] - 0.5) < 0.022 ? 'catch' : 'dive') : 'dive' };
+  s.block = null;
+  if (type === 'off' && Math.random() < 0.35) { const [bi] = simNearest(v.dots[def], d.x + dir * 0.03, d.y, s.gk[def]); if (bi >= 0) s.block = { side: def, idx: bi, t0: s.t + 0.05, x: d.x + dir * 0.025, y: d.y + (to[1] - d.y) * 0.15 }; }
   sfx('kick');
 }
 // Called when a match event is reached on the clock.
@@ -892,11 +907,14 @@ function simOnEvent(v, e){
     const def = otherSide(e.side), off = !(e.outcome === 'saved' || /saved/.test(e.text || ''));
     s.phase = 'held'; s.until = s.t + (off ? 1.2 : 0.9); s.goalKick = off;
     simGive(v, def, s.gk[def], 9); s.shot = null; s.attack = null; s.dive = null;
-  } else if (e.type === 'yellow' || e.type === 'red') {
+  } else if (e.type === 'yellow' || e.type === 'red' || e.type === 'injury') {
+    const idx = v.dots[e.side].findIndex(d => d.id === e.playerId);
+    if (idx >= 0 && e.type === 'injury') s.injured = { side: e.side, idx, t0: s.t };
+    if (idx >= 0 && e.type !== 'injury') s.card = { side: e.side, idx, color: e.type === 'red' ? 'red' : 'yellow', t0: s.t };
     if (s.phase !== 'play') return;
     const to = otherSide(e.side);
     const [i] = simNearest(v.dots[to], v.ball.x, v.ball.y, s.gk[to]);
-    s.phase = 'held'; s.until = s.t + 1; s.goalKick = false; simGive(v, to, i, 9); v.ball.z = 0;
+    s.phase = 'held'; s.until = s.t + (e.type === 'injury' ? 2.8 : 2.2); s.goalKick = false; simGive(v, to, i, 9); v.ball.z = 0;
   }
 }
 function stepPositions(now, dt){
@@ -928,7 +946,7 @@ function stepPositions(now, dt){
     if (s.pass) {
       const p0 = Math.max(0, Math.min(1, (s.t - s.pass.t0) / s.pass.dur)), p = s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
       ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = Math.sin(p * Math.PI) * s.pass.lob;
-      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); }
+      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t }; }
     } else {
       const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
@@ -963,7 +981,8 @@ function stepPositions(now, dt){
         } else if (atk && i === s.attack.shooter) { tx = s.attack.spot[0]; ty = s.attack.spot[1]; sp = 0.09; }
         if (s.pass && ((inPoss && i === s.pass.toIdx) || (!inPoss && i === s.pass.steal))) { tx = s.pass.to[0]; ty = s.pass.to[1]; sp = 0.09; }
         if (!inPoss && i === pressIdx) { tx = ball.x - d0 * 0.012; ty = ball.y; sp = 0.08; }
-        if (s.dive && s.dive.side === side && i === s.dive.idx) { ty = s.dive.y; sp = 0.16; }
+        if (s.dive && s.dive.side === side && i === s.dive.idx) { ty = s.dive.y; sp = s.dive.kind === 'dive' ? 0.16 : 0.08; }
+        if (s.block && s.phase === 'shot' && s.block.side === side && i === s.block.idx) { tx = s.block.x; ty = s.block.y; sp = 0.13; }
       } else if (s.phase === 'celebrate') {
         const c = s.celebrate;
         if (side === c.side && !gk) { if (i === c.scorer) { tx = c.corner[0]; ty = c.corner[1]; sp = 0.1; } else { const sc = v.dots[side][c.scorer]; const ang = i * 1.3; tx = sc.x + Math.cos(ang) * 0.025; ty = sc.y + Math.sin(ang) * 0.04; sp = 0.085; } }
@@ -1188,7 +1207,7 @@ function squadSorted(list){
 function playerRow(p){
   return `<div class="pl" data-s="${esc(p.name.toLowerCase())} ${esc(p.position.toLowerCase())}" onclick="showPlayer(${p.id})">
     ${posPill(p.position)}${rb(p.ovr)}
-    <div class="pl-n"><b>${esc(p.name)}</b> ${progressTag(p)} ${statusTag(p)}<div class="small dim">${p.age} yrs · ${esc(p.nation)} · ${p.contractYears <= 1 ? '<span style="color:var(--rd)">final year</span>' : p.contractYears + ' yrs left'}<span class="show-m"> · ${money(p.marketValue)}</span></div></div>
+    <div class="pl-n pl-np">${playerPortrait(p, 34)}<div style="min-width:0"><b>${esc(p.name)}</b> ${progressTag(p)} ${statusTag(p)}<div class="small dim">${p.age} yrs · ${esc(p.nation)} · ${p.contractYears <= 1 ? '<span style="color:var(--rd)">final year</span>' : p.contractYears + ' yrs left'}<span class="show-m"> · ${money(p.marketValue)}</span></div></div></div>
     <div class="hide-m"><div class="mini" title="Condition ${p.fit}%"><span style="width:${p.fit}%;background:${fitColor(p.fit)}"></span></div><div class="mini" title="Morale ${p.mor}"><span style="width:${p.mor}%;background:${p.mor >= 65 ? 'var(--bl)' : p.mor >= 45 ? 'var(--or)' : 'var(--rd)'}"></span></div></div>
     <div class="hide-m small">${p.form != null ? rb10(p.form) : '<span class="dim">–</span>'} <span class="dim">·</span> ${p.seasonStats.goals}G ${p.seasonStats.assists}A <span class="dim">(${p.seasonStats.apps})</span></div>
     <div class="stars" title="Potential">${stars(p.pot)}<div class="show-m small" style="color:${fitColor(p.fit)};letter-spacing:0;text-align:right">${p.fit}%</div></div>
@@ -1226,7 +1245,7 @@ async function showPlayer(id){
   const a = p.attrs || {};
   openMo('genMo');
   document.getElementById('genMoContent').innerHTML = `
-    <div class="row" style="margin-bottom:12px"><div style="flex:1"><div class="mo-title" style="margin:0">${esc(p.name)}</div><div class="small dim">${esc(p.position)} · ${esc(p.nation)} · age ${p.age} · ${esc(p.pers || 'personality unknown')} ${p.fromClub ? '· ' + esc(p.fromClub) : ''}</div></div>${p.fog ? ovrCell(p) + ' ' + potCell(p) : `<span class="rb big ${tier(p.ovr)}">${p.ovr}</span><span style="text-align:center"><span class="stars">${stars(p.pot)}</span><div class="small dim">potential</div></span>`} ${statusTag(p)}</div>
+    <div class="row" style="margin-bottom:12px">${playerPortrait(p, 72)}<div style="flex:1;min-width:0"><div class="mo-title" style="margin:0">${esc(p.name)}</div><div class="small dim">${esc(p.position)} · ${esc(p.nation)} · age ${p.age}${p.look ? ` · ${p.look.heightCm} cm` : ''} · ${esc(p.pers || 'personality unknown')} ${p.fromClub ? '· ' + esc(p.fromClub) : ''}</div><a href="#" class="hl small" onclick="closeMo('genMo');histGo('player',${p.id});return false">📚 Full career history</a></div>${p.fog ? ovrCell(p) + ' ' + potCell(p) : `<span class="rb big ${tier(p.ovr)}">${p.ovr}</span><span style="text-align:center"><span class="stars">${stars(p.pot)}</span><div class="small dim">potential</div></span>`} ${statusTag(p)}</div>
     ${p.fog ? `<div class="banner or small">Your scouts know ${p.known}% about him: ability ${p.ovrLo}–${p.ovrHi}${p.potLo ? `, potential ${p.potLo}–${p.potHi}` : ', potential unknown'}. ${extra && extra.scouting ? `Report in ${extra.scouting.weeksLeft} week${extra.scouting.weeksLeft > 1 ? 's' : ''}.` : `<a href="#" onclick="scoutPlayer(${p.id});return false" style="color:var(--bl)">Scout him (${money(STATE.scouting?.fee || 0)}) →</a>`}</div>` : ''}
     ${Object.keys(a).length ? `<div class="g2" style="margin-bottom:12px;align-items:center"><div style="text-align:center">${radar(a)}</div><div>${Object.entries(a).map(([k, v]) => `<div class="row" style="gap:6px;margin-bottom:5px"><span style="font-family:var(--fm);font-size:9px;color:var(--dim);width:72px">${k.toUpperCase()}</span><span class="mini" style="flex:1;height:8px;margin:0"><span style="width:${v}%;background:${v >= 75 ? '#0fa3a3' : v >= 65 ? '#2e9e4f' : v >= 55 ? '#c79a12' : v >= 45 ? '#b3541e' : '#5a6678'}"></span></span><b style="font-family:var(--fm);font-size:12px;width:30px;text-align:right">${p.fog ? '~' : ''}${v}</b></div>`).join('')}${p.form != null || p.progress ? `<div class="small dim mt8">${p.form != null ? `Form ${rb10(p.form)} ` : ''}${progressTag(p)}</div>` : ''}</div></div>` : '<div class="small dim" style="margin-bottom:12px">Attributes unknown — scout him to see them.</div>'}
     ${extra ? `<div class="small dim" style="margin-bottom:10px">Agent: <b style="color:var(--tx)">${esc(extra.agent.name)}</b> (${esc(extra.agent.style)}) · ${extra.caps} caps${extra.askFee ? ` · asking price ~${money(extra.askFee)}` : ''}${extra.blocked ? ' · <b style="color:var(--rd)">talks blocked</b>' : ''}</div>` : ''}
@@ -1424,7 +1443,7 @@ function pickCard(c, d, isCur){
   }).join('');
   const [vt, vc] = isCur ? ['', ''] : pickVerdict(c, d.cur, d.curR);
   return `<div class="pk ${isCur ? 'pk-cur' : ''} ${c.out ? 'pk-out' : ''}" ${isCur || c.out ? '' : `onclick="choosePick(${p.id})"`}>
-    <div class="pk-top">${posPill(p.position)}<div class="pk-n"><b>${esc(p.name)}</b><div class="small" style="color:${fitCol}">${p.age != null ? `<span class="dim">${p.age} yrs · </span>` : ''}${fitTxt}</div></div>
+    <div class="pk-top">${playerPortrait(p, 42)}${posPill(p.position)}<div class="pk-n"><b>${esc(p.name)}</b><div class="small" style="color:${fitCol}">${p.age != null ? `<span class="dim">${p.age} yrs · </span>` : ''}${fitTxt}</div></div>
       <div class="pk-r"><span class="rb big ${tier(c.r)}">${c.r}</span>${diff != null ? `<span class="pk-d" style="color:${diff > 0 ? 'var(--gr)' : diff < 0 ? 'var(--rd)' : 'var(--dim)'}">${diff > 0 ? '+' + diff : diff === 0 ? '=' : diff}</span>` : ''}</div></div>
     <div class="pk-stats"><span><i>Condition</i><b style="color:${fitColor(p.fit)}">${p.fit}%</b></span><span><i>Morale</i><b style="color:${p.mor >= 65 ? 'var(--gr)' : p.mor >= 45 ? 'var(--or)' : 'var(--rd)'}">${p.mor ?? '–'}</b></span><span><i>Form</i>${p.form != null ? rb10(p.form) : '<b class="dim">–</b>'}</span><span><i>Season</i><b>${ss.goals || 0}G ${ss.assists || 0}A</b></span><span><i>Games</i><b>${ss.apps || 0}</b></span></div>
     <div class="pk-stats pk-attrs">${attrs}</div>
@@ -1664,17 +1683,196 @@ async function viewClub(id){
     <div style="max-height:360px;overflow-y:auto">${r.squad.map(p => `<div class="lbr">${rb(p.ovr)}<div style="flex:1"><a href="#" onclick="showPlayer(${p.id});return false" style="color:var(--tx)">${esc(p.name)}</a><div class="small dim">${esc(p.position)} · age ${p.age} · ${money(p.marketValue)}</div></div><button class="btn bp bxs" onclick="openBid(${p.id})">Offer</button></div>`).join('')}</div>
     <button class="btn bg fw mt8" onclick="promptRename('club', ${r.id}, '')">Rename club</button><button class="btn bg fw mt4" onclick="closeMo('genMo')">Close</button>`;
 }
+// ── Player portraits ────────────────────────────────────────────────
+// Drawn from the player's permanent look (src/look.js) with the same skin, hair and beard colours
+// as his 3D figure in match3d.js (keep the palettes in step), so the face on his profile is the
+// face you see on the pitch. Cached by look and kit colour.
+const SKIN_PAL = ['#f6d7c3', '#ecc0a0', '#dca67f', '#c98d62', '#ad724a', '#8d5636', '#6c3f26', '#4a2a19'];
+const HAIR_PAL = ['#16110d', '#3a2618', '#5c3b22', '#8a6237', '#d8b46a', '#a8481f'];
+const EYE_PAL = ['#3b2416', '#5a3a1e', '#3f6f8f', '#4f7a45'];
+const PORTRAITS = new Map();
+function shade(hex, k){ const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, Math.round(v * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
+function mixHex(a, b, t){ const x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), m = (s) => Math.round(((x >> s) & 255) * (1 - t) + ((y >> s) & 255) * t); return `#${((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0')}`; }
+const clubHue = id => ((Number(id) || 0) * 137) % 360;
+function portraitSVG(look, hue = 210, size = 44){
+  if (!look) return `<span class="pt" style="width:${size}px;height:${size}px"></span>`;
+  const key = `${look.skin}.${look.hairStyle}.${look.hairCol}.${look.beardStyle}.${look.head}.${look.eyes}.${look.brows}.${look.grey}.${look.age >= 32 ? 1 : 0}.${hue}.${look.gk ? 1 : 0}`;
+  let svg = PORTRAITS.get(key);
+  if (!svg) {
+    const skin = SKIN_PAL[look.skin] || SKIN_PAL[2], sk2 = shade(skin, 0.82), sk3 = shade(skin, 0.68);
+    const hair = mixHex(HAIR_PAL[look.hairCol] || HAIR_PAL[0], '#b9b4ad', look.grey || 0), hair2 = shade(hair.startsWith('#') ? hair : '#000000', 1.35);
+    const eye = EYE_PAL[look.eyes] || EYE_PAL[0], kit = look.gk ? 'hsl(52,85%,52%)' : `hsl(${hue},72%,46%)`, kit2 = look.gk ? 'hsl(52,85%,36%)' : `hsl(${hue},75%,30%)`;
+    const wx = [1, 0.94, 1.07, 0.97][look.head] || 1, jaw = [0, 3, -2, 2][look.head] || 0;
+    const id = 'p' + PORTRAITS.size;
+    const head = `M60 31 C${60 + 25 * wx} 31 ${60 + 28 * wx} 50 ${60 + 27 * wx} 66 C${60 + 26 * wx} ${84 + jaw} ${60 + 15 * wx} ${98 + jaw} 60 ${100 + jaw} C${60 - 15 * wx} ${98 + jaw} ${60 - 26 * wx} ${84 + jaw} ${60 - 27 * wx} 66 C${60 - 28 * wx} 50 ${60 - 25 * wx} 31 60 31Z`;
+    const L = 60 - 27 * wx, R = 60 + 27 * wx;
+    const top = `M${L - 1} 60 C${L - 3} 36 ${60 - 18 * wx} 24 60 24 C${60 + 18 * wx} 24 ${R + 3} 36 ${R + 1} 60 C${R - 3} 50 ${60 + 18 * wx} 42 60 43 C${60 - 18 * wx} 42 ${L + 3} 50 ${L - 1} 60Z`;
+    let behind = '', over = '';
+    switch (look.hairStyle) {
+      case 'crop': over = `<path d="${top}" fill="${hair}"/>`; break;
+      case 'buzz': over = `<path d="${top}" fill="${hair}" opacity=".55"/>`; break;
+      case 'receding': over = `<path d="M${L} 58 C${L - 2} 36 ${60 - 18 * wx} 25 60 25 C${60 + 18 * wx} 25 ${R + 2} 36 ${R} 58 C${R - 3} 46 ${60 + 12 * wx} 36 60 40 C${60 - 12 * wx} 36 ${L + 3} 46 ${L} 58Z" fill="${hair}" opacity=".8"/>`; break;
+      case 'afro': behind = `<ellipse cx="60" cy="44" rx="${38 * wx}" ry="30" fill="${hair}"/>`; over = `<path d="M${L - 4} 56 C${L - 6} 30 ${60 - 20 * wx} 18 60 18 C${60 + 20 * wx} 18 ${R + 6} 30 ${R + 4} 56 C${R - 2} 46 ${60 + 18 * wx} 40 60 41 C${60 - 18 * wx} 40 ${L + 2} 46 ${L - 4} 56Z" fill="${hair}"/>`; break;
+      case 'curly': over = `<path d="${top}" fill="${hair}"/>` + [-20, -12, -4, 4, 12, 20].map((d, i) => `<circle cx="${60 + d * wx}" cy="${27 + (i % 2) * 3 - Math.abs(d) * 0.12}" r="7" fill="${hair}"/>`).join(''); break;
+      case 'swept': over = `<path d="${top}" fill="${hair}"/><path d="M${L + 2} 46 C${60 - 10} 22 ${R + 6} 22 ${R + 2} 44 C${60 + 8} 32 ${60 - 6} 36 ${L + 2} 46Z" fill="${hair}"/><path d="M${60 - 12} 30 C60 25 ${R} 28 ${R} 38" stroke="${hair2}" stroke-width="1.4" fill="none" opacity=".6"/>`; break;
+      case 'long': behind = `<path d="M${L - 5} 56 C${L - 8} 22 ${R + 8} 22 ${R + 5} 56 L${R + 7} 108 C${R} 112 ${R - 6} 104 ${R - 6} 96 L${L + 6} 96 C${L + 6} 104 ${L} 112 ${L - 7} 108Z" fill="${hair}"/>`; over = `<path d="${top}" fill="${hair}"/>`; break;
+      case 'mohawk': over = `<path d="${top}" fill="${hair}" opacity=".35"/><path d="M${60 - 7} 46 C${60 - 9} 26 ${60 - 4} 15 60 14 C${60 + 4} 15 ${60 + 9} 26 ${60 + 7} 46 C${60 + 3} 42 ${60 - 3} 42 ${60 - 7} 46Z" fill="${hair}"/>`; break;
+      case 'fade': over = `<path d="${top}" fill="${hair}" opacity=".45"/><path d="M${60 - 19 * wx} 44 C${60 - 21 * wx} 26 ${60 + 21 * wx} 26 ${60 + 19 * wx} 44 C${60 + 10} 39 ${60 - 10} 39 ${60 - 19 * wx} 44Z" fill="${hair}"/>`; break;
+      case 'twists': over = `<path d="${top}" fill="${hair}"/>` + [-22, -14, -6, 2, 10, 18, 24].map((d, i) => `<path d="M${60 + d * wx} 30 q${(i % 2 ? 3 : -3)} 9 ${(i % 2 ? 1 : -1)} 17" stroke="${hair}" stroke-width="5.5" stroke-linecap="round" fill="none"/>`).join(''); break;
+      default: over = '';
+    }
+    const bald = look.hairStyle === 'bald' ? `<ellipse cx="${60 - 8}" cy="40" rx="9" ry="5" fill="#fff" opacity=".18"/>` : '';
+    const beardCol = mixHex(HAIR_PAL[look.hairCol] || HAIR_PAL[0], '#b9b4ad', (look.grey || 0) * 1.2);
+    const cheek = `M${L + 3} 74 C${L + 6} ${92 + jaw} ${60 - 10} ${100 + jaw} 60 ${101 + jaw} C${60 + 10} ${100 + jaw} ${R - 6} ${92 + jaw} ${R - 3} 74 C${R - 8} 82 ${60 + 12} 84 60 84 C${60 - 12} 84 ${L + 8} 82 ${L + 3} 74Z`;
+    const stache = `<path d="M${60 - 10} 85 C${60 - 4} 81 ${60 + 4} 81 ${60 + 10} 85 C${60 + 4} 84 ${60 - 4} 84 ${60 - 10} 85Z" fill="${beardCol}" stroke="${beardCol}" stroke-width="1.6"/>`;
+    const beard = { stubble: `<path d="${cheek}" fill="${beardCol}" opacity=".24"/>`, full: `<path d="${cheek}" fill="${beardCol}" opacity=".92"/>${stache}`,
+      goatee: `<path d="M${60 - 8} 92 C${60 - 8} ${101 + jaw} ${60 + 8} ${101 + jaw} ${60 + 8} 92 C${60 + 4} 94 ${60 - 4} 94 ${60 - 8} 92Z" fill="${beardCol}"/>${stache}`,
+      moustache: stache, 'chin strap': `<path d="M${L + 3} 72 C${L + 6} ${94 + jaw} ${60 - 10} ${101 + jaw} 60 ${102 + jaw} C${60 + 10} ${101 + jaw} ${R - 6} ${94 + jaw} ${R - 3} 72" stroke="${beardCol}" stroke-width="3" fill="none"/>` }[look.beardStyle] || '';
+    const bw = [1.6, 2.2, 2.8, 3.4][look.brows] || 2.2, brow = shade(HAIR_PAL[look.hairCol] || '#16110d', look.hairCol >= 4 ? 0.75 : 1);
+    const lines = look.age >= 32 ? `<path d="M${60 - 22} 70 l-4 2 M${60 + 22} 70 l4 2" stroke="${sk3}" stroke-width="1" opacity=".7"/>` : '';
+    svg = `<svg viewBox="12 14 96 96" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="${id}f" cx=".42" cy=".38" r=".75"><stop offset="0" stop-color="${shade(skin, 1.08)}"/><stop offset=".7" stop-color="${skin}"/><stop offset="1" stop-color="${sk2}"/></radialGradient><linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="hsl(${hue},40%,24%)"/><stop offset="1" stop-color="hsl(${hue},45%,12%)"/></linearGradient></defs>
+      <rect width="120" height="120" fill="url(#${id}b)"/>
+      ${behind}
+      <path d="M8 124 C10 108 26 102 42 100 L78 100 C94 102 110 108 112 124Z" fill="${kit}"/><path d="M42 100 L60 116 L78 100" fill="${kit2}"/><path d="M47 100 L60 111 L73 100" fill="none" stroke="#fff" stroke-width="2" opacity=".85"/>
+      <path d="M49 86 L49 104 C54 109 66 109 71 104 L71 86Z" fill="${sk2}"/>
+      <ellipse cx="${L + 1}" cy="68" rx="4.5" ry="7.5" fill="${sk2}"/><ellipse cx="${R - 1}" cy="68" rx="4.5" ry="7.5" fill="${sk2}"/>
+      <path d="${head}" fill="url(#${id}f)"/>
+      ${beard}${bald}
+      <path d="M${60 - 16} ${62 - bw / 2} q8 -4 13 0" stroke="${brow}" stroke-width="${bw}" stroke-linecap="round" fill="none"/><path d="M${60 + 3} ${62 - bw / 2} q5 -4 13 0" stroke="${brow}" stroke-width="${bw}" stroke-linecap="round" fill="none"/>
+      <ellipse cx="${60 - 10}" cy="68" rx="5.2" ry="2.9" fill="#f4f1ea"/><ellipse cx="${60 + 10}" cy="68" rx="5.2" ry="2.9" fill="#f4f1ea"/>
+      <circle cx="${60 - 10}" cy="68" r="2.5" fill="${eye}"/><circle cx="${60 + 10}" cy="68" r="2.5" fill="${eye}"/><circle cx="${60 - 10}" cy="68" r="1.1" fill="#0d0a08"/><circle cx="${60 + 10}" cy="68" r="1.1" fill="#0d0a08"/>
+      <circle cx="${60 - 9.2}" cy="67.2" r=".6" fill="#fff"/><circle cx="${60 + 10.8}" cy="67.2" r=".6" fill="#fff"/>
+      <path d="M${60 - 15} 65.6 q5 -2.4 10 0 M${60 + 5} 65.6 q5 -2.4 10 0" stroke="${sk3}" stroke-width=".9" fill="none" opacity=".6"/>
+      <path d="M60 70 C59 75 56.5 78 56 80 C58 82 62 82 64 80 C63.5 78 61 75 60 70" fill="${sk2}" opacity=".85"/><path d="M57 80.5 q1 1 2 0 M61 80.5 q1 1 2 0" stroke="${sk3}" stroke-width="1" fill="none"/>
+      <path d="M${60 - 8} 88 C${60 - 3} 86.4 ${60 + 3} 86.4 ${60 + 8} 88 C${60 + 3} 89 ${60 - 3} 89 ${60 - 8} 88Z" fill="${shade(skin, 0.62)}"/><path d="M${60 - 7} 88.4 C${60 - 3} 92 ${60 + 3} 92 ${60 + 7} 88.4" fill="${shade(skin, 0.74)}"/>
+      ${lines}${over}</svg>`;
+    PORTRAITS.set(key, svg);
+  }
+  return `<span class="pt" style="width:${size}px;height:${size}px">${svg}</span>`;
+}
+function playerPortrait(p, size){ const lk = p && p.look ? { ...p.look, gk: p.position === 'GK' } : null; return portraitSVG(lk, clubHue(p && (p.clubId ?? p.fromClubId)), size); }
+
+// ── History centre: your career, clubs, players, competitions and matches ──────────
+let HIST = { tab: 'career' };
+function histGo(tab, arg){ if (currentSection !== 'history') HIST_KEEP = true; if (currentSection === 'history') { NAV_TRAIL.push({ h: { ...HIST } }); try { history.pushState({ gaffer: 1 }, ''); } catch {} } HIST = { ...HIST, tab, arg: arg ?? null }; if (currentSection !== 'history') navTo('history'); else renderSection('history'); document.getElementById('sc').scrollTop = 0; }
+const flagBadge = f => !f ? '' : f.split('').includes('E') && f !== 'E' ? flagBadge(f.replace('E', '')) + flagBadge('E') : ({ C: '<span class="tag tg">CHAMPIONS</span>', P: '<span class="tag tg">↑ PROMOTED</span>', PO: '<span class="tag tg">↑ PLAY-OFFS</span>', R: '<span class="tag tr">↓ RELEGATED</span>', E: '<span class="tag tr">VOTED OUT</span>' }[f] || '');
+const sw = (s, w) => w ? `${s}/${String(s + 1).slice(2)} wk ${w === 99 ? 'end' : w}` : `${s}/${String(s + 1).slice(2)}`;
+const clubLink = (id, name) => id != null ? `<a href="#" class="hl" onclick="histGo('club',${id});return false">${esc(name)}</a>` : esc(name || '—');
+const playerLink = (id, name) => id != null ? `<a href="#" class="hl" onclick="histGo('player',${id});return false">${esc(name)}</a>` : esc(name || '—');
 function rHistory(){
-  api('/api/history?limit=15').then(r => {
-    if (currentSection !== 'history' || !r.ok) return;
-    const h = r.hallOfFame || {};
-    document.getElementById('sc').innerHTML = `<div class="sct">History</div><div class="g2">
-      <div class="card"><div class="ch">Your seasons</div>${r.managerSeasons.map(s => `<div class="sr"><span>${esc(s.seasonLabel)} · ${esc(s.club)} · ${esc(s.league)}</span><span class="tag ${s.position <= 3 ? 'tg' : 'tb2'}">${ordinal(s.position)} · ${s.points}pt</span></div>`).join('') || '<div class="small dim">No completed seasons yet.</div>'}</div>
-      <div class="card"><div class="ch">Manager</div><div class="sr"><span>Status</span><b style="color:var(--gold)">${esc(h.status)}</b></div><div class="sr"><span>Reputation</span><span>${h.reputation}</span></div><div class="sr"><span>Trophies</span><span>${h.trophies}</span></div></div>
-      <div class="card"><div class="ch">Continental winners</div>${r.continentalWinners.map(w => `<div class="sr small"><span>${w.season} ${esc(w.comp || w.continent)}</span><b>${esc(w.club)}</b></div>`).join('') || '<div class="small dim">None yet.</div>'}</div>
-      <div class="card"><div class="ch">League winners</div>${r.leagueWinners.slice(0, 20).map(w => `<div class="sr small"><span>${w.season} ${esc(w.league)}</span><b>${esc(w.club)}</b></div>`).join('') || '<div class="small dim">None yet.</div>'}</div></div>`;
-  });
-  return '<div class="sct">History</div><div class="card small dim">Loading…</div>';
+  const tabs = [['career', '👔 Your career'], ['clubs', '🏟 Clubs'], ['players', '👤 Players'], ['comps', '🏆 Competitions'], ['matches', '📋 Matches']];
+  const head = `<div class="sct">History <span class="scs">every season is archived — nothing is overwritten</span></div>
+    <div class="chips">${tabs.map(([k, l]) => `<button class="chip ${HIST.tab === k || (HIST.tab === 'club' && k === 'clubs') || (HIST.tab === 'player' && k === 'players') || (HIST.tab === 'comp' && k === 'comps') || (HIST.tab === 'match' && k === 'matches') ? 'on' : ''}" onclick="histGo('${k}')">${l}</button>`).join('')}</div>
+    <div class="row" style="margin-bottom:10px"><input id="histQ" placeholder="Search any player or club, past or present…" onkeydown="if(event.key==='Enter')histSearch()" style="flex:1"><button class="btn bs bsm" onclick="histSearch()">Search</button></div>`;
+  const fill = html => { if (currentSection === 'history') document.getElementById('sc').innerHTML = head + html; };
+  const t = HIST.tab, arg = HIST.arg;
+  const load = (url, fn) => api(url).then(r => fill(r && r.ok ? fn(r) : `<div class="card small dim">${esc((r && r.error) || 'Not available')}</div>`)).catch(e => fill(`<div class="card" style="color:var(--rd)">${esc(e.message)}</div>`));
+  if (t === 'career') load('/api/hist/manager', histCareer);
+  else if (t === 'clubs') load('/api/hist', histClubs);
+  else if (t === 'club') load('/api/hist/club/' + arg, histClub);
+  else if (t === 'players') load('/api/hist', histPlayers);
+  else if (t === 'player') load('/api/hist/player/' + arg, histPlayer);
+  else if (t === 'comps') load('/api/hist', histComps);
+  else if (t === 'comp') load('/api/hist/comp?key=' + encodeURIComponent(arg), histComp);
+  else if (t === 'matches') load('/api/hist/matches' + (arg ? '?season=' + arg : ''), histMatches);
+  else if (t === 'match') load('/api/hist/match/' + arg, histMatch);
+  else if (t === 'search') load('/api/hist/search?q=' + encodeURIComponent(arg || ''), histFound);
+  return head + '<div class="card small dim">Loading…</div>';
+}
+function histSearch(){ const q = (document.getElementById('histQ') || {}).value || ''; if (q.trim().length < 2) return notify('Type at least two letters', 'w'); histGo('search', q.trim()); }
+function histFound(r){
+  return `<div class="g2"><div class="card"><div class="ch">Players <span class="small dim">${r.players.length}</span></div>${r.players.map(p => `<div class="lu-row" onclick="histGo('player',${p.id})">${posPill(p.position)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${esc(p.club)} · ${p.age} yrs${p.retired ? ' · retired' : ''}</span></span>${rb(p.ovr)}</div>`).join('') || '<div class="small dim">No players found.</div>'}</div>
+    <div class="card"><div class="ch">Clubs <span class="small dim">${r.clubs.length}</span></div>${r.clubs.map(c => `<div class="lu-row" onclick="histGo('club',${c.id})"><span class="lu-n"><b>${esc(c.name)}</b><span class="small dim">${c.active ? 'active' : 'no longer in the leagues'}</span></span><span class="lu-act">History ›</span></div>`).join('') || '<div class="small dim">No clubs found.</div>'}</div></div>`;
+}
+function histCareer(r){
+  const t = r.totals;
+  return `<div class="g4" style="margin-bottom:12px">${[['Matches', t.p], ['Won · drawn · lost', `${t.w} · ${t.d} · ${t.l}`], ['Win rate', t.winPct != null ? t.winPct + '%' : '–'], ['Trophies', r.trophies], ['Clubs', t.clubs], ['Promotions', t.promotions], ['Relegations', t.relegations], ['Sackings', r.sacks]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:18px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+  <div class="card"><div class="ch">Clubs managed</div>${r.stints.map(s => `<div class="hs-stint"><div class="row"><b style="flex:1">${clubLink(s.clubId, s.club)}</b><span class="small dim">${sw(s.from[0], s.from[1])} → ${s.current ? 'now' : sw(s.to[0], s.to[1])}${s.how ? ` · ${esc(s.how)}` : ''}</span></div>
+    <div class="small">${s.p != null ? `${s.p} matches · ${s.w}W ${s.d}D ${s.l}L · ${s.winPct ?? 0}% wins · goals ${s.gf}–${s.ga}` : '<span class="dim">Before records began: match totals were not kept</span>'}${s.promotions ? ` · ↑ ${s.promotions} promotion${s.promotions > 1 ? 's' : ''}` : ''}${s.relegations ? ` · ↓ ${s.relegations}` : ''}</div>
+    ${s.honours.length ? `<div class="small" style="margin-top:3px">🏆 ${s.honours.map(h => `${esc(h.comp)} ${h.season}`).join(' · ')}</div>` : ''}</div>`).join('') || '<div class="small dim">Nothing yet.</div>'}</div>
+  <div class="card"><div class="ch">Season by season</div>${r.seasons.map(s => `<div class="sr small"><span>${esc(s.seasonLabel)} · ${esc(s.club)} · ${esc(s.league)}</span><span>${ordinal(s.position)} · ${s.points} pts · ${esc(s.outcome || '')}</span></div>`).join('') || '<div class="small dim">Your first season is still going.</div>'}</div>`;
+}
+function histClubs(r){
+  const lg = (STATE.allLeagues || []).filter(l => l.country === STATE.country).sort((a, b) => a.level - b.level);
+  return `<div class="card"><div class="ch">Your clubs</div>${r.myClubs.map(c => `<div class="lu-row" onclick="histGo('club',${c.id})"><span class="lu-n"><b>${esc(c.name)}</b></span><span class="lu-act">History ›</span></div>`).join('')}</div>
+    ${lg.map(l => `<div class="card"><div class="ch">${esc(l.country)} ${esc(l.name)}</div><div class="hs-grid">${l.clubs.map(c => `<button class="chip" onclick="histGo('club',${c.id})">${esc(c.name)}</button>`).join('')}</div></div>`).join('')}
+    <div class="small dim">Search above for any club in the world, including clubs voted out of the leagues.</div>`;
+}
+function histClub(r){
+  const c = r.current;
+  return `<div class="card"><div class="row"><div style="flex:1"><div class="mo-title" style="margin:0">${esc(r.name)}</div><div class="small dim">${c ? `${esc(c.country)} · ${esc(c.league)} · manager ${esc(c.manager)} · balance ${money(c.balance)}` : 'No longer in the leagues'}</div></div>
+    <div class="hs-cab">${[['🏆', r.counts.league, 'League titles'], ['🥇', r.counts.cup, 'Cups'], ['🌍', r.counts.continental, 'Continental']].map(([i, n, l]) => `<span title="${l}"><b>${i} ${n}</b><i>${l}</i></span>`).join('')}</div></div></div>
+  <div class="card" style="padding:0;overflow:auto"><div class="ch" style="padding:12px 12px 4px">Season by season</div>
+    ${r.seasons.length ? `<table class="st"><thead><tr><th>Season</th><th>League</th><th class="tc">Pos</th><th class="tc">P</th><th class="tc">W</th><th class="tc">D</th><th class="tc">L</th><th class="tc">GF</th><th class="tc">GA</th><th class="tc">Pts</th><th></th><th class="tc hide-m">Balance</th></tr></thead><tbody>
+    ${r.seasons.map(s => `<tr><td>${esc(s.label)}</td><td><a href="#" class="hl" onclick="histGo('comp','${esc(s.leagueKey)}');return false">${esc(s.league)}</a></td><td class="tc"><b>${s.pos}</b>/${s.size}</td><td class="tc">${s.p}</td><td class="tc">${s.w}</td><td class="tc">${s.d}</td><td class="tc">${s.l}</td><td class="tc">${s.gf}</td><td class="tc">${s.ga}</td><td class="tc"><b>${s.pts}</b></td><td>${flagBadge(s.flag)}</td><td class="tc hide-m">${money(s.balance)}</td></tr>`).join('')}</tbody></table>` : '<div class="small dim" style="padding:12px">No completed seasons yet.</div>'}</div>
+  <div class="g2"><div>
+    <div class="card"><div class="ch">Honours</div>${r.trophies.map(t => `<div class="sr small"><span>🏆 ${esc(t.comp)}</span><span>${esc(t.label)}</span></div>`).join('') || '<div class="small dim">None yet.</div>'}
+      ${r.finals.length ? `<div class="ch mt8">Runners-up</div>${r.finals.map(t => `<div class="sr small"><span>🥈 ${esc(t.comp)}</span><span>${esc(t.label)}</span></div>`).join('')}` : ''}</div>
+    <div class="card"><div class="ch">Managers</div>${c ? `<div class="sr small"><span>Now</span><b>${esc(c.manager)}</b></div>` : ''}${r.managers.map(m => `<div class="sr small"><span>${sw(m.season, m.week)} · ${esc(m.why)}</span><span>${esc(m.out || '—')} → ${esc(m.in || 'vacant')}</span></div>`).join('') || '<div class="small dim">No changes recorded.</div>'}
+      ${r.myStints.map(s => `<div class="small mt4">You: ${sw(s.from[0], s.from[1])} → ${s.current ? 'now' : sw(s.to[0], s.to[1])}${s.p != null ? ` · ${s.p} games, ${s.winPct ?? 0}% won` : ''}</div>`).join('')}</div>
+  </div><div>
+    <div class="card"><div class="ch">Most appearances</div>${r.topApps.map(p => `<div class="sr small"><span>${playerLink(p.id, p.name)} <span class="dim">${p.from}–${p.to}${p.live ? '' : ' · retired'}</span></span><b>${p.apps}</b></div>`).join('') || '<div class="small dim">Builds up season by season.</div>'}</div>
+    <div class="card"><div class="ch">Top scorers</div>${r.topScorers.map(p => `<div class="sr small"><span>${playerLink(p.id, p.name)} <span class="dim">${p.from}–${p.to}</span></span><b>${p.goals}</b></div>`).join('') || '<div class="small dim">Builds up season by season.</div>'}</div>
+    ${r.records ? `<div class="card"><div class="ch">Records</div>${[['Biggest win', r.records.biggestWin, x => `${esc(x.score)} vs ${esc(x.opponent)} (${x.season})`], ['Heaviest defeat', r.records.heaviestDefeat, x => `${esc(x.score)} vs ${esc(x.opponent)} (${x.season})`], ['Record signing', r.records.recordSigning, x => `${esc(x.name)} ${money(x.fee)} (${x.season})`], ['Record sale', r.records.recordSale, x => `${esc(x.name)} ${money(x.fee)} (${x.season})`], ['Most goals in a season', r.records.seasonScorer, x => `${esc(x.name)} ${x.goals} (${x.season})`]].filter(x => x[1]).map(([l, v, f]) => `<div class="sr small"><span>${l}</span><span>${f(v)}</span></div>`).join('') || '<div class="small dim">None yet.</div>'}</div>` : ''}
+  </div></div>`;
+}
+function histPlayers(){
+  const mine = (STATE.squad || []).slice().sort((a, b) => b.ovr - a.ovr);
+  return `<div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">Your squad <span class="small dim">tap for a full career</span></div>${mine.map(p => `<div class="lu-row" onclick="histGo('player',${p.id})">${playerPortrait(p, 36)}${posPill(p.position)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${p.age} yrs · ${p.apps + (p.subApps || 0)} games · ${p.goals} goals in his career</span></span>${rb(p.ovr)}</div>`).join('')}</div>
+    <div class="small dim">Search above for anyone else, including retired players.</div>`;
+}
+function histPlayer(r){
+  const L = r.look ? { ...r.look, gk: r.position === 'GK' } : null, t = r.totals;
+  const gk = r.position === 'GK';
+  return `<div class="card"><div class="row" style="align-items:center;gap:14px">${portraitSVG(L, clubHue(r.clubId), 92)}<div style="flex:1;min-width:0"><div class="mo-title" style="margin:0">${esc(r.name)}</div>
+      <div class="small dim">${esc(r.position)} · ${esc(r.nation)} · ${r.retired ? `retired in ${r.retiredSeason} aged ${r.age}` : `age ${r.age} · ${clubLink(r.clubId, r.club)}`}${r.look ? ` · ${r.look.heightCm} cm` : ''}${r.caps ? ` · ${r.caps} caps` : ''}</div>
+      <div class="small mt4">${r.clubs.map(esc).join(' → ')}</div></div>${rb(r.ovr)}</div>
+    ${!r.retired ? `<button class="btn bg bsm mt8" onclick="showPlayer(${r.id})">Open profile</button>` : ''}</div>
+  <div class="g4" style="margin-bottom:12px">${[['Games', t.apps + t.sub], ['Goals', t.goals], ['Assists', t.assists], [gk ? 'Clean sheets' : 'Cards', gk ? t.cs : `${t.yel}🟨 ${t.red}🟥`], ['Honours', r.honours.length], ['Injuries', t.inj]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:18px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+  ${r.lifetime && r.lifetime.apps + r.lifetime.sub > t.apps + t.sub ? `<div class="small dim" style="margin:-6px 0 10px">Whole career including seasons before records began: ${r.lifetime.apps + r.lifetime.sub} games, ${r.lifetime.goals} goals, ${r.lifetime.assists} assists.</div>` : ''}
+  <div class="card" style="padding:0;overflow:auto"><div class="ch" style="padding:12px 12px 4px">Career</div>${r.career.length ? `<table class="st"><thead><tr><th>Season</th><th>Club</th><th class="tc">Games</th><th class="tc">Goals</th><th class="tc">Assists</th><th class="tc">${gk ? 'CS' : '🟨'}</th><th class="tc">🟥</th><th class="tc hide-m">Inj.</th><th class="tc">Avg</th></tr></thead><tbody>
+    ${r.career.map(c => `<tr${c.current ? ' class="hlr"' : ''}><td>${esc(c.label)}${c.current ? ' <span class="small dim">now</span>' : ''}</td><td>${clubLink(c.clubId, c.club)}${c.loan ? ' <span class="tag tb2">LOAN</span>' : ''}</td><td class="tc">${c.apps}${c.sub ? `<span class="dim">+${c.sub}</span>` : ''}</td><td class="tc">${c.goals}</td><td class="tc">${c.assists}</td><td class="tc">${gk ? c.cs : c.yel}</td><td class="tc">${c.red}</td><td class="tc hide-m">${c.inj}</td><td class="tc">${c.rating ? rb10(c.rating) : '<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="small dim" style="padding:12px">No appearances recorded yet.</div>'}</div>
+  <div class="g2"><div class="card"><div class="ch">Transfers and loans</div>${r.moves.map(m => `<div class="sr small"><span>${sw(m.season, m.week)} · ${esc(m.label)}</span><span>${clubLink(m.fromId, m.from)} → ${clubLink(m.toId, m.to)}${m.fee ? ` · <b>${money(m.fee)}</b>` : ''}</span></div>`).join('') || '<div class="small dim">No moves recorded.</div>'}</div>
+    <div class="card"><div class="ch">Honours</div>${r.honours.map(h => `<div class="sr small"><span>${h.code === 'GB' ? '🌟' : ['P', 'B', 'Y', 'G', 'WB', 'WY', 'T'].includes(h.code) ? '🏅' : '🏆'} ${esc(h.title)}</span><span>${esc(h.comp)} ${h.season}</span></div>`).join('') || '<div class="small dim">None yet.</div>'}</div></div>`;
+}
+function histComps(r){
+  const groups = [['league', 'Leagues'], ['cup', 'Domestic cups'], ['continental', 'Continental'], ['international', 'International'], ['awards', 'Awards']];
+  return groups.map(([k, l]) => { const cs = r.competitions.filter(c => c.kind === k); return cs.length ? `<div class="card"><div class="ch">${l}</div><div class="hs-grid">${cs.map(c => `<button class="chip" onclick="histGo('comp','${esc(c.key)}')">${esc(c.name)}</button>`).join('')}</div></div>` : ''; }).join('')
+    + `<div class="small dim">${r.counts.seasons} completed season${r.counts.seasons === 1 ? '' : 's'} archived · ${r.counts.matches} of your matches · ${r.counts.retired} notable retired players kept.</div>`;
+}
+function histComp(r){
+  const who = x => x ? `${playerLink(x.id, x.name)} <span class="dim">${esc(x.club || '')}${x.n != null ? ` · ${x.n}` : ''}</span>` : '<span class="dim">–</span>';
+  const body = r.kind === 'awards' ? r.seasons.map(s => `<div class="card"><div class="ch">${esc(s.label)}</div><div class="sr small"><span>🌟 Golden Ball</span><span>${who(s.goldenBall)}</span></div><div class="sr small"><span>👟 Golden Boot</span><span>${who(s.goldenBoot)}</span></div><div class="sr small"><span>⭐ Golden Boy</span><span>${who(s.goldenBoy)}</span></div>
+      ${s.team.length ? `<div class="small dim mt4">Team of the year: ${s.team.map(x => `${esc(x.pos)} ${playerLink(x.id, x.name)}`).join(' · ')}</div>` : ''}</div>`).join('')
+    : r.seasons.map((s, i) => `<div class="card"><div class="row"><b style="flex:1">${esc(s.label)}</b>${s.table ? `<button class="btn bg bxs" onclick="histTable(${i})">Final table</button>` : ''}</div>
+      <div class="sr small"><span>🏆 Winner</span><b>${s.winnerId != null ? clubLink(s.winnerId, s.winner) : esc(s.winner || '–')}</b></div><div class="sr small"><span>🥈 Runner-up</span><span>${s.runnerUpId != null ? clubLink(s.runnerUpId, s.runnerUp) : esc(s.runnerUp || '–')}</span></div>
+      ${r.kind === 'league' ? `<div class="sr small"><span>👟 Top scorer</span><span>${who(s.top)}</span></div><div class="sr small"><span>🏅 Player of the season</span><span>${who(s.best)}</span></div><div class="sr small"><span>⭐ Young player</span><span>${who(s.young)}</span></div><div class="sr small"><span>🧤 Golden Glove</span><span>${who(s.glove)}</span></div>` : ''}
+      ${s.partial ? '<div class="small dim">From before the full archive: winners only.</div>' : ''}</div>`).join('');
+  HIST.comp = r;
+  return `<div class="row" style="margin-bottom:8px"><button class="btn bg bsm" onclick="histGo('comps')">‹ All competitions</button><div class="mo-title" style="margin:0;flex:1">${esc(r.name)}</div></div>
+    ${r.titles.length ? `<div class="card"><div class="ch">Roll of honour</div><div class="hs-grid">${r.titles.map(t => `<span class="chip">${esc(t.club)} <b>${t.n}</b></span>`).join('')}</div></div>` : ''}
+    ${body || '<div class="card small dim">No completed seasons yet. Winners appear here at the end of each season.</div>'}`;
+}
+function histTable(i){
+  const s = HIST.comp && HIST.comp.seasons[i]; if (!s || !s.table) return;
+  openMo('genMo');
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">${esc(HIST.comp.name)} ${esc(s.label)}</div><div style="overflow:auto"><table class="st"><thead><tr><th>#</th><th>Club</th><th class="tc">P</th><th class="tc">W</th><th class="tc">D</th><th class="tc">L</th><th class="tc">GD</th><th class="tc">Pts</th><th></th></tr></thead><tbody>
+    ${s.table.map(t => `<tr><td>${t.pos}</td><td><a href="#" class="hl" onclick="closeMo('genMo');histGo('club',${t.clubId});return false">${esc(t.club)}</a></td><td class="tc">${t.p}</td><td class="tc">${t.w}</td><td class="tc">${t.d}</td><td class="tc">${t.l}</td><td class="tc">${t.gf - t.ga >= 0 ? '+' : ''}${t.gf - t.ga}</td><td class="tc"><b>${t.pts}</b></td><td>${flagBadge(t.flag)}</td></tr>`).join('')}</tbody></table></div><button class="btn bg fw mt8" onclick="closeMo('genMo')">Close</button>`;
+}
+function histMatches(r){
+  const s = HIST.arg;
+  return `<div class="chips"><span class="small dim">Season</span><button class="chip ${!s ? 'on' : ''}" onclick="histGo('matches')">All</button>${r.seasons.map(x => `<button class="chip ${s == x ? 'on' : ''}" onclick="histGo('matches',${x})">${x}/${String(x + 1).slice(2)}</button>`).join('')}</div>
+    <div class="card" style="padding:0;overflow:hidden">${r.matches.map(m => `<div class="lu-row" onclick="histGo('match',${m.id})"><span class="small dim" style="width:64px">${m.season}/${String(m.season + 1).slice(2)} wk ${m.week}</span><span class="lu-n"><b>${esc(m.home)} ${m.hg}–${m.ag} ${esc(m.away)}</b><span class="small dim">${esc(m.comp)}${m.pens ? ` · pens ${m.pens.home}–${m.pens.away}` : ''}</span></span><span class="lu-act">Details ›</span></div>`).join('') || '<div class="small dim" style="padding:12px">Matches you manage are recorded here.</div>'}</div>`;
+}
+function histMatch(r){
+  const m = r.match, side = i => (m.xi[i] || []).map(([id, name, slot]) => { const rt = ((m.rt || [])[i] || []).find(x => x[0] === id); return `<div class="sr small"><span><b style="font-family:var(--fm);font-size:10px;width:34px;display:inline-block">${esc(slot)}</b>${playerLink(id, name)}</span>${rt ? rb10(rt[1] / 10) : ''}</div>`; }).join('');
+  const icon = { goal: '⚽', yellow: '🟨', red: '🟥', sub: '🔁', injury: '🏥' };
+  return `<div class="row" style="margin-bottom:8px"><button class="btn bg bsm" onclick="histGo('matches')">‹ Matches</button><span class="small dim" style="flex:1">${esc(m.c)} · ${m.s}/${String(m.s + 1).slice(2)} week ${m.w}</span></div>
+  <div class="card"><div class="score">${clubLink(m.h, m.hn)} ${m.hg} – ${m.ag} ${clubLink(m.a, m.an)}</div>${m.pens ? `<div class="small" style="text-align:center">Penalties ${m.pens.home}–${m.pens.away}</div>` : ''}
+    <div class="g4 mt8">${[['xG', `${m.x[0]} – ${m.x[1]}`], ['Shots', `${m.sh[0]} – ${m.sh[1]}`], ['Possession', `${m.pos}% – ${100 - m.pos}%`], ['Formations', m.f ? `${m.f[0]} · ${m.f[1]}` : '–']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+    ${m.motm ? `<div class="small" style="text-align:center;margin-top:6px">⭐ Man of the match: <b>${esc(m.motm)}</b></div>` : ''}</div>
+  <div class="card"><div class="ch">Events</div>${m.ev.map(e => `<div class="small" style="padding:3px 0">${e[0]}' ${esc(e[3])} <span class="dim">· ${esc(e[2] ? m.an : m.hn)}</span></div>`).join('') || '<div class="small dim">A quiet game.</div>'}</div>
+  <div class="g2"><div class="card"><div class="ch">${esc(m.hn)}</div>${side(0)}</div><div class="card"><div class="ch">${esc(m.an)}</div>${side(1)}</div></div>`;
 }
 
 // ── SAVES ───────────────────────────────────────────────────────────
@@ -1809,6 +2007,7 @@ function rSettings(){
       <label class="lbl">Theme</label><div class="row" style="margin-bottom:10px">${['dark', 'light'].map(t => `<button class="btn bsm ${(PREFS.theme || 'dark') === t ? 'bact' : 'bg'}" onclick="PREFS.theme='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Text size</label><div class="row" style="margin-bottom:10px">${['normal', 'large'].map(t => `<button class="btn bsm ${(PREFS.size || 'normal') === t ? 'bact' : 'bg'}" onclick="PREFS.size='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">3D graphics quality</label><select onchange="PREFS.gfx=this.value;savePrefs()">${[['auto', 'Automatic (decides from your device)'], ['low', 'Low — smoothest on older phones'], ['high', 'High — sharper, with shadows']].map(([k, l]) => `<option value="${k}" ${(PREFS.gfx || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Sound</label><div class="row"><button class="btn bsm ${PREFS.sound === false ? 'bg' : 'bact'}" onclick="toggleSound();renderSection('settings')">${PREFS.sound === false ? '🔇 Off' : '🔊 On'}</button>
         <input type="range" min="0" max="1" step="0.05" value="${PREFS.volume ?? 0.6}" oninput="PREFS.volume=+this.value;savePrefs();if(window.GafferSound)GafferSound.setVolume(PREFS.volume)" style="flex:1;padding:0"></div></div>
     ${settingsExtra()}

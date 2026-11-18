@@ -241,21 +241,38 @@ function buildCornerFlags(scene) {
 }
 
 // Face painted on the head sphere (the front of the head is at u = 0.5).
-function faceTexture(skin) {
+// Palettes shared with the portraits in index.html (keep them in step).
+const SKIN_PAL = ['#f6d7c3', '#ecc0a0', '#dca67f', '#c98d62', '#ad724a', '#8d5636', '#6c3f26', '#4a2a19'];
+const HAIR_PAL = ['#16110d', '#3a2618', '#5c3b22', '#8a6237', '#d8b46a', '#a8481f'];
+const EYE_PAL = ['#3b2416', '#5a3a1e', '#3f6f8f', '#4f7a45'];
+const greyed = (hex, g) => new THREE.Color(hex).lerp(new THREE.Color('#b9b4ad'), Math.min(1, g || 0));
+
+// Face painted on the head sphere (the front of the head is at u = 0.5).
+function faceTexture(skin, eye = EYE_PAL[0], brows = 1, beard = 'none', beardHex = '#16110d') {
   const c = document.createElement('canvas'); c.width = 256; c.height = 128;
   const g = c.getContext('2d');
-  const base = new THREE.Color(skin), dark = base.clone().multiplyScalar(0.62), lite = base.clone().lerp(new THREE.Color(0xffffff), 0.12);
+  const base = new THREE.Color(skin), dark = base.clone().multiplyScalar(0.62), mid = base.clone().multiplyScalar(0.8), lite = base.clone().lerp(new THREE.Color(0xffffff), 0.14);
   g.fillStyle = `#${base.getHexString()}`; g.fillRect(0, 0, 256, 128);
-  const gr = g.createRadialGradient(128, 62, 6, 128, 62, 46); gr.addColorStop(0, `#${lite.getHexString()}`); gr.addColorStop(1, `#${base.getHexString()}`);
-  g.fillStyle = gr; g.fillRect(84, 20, 88, 92);
-  for (const dx of [-15, 15]) {
-    g.fillStyle = '#f4f1ea'; g.beginPath(); g.ellipse(128 + dx, 56, 6, 3.6, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1b1410'; g.beginPath(); g.arc(128 + dx, 56, 2.6, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = '#1b1410'; g.lineWidth = 3; g.beginPath(); g.moveTo(128 + dx - 8, 47); g.lineTo(128 + dx + 8, 46); g.stroke();
+  const gr = g.createRadialGradient(128, 58, 6, 128, 62, 50); gr.addColorStop(0, `#${lite.getHexString()}`); gr.addColorStop(1, `#${base.getHexString()}`);
+  g.fillStyle = gr; g.fillRect(78, 14, 100, 100);
+  for (const dx of [-30, 30]) { const sg = g.createRadialGradient(128 + dx, 70, 2, 128 + dx, 70, 16); sg.addColorStop(0, `#${mid.getHexString()}55`); sg.addColorStop(1, `#${mid.getHexString()}00`); g.fillStyle = sg; g.fillRect(100 + dx, 50, 56, 40); }
+  if (beard !== 'none') {
+    g.globalAlpha = beard === 'stubble' ? 0.28 : beard === 'moustache' ? 0 : 0.85;
+    g.fillStyle = beardHex; g.beginPath(); g.moveTo(96, 70); g.quadraticCurveTo(100, 112, 128, 116); g.quadraticCurveTo(156, 112, 160, 70); g.quadraticCurveTo(146, 84, 128, 84); g.quadraticCurveTo(110, 84, 96, 70); g.fill();
+    g.globalAlpha = beard === 'stubble' ? 0.3 : 0.9;
+    if (beard !== 'chin strap') { g.beginPath(); g.ellipse(128, 83, 11, 2.6, 0, 0, Math.PI * 2); g.fill(); }
+    g.globalAlpha = 1;
   }
-  g.strokeStyle = `#${dark.getHexString()}`; g.lineWidth = 2.5;
-  g.beginPath(); g.moveTo(128, 60); g.lineTo(126, 72); g.lineTo(131, 73); g.stroke();              // nose
-  g.lineWidth = 3; g.beginPath(); g.moveTo(118, 87); g.quadraticCurveTo(128, 91, 138, 87); g.stroke();   // mouth
+  for (const dx of [-15, 15]) {
+    g.fillStyle = '#f4f1ea'; g.beginPath(); g.ellipse(128 + dx, 56, 6.4, 3.6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = eye; g.beginPath(); g.arc(128 + dx, 56, 2.9, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#0d0a08'; g.beginPath(); g.arc(128 + dx, 56, 1.3, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = `#${dark.getHexString()}`; g.lineWidth = 1; g.beginPath(); g.ellipse(128 + dx, 56, 6.4, 3.6, 0, Math.PI, 0); g.stroke();
+    g.strokeStyle = beardHex; g.lineWidth = 2 + brows; g.lineCap = 'round'; g.beginPath(); g.moveTo(128 + dx - 8, 48); g.quadraticCurveTo(128 + dx, 44, 128 + dx + 8, 47); g.stroke();
+  }
+  g.fillStyle = `#${mid.getHexString()}`; g.beginPath(); g.moveTo(128, 58); g.lineTo(123, 74); g.quadraticCurveTo(128, 77, 133, 74); g.closePath(); g.fill();   // nose
+  g.fillStyle = `#${dark.getHexString()}`; g.beginPath(); g.ellipse(128, 89, 9, 2.4, 0, 0, Math.PI * 2); g.fill();                                     // lips
+  g.fillStyle = `#${base.clone().multiplyScalar(0.72).getHexString()}`; g.beginPath(); g.ellipse(128, 91, 7, 1.8, 0, 0, Math.PI); g.fill();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -278,43 +295,67 @@ function playerGeometry() {
     shoulder: new THREE.SphereGeometry(0.07, 8, 6), upper: cyl(0.055, 0.045, 0.27, -0.135, 8), sleeve: cyl(0.066, 0.062, 0.15, -0.07, 8),
     fore: cyl(0.044, 0.034, 0.25, -0.125, 8), hand,
     blob: new THREE.PlaneGeometry(1.5, 1.5), streak: new THREE.PlaneGeometry(2.4, 0.62),
+    curl: new THREE.SphereGeometry(0.042, 8, 6), strip: new THREE.BoxGeometry(0.2, 0.07, 0.045), twist: cyl(0.02, 0.016, 0.13, -0.065, 6),
+    longBack: (() => { const g = new THREE.SphereGeometry(0.13, 12, 10); g.scale(0.8, 1.5, 1.05); g.translate(-0.05, -0.1, 0); return g; })(),
+    beard: new THREE.SphereGeometry(0.118, 14, 8, -Math.PI * 0.42, Math.PI * 0.84, Math.PI * 0.55, Math.PI * 0.3),
+    calf: (() => { const g = new THREE.SphereGeometry(0.06, 8, 6); g.scale(1, 1.9, 1); g.translate(-0.012, -0.13, 0); return g; })(),
+    card: new THREE.PlaneGeometry(0.09, 0.12), flag: (() => { const g = new THREE.PlaneGeometry(0.34, 0.26); g.translate(0.17, 0.13, 0); return g; })(),
+    pole: cyl(0.012, 0.012, 0.6, 0.3, 5), board: new THREE.BoxGeometry(0.62, 0.42, 0.05),
   };
 }
 
 function makePlayer(geo, m) {
   const g = new THREE.Group();
   const rig = new THREE.Group(); g.add(rig);
-  const build = m.build || { h: 1, w: 1 };
-  rig.scale.set(S * build.h * build.w, S * build.h, S * build.h * build.w);
+  const lk = m.look || null;
+  const hs = lk ? lk.heightCm / 181 : (m.build ? m.build.h : 1);
+  const bw = lk ? 0.94 + lk.build / 15 * 0.13 : (m.build ? m.build.w : 1);       // broader players fill out the frame
+  rig.scale.set(S * hs * bw, S * hs, S * hs * bw);
+  const limb = lk ? 0.92 + lk.build / 15 * 0.2 : 1;                              // and carry thicker limbs
   const mesh = (ge, ma, shadow) => { const x = new THREE.Mesh(ge, ma); x.castShadow = !!shadow; return x; };
   const hips = new THREE.Group(); hips.position.y = 0.94; rig.add(hips);
   const pelvis = mesh(geo.pelvis, m.shorts, true); pelvis.scale.set(0.72, 1, 1.08); hips.add(pelvis);
   const torso = new THREE.Group(); torso.position.y = 0.04; hips.add(torso);
-  const chest = mesh(geo.chest, m.shirt, true); chest.scale.set(0.66, 1, 1.12); torso.add(chest);
-  const neck = mesh(geo.neck, m.skin); neck.position.y = 0.63; torso.add(neck);
+  const chest = mesh(geo.chest, m.shirt, true); chest.scale.set(0.66 * (0.96 + (bw - 1)), 1, 1.12); torso.add(chest);
+  const neck = mesh(geo.neck, m.skin); neck.position.y = 0.63; neck.scale.set(limb, 1, limb); torso.add(neck);
   const head = new THREE.Group(); head.position.y = 0.78; torso.add(head);
-  const skull = mesh(geo.head, m.face || m.skin, true); skull.scale.set(0.97, 1.15, 0.9); head.add(skull);
-  for (const z of [-0.105, 0.105]) { const e = mesh(geo.ear, m.skin); e.position.set(-0.005, 0, z); head.add(e); }
-  const nose = mesh(geo.nose, m.skin); nose.position.set(0.108, -0.012, 0); head.add(nose);
-  if (m.hairStyle === 0 || m.hairStyle === 2) { const h = mesh(geo.hairCap, m.hair); h.scale.set(1, 1.12, 0.93); h.position.set(-0.014, 0.022, 0); head.add(h); }
-  if (m.hairStyle === 1) { const h = mesh(geo.hairAfro, m.hair); h.position.set(-0.024, 0.06, 0); head.add(h); }
-  if (m.hairStyle === 2) { const t2 = mesh(geo.hairTop, m.hair); t2.position.set(0, 0.145, 0); head.add(t2); }
+  const shape = lk ? [[0.97, 1.15, 0.9], [0.93, 1.21, 0.88], [1.02, 1.1, 0.95], [0.94, 1.17, 0.86]][lk.head] : [0.97, 1.15, 0.9];
+  const skull = mesh(geo.head, m.face || m.skin, true); skull.scale.set(...shape); head.add(skull);
+  for (const z of [-0.105, 0.105]) { const e = mesh(geo.ear, m.skin); e.position.set(-0.005, 0, z * shape[2] / 0.9); head.add(e); }
+  const nose = mesh(geo.nose, m.skin); nose.position.set(0.108 * shape[0] / 0.97, -0.012, 0); head.add(nose);
+  const style = lk ? lk.hairStyle : ['crop', 'afro', 'fade', 'bald'][m.hairStyle || 0];
+  const cap = (sc = 1, op) => { const h = mesh(geo.hairCap, op ? m.hairSoft : m.hair); h.scale.set(shape[0] * sc, shape[1] * 0.98 * sc, shape[2] * sc); h.position.set(-0.014, 0.022, 0); head.add(h); return h; };
+  if (style === 'crop' || style === 'swept' || style === 'curly' || style === 'long' || style === 'twists') cap(1.02);
+  if (style === 'buzz' || style === 'fade' || style === 'mohawk') cap(1.0, true);
+  if (style === 'receding') { const h = cap(1.0, true); h.position.x = -0.03; h.rotation.z = 0.25; }
+  if (style === 'afro') { const h = mesh(geo.hairAfro, m.hair); h.position.set(-0.024, 0.06, 0); head.add(h); }
+  if (style === 'fade') { const t2 = mesh(geo.hairTop, m.hair); t2.position.set(0, 0.145, 0); head.add(t2); }
+  if (style === 'swept') { const t2 = mesh(geo.hairTop, m.hair); t2.scale.set(1.05, 0.8, 1.1); t2.position.set(0.02, 0.13, 0.02); t2.rotation.set(0.25, 0, -0.2); head.add(t2); }
+  if (style === 'mohawk') { const t2 = mesh(geo.strip, m.hair); t2.position.set(-0.01, 0.15, 0); head.add(t2); }
+  if (style === 'curly') for (let k = 0; k < 9; k++) { const c = mesh(geo.curl, m.hair); const a = (k / 9) * Math.PI * 2; c.position.set(Math.cos(a) * 0.07 - 0.01, 0.13 + Math.sin(k * 1.7) * 0.012, Math.sin(a) * 0.07); head.add(c); }
+  if (style === 'twists') for (let k = 0; k < 10; k++) { const c = mesh(geo.twist, m.hair); const a = (k / 10) * Math.PI * 2; c.position.set(Math.cos(a) * 0.1 - 0.02, 0.1, Math.sin(a) * 0.1); c.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); head.add(c); }
+  if (style === 'long') { const b = mesh(geo.longBack, m.hair); head.add(b); }
+  const beard = lk ? lk.beardStyle : 'none';
+  if (beard === 'full' || beard === 'goatee') { const b = mesh(geo.beard, m.beard || m.hair); b.scale.set(shape[0] * 1.04, shape[1] * (beard === 'goatee' ? 0.95 : 1.04), shape[2] * (beard === 'goatee' ? 0.45 : 1.06)); head.add(b); }
   const leg = z => {
     const hip = new THREE.Group(); hip.position.set(0, -0.03, z); hips.add(hip);
-    hip.add(mesh(geo.thigh, m.skin, true), mesh(geo.shortsLeg, m.shorts));
+    const th = mesh(geo.thigh, m.skin, true); th.scale.set(limb, 1, limb);
+    hip.add(th, mesh(geo.shortsLeg, m.shorts));
     const knee = new THREE.Group(); knee.position.y = -0.42; hip.add(knee);
-    knee.add(mesh(geo.knee, m.skin), mesh(geo.shin, m.skin), mesh(geo.sock, m.sock, true));
+    const calf = mesh(geo.calf, m.skin); calf.scale.set(limb, 1, limb);
+    knee.add(mesh(geo.knee, m.skin), mesh(geo.shin, m.skin), calf, mesh(geo.sock, m.sock, true));
     const ankle = new THREE.Group(); ankle.position.y = -0.41; knee.add(ankle);
     ankle.add(mesh(geo.boot, m.boot, true));
     return { hip, knee, ankle };
   };
   const arm = z => {
     const sh = new THREE.Group(); sh.position.set(0, 0.5, z); torso.add(sh);
-    sh.add(mesh(geo.shoulder, m.sleeve), mesh(geo.upper, m.skin, true), mesh(geo.sleeve, m.sleeve));
+    const up = mesh(geo.upper, m.skin, true); up.scale.set(limb, 1, limb);
+    sh.add(mesh(geo.shoulder, m.sleeve), up, mesh(geo.sleeve, m.sleeve));
     const el = new THREE.Group(); el.position.y = -0.27; sh.add(el);
     el.add(mesh(geo.fore, m.skin));
     const hand = mesh(geo.hand, m.glove || m.skin); hand.position.y = -0.285; el.add(hand);
-    return { sh, el };
+    return { sh, el, hand };
   };
   const blob = new THREE.Mesh(geo.blob, m.blob); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.03; blob.renderOrder = 1; g.add(blob);
   // Night: one shadow from each floodlight. They sit in a group that cancels the player's turn,
@@ -328,7 +369,7 @@ function makePlayer(geo, m) {
       st.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx)); st.position.set(dx * 1.05, 0.025, dz * 1.05); st.renderOrder = 1; shadows.add(st);
     }
   }
-  g.userData = { rig, hips, torso, chest, head, blob, shadows, legL: leg(0.096), legR: leg(-0.096), armL: arm(0.245), armR: arm(-0.245), sy: S * build.h,
+  g.userData = { rig, hips, torso, chest, head, blob, shadows, legL: leg(0.096), legR: leg(-0.096), armL: arm(0.245), armR: arm(-0.245), sy: S * hs, cel: lk ? lk.cel : 0,
     face: 0, ph: Math.random() * 6, spd: 0, mv: 0, lx: null, lz: 0, bank: 0, acc: 0, look: 0, lastSpd: 0, fwd: 1, side: 0 };
   return g;
 }
@@ -365,7 +406,34 @@ function pose(u, a, dt, t, i) {
   let free = true;                                 // the head is free to follow the ball
   if (a.dribble) { abL -= 0.22; abR += 0.22; lean -= 0.05; }
 
-  if (a.dive) {                                   // keeper throws himself across the goal
+  if (a.injured != null) {                        // down injured: on his back, knee up, hands on the shin
+    const w = clamp01(a.injured / 0.5);
+    pitch = -1.45 * w; y = lerp(y, 0.16, w); hipL = lerp(hipL, 1.2, w); kneeL = lerp(kneeL, -1.9, w); hipR = lerp(hipR, 0.2, w); kneeR = lerp(kneeR, -0.3, w);
+    shL = shR = lerp(shL, 1.6, w); elL = elR = 1.2; lean = 0; twist = 0; roll = Math.sin(t * 3) * 0.08 * w; free = false;
+  } else if (a.header) {                          // jump and head it: neck forward, arms out for balance
+    const k = Math.sin(Math.PI * clamp01(a.header));
+    y = 0.42 * k; kneeL = kneeR = -0.7 * k; hipL = hipR = 0.3 * k; abL = -1.1 * k; abR = 1.1 * k; shL = shR = 0.5 * k; lean = 0.35 * k; headZ = -0.45 * k; free = false;
+  } else if (a.touch != null) {                   // first touch: cushion the ball with the inside of the foot
+    const k = Math.sin(Math.PI * clamp01(a.touch / 0.35));
+    hipR = lerp(hipR, 0.5, k); kneeR = lerp(kneeR, -0.55, k); spreadR -= 0.25 * k; hipL = lerp(hipL, 0.05, k); kneeL = lerp(kneeL, -0.3, k); lean = lerp(lean, 0.05, k); headZ = -0.35 * k; abL -= 0.3 * k; abR += 0.3 * k;
+  } else if (a.catchBall) {                       // keeper takes it cleanly into his chest
+    const k = clamp01(a.catchBall / 0.2);
+    shL = shR = lerp(shL, 1.35, k); elL = elR = lerp(elL, 1.15, k); abL = 0.15; abR = -0.15; kneeL = kneeR = -0.35 * k; drop = 0.05 * k; lean = 0.12 * k; free = false;
+  } else if (a.punch) {                           // keeper punches it clear
+    const k = Math.sin(Math.PI * clamp01(a.punch / 0.5));
+    y = 0.45 * k; shR = lerp(shR, 3.0, k); elR = 0.05; shL = lerp(shL, 1.2, k); elL = 0.8; kneeL = -0.9 * k; hipL = 0.6 * k; free = false;
+  } else if (a.block != null) {                   // throws a leg across the shot, arms behind his back
+    const k = Math.sin(Math.PI * clamp01(a.block / 0.6)) ** 0.7;
+    spreadR -= 0.9 * k; kneeR = lerp(kneeR, -0.1, k); hipR = lerp(hipR, 0.4, k); kneeL = lerp(kneeL, -0.6, k); shL = shR = lerp(shL, -0.7, k); elL = elR = 0.9; roll = 0.25 * k; lean = -0.1 * k; y *= 1 - k;
+  } else if (a.card) {                            // referee shows a card, arm straight up
+    shR = 3.05; elR = 0.05; abR = 0.1; shL = -0.2; elL = 0.6; lean = -0.04; headZ = 0.1;
+  } else if (a.boardUp) {                         // fourth official holds up the board
+    shL = shR = 2.5; elL = elR = 0.9; abL = -0.25; abR = 0.25;
+  } else if (a.flag) {                            // assistant referee: flag in the right hand
+    shR = Math.max(shR, 0.25); elR = 0.4;
+  }
+  if (a.injured != null || a.header || a.touch != null || a.catchBall || a.punch || a.block != null || a.card || a.boardUp) { /* action set above */ }
+  else if (a.dive) {                              // keeper throws himself across the goal
     const w = clamp01(a.dive.age / 0.2), far = Math.min(1, Math.abs(a.dive.reach) * 9);
     roll = a.dive.sign * 1.35 * w * far; y = 0.55 * w * far + 0.1 * w;
     shL = shR = lerp(shL, 2.95, w); elL = elR = 0.1; hipL = 0.25 * w; hipR = -0.2 * w; kneeL = kneeR = -0.35 * w; lean = 0; twist = 0; free = false;
@@ -383,7 +451,12 @@ function pose(u, a, dt, t, i) {
     shL = lerp(shL, 0.75 * p, w); shR = lerp(shR, -0.8 * p, w); abL = lerp(abL, -0.55, w); abR = lerp(abR, 0.4, w);
     lean = lerp(lean, q < 0.2 ? -0.12 : 0.14 * p, w); twist = lerp(twist, q < 0.2 ? -0.3 * p : 0.35 * p, w); y *= 1 - w; headZ = -0.25 * w;
   } else if (a.cel === 'scorer') {
+    // Every player has his own celebration (part of his look): jump and punch the air, a knee
+    // slide, pointing to the sky, or the aeroplane.
     if (u.spd > 1.6) { abL = -1.45; abR = 1.45; shL = shR = 0; elL = elR = 0.08; lean -= 0.05; headZ = 0.15; }          // arms out, wheeling away
+    else if (u.cel === 1) { kneeL = kneeR = -2.1; hipL = hipR = 0.75; drop = 0.42; lean = -0.35; shL = shR = 2.6; elL = elR = 0.25; headZ = 0.45; }
+    else if (u.cel === 2) { shR = 3.0; elR = 0.05; shL = 0.3; elL = 0.5; headZ = 0.55; lean = -0.12; y += Math.abs(Math.sin(t * 3)) * 0.06; }
+    else if (u.cel === 3) { abL = -1.5; abR = 1.5; shL = shR = 0; elL = elR = 0.05; roll = Math.sin(t * 2.4) * 0.3; headZ = 0.2; }
     else { const k = Math.abs(Math.sin(t * 5.5)); y += k * 0.5; shL = 2.75 + Math.sin(t * 11) * 0.25; shR = 2.75 - Math.sin(t * 11) * 0.25; elL = elR = 0.35; kneeL = kneeR = -0.5 * (1 - k); headZ = 0.2; }
     free = false;
   } else if (a.cel === 'mate') {
@@ -408,11 +481,13 @@ function pose(u, a, dt, t, i) {
   u.blob.scale.setScalar(1 - Math.min(0.6, y * 0.9));
 }
 
-export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false } = {}) {
+export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto' } = {}) {
   if (!container) throw new Error('no container');
-  const low = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(low ? 1.75 : 2, window.devicePixelRatio || 1));
+  // Graphics quality: 'low' for older phones, 'high' for strong devices, 'auto' decides from the device.
+  const weak = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
+  const low = quality === 'low' || (quality === 'auto' && weak);
+  const renderer = new THREE.WebGLRenderer({ antialias: quality !== 'low', powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(quality === 'low' ? 1 : low ? 1.75 : 2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = !low && !night;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -452,9 +527,23 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const geo = playerGeometry();
   const lam = c => new THREE.MeshLambertMaterial({ color: c });
   const blobTex = blobTexture();
-  const skinCols = [0xf1c9a5, 0xd9a066, 0x8d5524, 0x5c3a21, 0xe6b98a];
-  const skins = skinCols.map(lam), faces = skinCols.map(c => new THREE.MeshLambertMaterial({ map: faceTexture(c) }));
-  const hairs = [0x1a1410, 0x3b2a1a, 0x0c0c0c, 0xc9a45a, 0x6b3a1c].map(lam);
+  const skins = SKIN_PAL.map(c => lam(new THREE.Color(c)));
+  const faces = SKIN_PAL.map(c => new THREE.MeshLambertMaterial({ map: faceTexture(c) }));
+  const hairs = HAIR_PAL.map(c => lam(new THREE.Color(c)));
+  // Per-look materials (face with his eyes, brows and beard; hair greyed with age), cached.
+  const lookMats = new Map();
+  function matsFor(lk) {
+    if (!lk) return { skin: skins[2], face: faces[2], hair: hairs[0], hairSoft: hairs[0] };
+    const key = `${lk.skin}.${lk.eyes}.${lk.brows}.${lk.beardStyle}.${lk.hairCol}.${lk.grey}`;
+    let m = lookMats.get(key);
+    if (!m) {
+      const hc = greyed(HAIR_PAL[lk.hairCol] || HAIR_PAL[0], lk.grey), bc = greyed(HAIR_PAL[lk.hairCol] || HAIR_PAL[0], (lk.grey || 0) * 1.3);
+      m = { skin: skins[lk.skin] || skins[2], face: new THREE.MeshLambertMaterial({ map: faceTexture(SKIN_PAL[lk.skin] || SKIN_PAL[2], EYE_PAL[lk.eyes] || EYE_PAL[0], lk.brows, lk.beardStyle, `#${bc.getHexString()}`) }),
+        hair: lam(hc), hairSoft: new THREE.MeshLambertMaterial({ color: hc.clone().lerp(new THREE.Color(SKIN_PAL[lk.skin] || SKIN_PAL[2]), 0.35) }), beard: lam(bc) };
+      lookMats.set(key, m);
+    }
+    return m;
+  }
   const boots = [0x15181d, 0xf2f2f2, 0xff5a1f, 0x21d07a, 0x2aa7ff].map(lam);
   const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: night ? 0.55 : 1 });
   const streakMat = night ? new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.4 }) : null;
@@ -466,8 +555,37 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const gkKit = { home: ['#f2d21f', 0xf2d21f], away: ['#31d17c', 0x31d17c] };
   const gloves = lam(0xffffff);
   const players = { home: [], away: [] };
-  const refMats = { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, null, '#16181c') }), sleeve: lam(0x16181c), shorts: lam(0x16181c), sock: lam(0x16181c), skin: skins[1], face: faces[1], hair: hairs[0], hairStyle: 0, boot: boots[0], blob: blobMat };
-  const referee = makePlayer(geo, refMats); referee.position.set(-6, 0, 8); scene.add(referee);
+  const refMats = { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, null, '#16181c') }), sleeve: lam(0x16181c), shorts: lam(0x16181c), sock: lam(0x16181c), skin: skins[1], face: faces[1], hair: hairs[0], hairSoft: hairs[0], hairStyle: 0, boot: boots[0], blob: blobMat };
+  const official = (lkSkin, style) => makePlayer(geo, { ...refMats, skin: skins[lkSkin], face: faces[lkSkin], hairStyle: style });
+  const referee = official(1, 0); referee.position.set(-6, 0, 8); scene.add(referee);
+  // Cards in the referee's hand
+  const cardY = new THREE.Mesh(geo.card, new THREE.MeshBasicMaterial({ color: 0xffd400, side: THREE.DoubleSide }));
+  const cardR = new THREE.Mesh(geo.card, new THREE.MeshBasicMaterial({ color: 0xe0161f, side: THREE.DoubleSide }));
+  for (const cd of [cardY, cardR]) { cd.position.set(0.02, -0.11, 0); cd.visible = false; referee.userData.armR.hand.add(cd); }
+  // Two assistant referees on the touchlines, each covering a half, with a flag
+  const flagMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, side: THREE.DoubleSide });
+  const assistants = [{ fig: official(4, 2), side: 1, z: -(W / 2 + 1.2), x: 20 }, { fig: official(6, 1), side: -1, z: W / 2 + 1.2, x: -20 }];
+  for (const as of assistants) {
+    const pole = new THREE.Mesh(geo.pole, refMats.sleeve), fl = new THREE.Mesh(geo.flag, flagMat);
+    pole.rotation.z = -Math.PI / 2; fl.position.set(0, 0.6, 0); pole.add(fl);
+    pole.position.set(0, -0.05, 0); as.fig.userData.armR.hand.add(pole);
+    as.fig.position.set(as.x, 0, as.z); scene.add(as.fig);
+  }
+  // Fourth official at halfway with the substitution board
+  const fourth = official(3, 3); fourth.position.set(0, 0, W / 2 + 3.2); fourth.userData.face = -Math.PI / 2; fourth.rotation.y = -Math.PI / 2; scene.add(fourth);
+  const boardCanvas = document.createElement('canvas'); boardCanvas.width = 128; boardCanvas.height = 88;
+  const boardTex = new THREE.CanvasTexture(boardCanvas);
+  const subBoard = new THREE.Mesh(geo.board, [refMats.sleeve, refMats.sleeve, refMats.sleeve, refMats.sleeve, new THREE.MeshBasicMaterial({ map: boardTex }), new THREE.MeshBasicMaterial({ map: boardTex })]);
+  subBoard.visible = false; scene.add(subBoard);
+  let boardShown = null;
+  function drawBoard(outN, inN) {
+    const g = boardCanvas.getContext('2d');
+    g.fillStyle = '#05070a'; g.fillRect(0, 0, 128, 88);
+    g.font = 'bold 36px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#ff2b2b'; g.fillText(String(outN).padStart(2, '0'), 64, 24);
+    g.fillStyle = '#2bff6a'; g.fillText(String(inN).padStart(2, '0'), 64, 66);
+    boardTex.needsUpdate = true;
+  }
 
   const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 20, 16), new THREE.MeshLambertMaterial({ map: ballTexture() }));
   ball.castShadow = true; scene.add(ball);
@@ -513,25 +631,41 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
   if (ro) ro.observe(container);
 
+  const subsOn = { home: 0, away: 0 };
+  function buildFigure(v, side, i, d, number) {
+    const lineup = (v.m.lineups && v.m.lineups[side]) || [];
+    const entry = lineup.find(x => x.playerId === d.id) || lineup[i];
+    const lk = (entry && entry.playerId === d.id && entry.look) || ((v.m.lineups || {}).looks || {})[d.id] || null;
+    const gk = !!(entry && entry.slot === 'GK' && entry.playerId === d.id) || (lk && lk.gk);
+    const tm = team[side];
+    const kit = gk
+      ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
+      : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
+    const n = Math.abs(Number(d.id) || i * 7 + 3);
+    const p = makePlayer(geo, { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat });
+    p.userData.gk = gk; p.userData.pid = d.id; p.userData.number = number;
+    p.userData.face = side === 'home' ? 0 : Math.PI;
+    scene.add(p);
+    return p;
+  }
   function ensurePlayers(v) {
     for (const side of ['home', 'away']) {
-      if (players[side].length) continue;
-      const lineup = (v.m.lineups && v.m.lineups[side]) || [];
-      const tm = team[side];
-      let num = 1;
+      if (!players[side].length) {
+        let num = 1;
+        const lineup = (v.m.lineups && v.m.lineups[side]) || [];
+        v.dots[side].forEach((d, i) => { const gk = lineup[i] && lineup[i].slot === 'GK'; players[side].push(buildFigure(v, side, i, d, gk ? 1 : ++num)); });
+        continue;
+      }
+      // A substitute coming on gets his own face and build (and a squad number from 12 up).
       v.dots[side].forEach((d, i) => {
-        const gk = lineup[i] && lineup[i].slot === 'GK';
-        const n = Math.abs(Number(d.id) || i * 7 + 3), number = gk ? 1 : ++num;
-        const mats = gk
-          ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
-          : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
-        Object.assign(mats, { skin: skins[n % skins.length], face: faces[n % skins.length], hair: hairs[(n >> 2) % hairs.length], hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat,
-          build: { h: 0.95 + (n % 7) * 0.017 + (gk ? 0.03 : 0), w: 0.96 + ((n >> 3) % 5) * 0.024 } });   // no two players are the same size
-        const p = makePlayer(geo, mats);
-        p.userData.face = side === 'home' ? 0 : Math.PI;
-        p.userData.gk = !!gk;
-        scene.add(p);
-        players[side].push(p);
+        const old = players[side][i];
+        if (!old || old.userData.pid === d.id || d.id == null) return;
+        const outN = old.userData.number, inN = 12 + subsOn[side]++;
+        const fresh = buildFigure(v, side, i, d, inN);
+        fresh.position.copy(old.position); fresh.userData.face = old.userData.face; fresh.userData.lx = old.userData.lx; fresh.userData.lz = old.userData.lz;
+        scene.remove(old);
+        players[side][i] = fresh;
+        drawBoard(outN, inN); boardShown = { until: performance.now() + 4200 };
       });
     }
   }
@@ -566,8 +700,17 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           if (frozen) return;
           const a = { speed: Math.min(speed, 11), power: 1 };
           const isHolder = sim.poss === side && sim.holder === i;
-          if (cel) a.cel = side !== cel.side ? 'sad' : i === cel.scorer ? 'scorer' : u.gk ? null : 'mate';
-          else if (sim.dive && sim.dive.side === side && sim.dive.idx === i && sim.phase === 'shot') a.dive = { age: sim.t - sim.dive.t0, reach: sim.dive.y - d.y, sign: (Math.sign(sim.dive.y - d.y) || 1) * (Math.cos(u.face) >= 0 ? 1 : -1) };
+          const ballNear = Math.hypot(bx - px, bz - pz);
+          if (sim.injured && sim.injured.side === side && sim.injured.idx === i && sim.t - sim.injured.t0 < 3.2) a.injured = sim.t - sim.injured.t0;
+          else if (cel) a.cel = side !== cel.side ? 'sad' : i === cel.scorer ? 'scorer' : u.gk ? null : 'mate';
+          else if (sim.dive && sim.dive.side === side && sim.dive.idx === i && sim.phase === 'shot') {
+            const age = sim.t - sim.dive.t0;
+            if (sim.dive.kind === 'catch') a.catchBall = age; else if (sim.dive.kind === 'punch') a.punch = age;
+            else a.dive = { age, reach: sim.dive.y - d.y, sign: (Math.sign(sim.dive.y - d.y) || 1) * (Math.cos(u.face) >= 0 ? 1 : -1) };
+          }
+          else if (sim.block && sim.block.side === side && sim.block.idx === i && sim.t - sim.block.t0 < 0.7) a.block = sim.t - sim.block.t0;
+          else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); }
+          else if (sim.touch && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.35) a.touch = sim.t - sim.touch.t0;
           else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) a.slide = tackleAge;
           else if (sim.strike && sim.strike.side === side && sim.strike.idx === i && strikeAge < 0.55) { a.strike = strikeAge; a.power = sim.strike.power || 0.7; }
           else if (sim.phase === 'held' && !sim.goalKick && isHolder && u.gk) a.hold = true;
@@ -584,20 +727,41 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           p.rotation.y = u.face;
           if (u.shadows) u.shadows.rotation.y = -u.face;
           a.turn = turned / dt; a.rel = speed > 0.5 ? wrap(moveAng - u.face) : 0; a.look = wrap(ballAng - u.face); a.near = ballDist < 7 && by < 1.2; a.dribble = dribble;
+          if (!a.header) u.hd = 0;
           pose(u, a, dt, t, i);
         });
       }
 
-      // Referee keeps up with play, a few metres off the ball
+      // Referee keeps up with play, a few metres off the ball; for a card he goes to the player.
+      const card = sim.card && sim.t - sim.card.t0 < 3 ? sim.card : null;
+      const booked = card ? (v.dots[card.side] || [])[card.idx] : null;
+      cardY.visible = cardR.visible = false;
       if (!frozen) {
-        const rx = Math.max(-L / 2 + 4, Math.min(L / 2 - 4, bx - 7)), rz = Math.max(-W / 2 + 4, Math.min(W / 2 - 4, bz + (bz > 0 ? -9 : 9)));
+        let rx = Math.max(-L / 2 + 4, Math.min(L / 2 - 4, bx - 7)), rz = Math.max(-W / 2 + 4, Math.min(W / 2 - 4, bz + (bz > 0 ? -9 : 9)));
+        if (booked) { rx = (booked.x - 0.5) * L - 1.6; rz = (booked.y - 0.5) * W + 0.4; }
         const dx = rx - refPos.x, dz = rz - refPos.z, dist = Math.hypot(dx, dz), u = referee.userData;
         const stepLen = Math.min(dist, (dist > 4 ? 6.5 : dist > 1.5 ? 2.5 : 0) * dt);
         if (dist > 0.01) { refPos.x += dx / dist * stepLen; refPos.z += dz / dist * stepLen; }
         referee.position.set(refPos.x, 0, refPos.z);
         const refTurn = turn(u, stepLen / dt > 0.9 ? Math.atan2(-dz, dx) : Math.atan2(-(bz - refPos.z), bx - refPos.x), dt * 8);
         referee.rotation.y = u.face;
-        pose(u, { speed: stepLen / dt, power: 1, turn: refTurn / dt, look: wrap(Math.atan2(-(bz - refPos.z), bx - refPos.x) - u.face) }, dt, t, 30);
+        const showing = booked && dist < 2.2;
+        if (showing) (card.color === 'red' ? cardR : cardY).visible = true;
+        pose(u, { speed: stepLen / dt, power: 1, turn: refTurn / dt, look: wrap(Math.atan2(-(bz - refPos.z), bx - refPos.x) - u.face), card: showing }, dt, t, 30);
+        // Assistants run the line, level with play in their half
+        for (const as of assistants) {
+          const ux = as.fig.userData;
+          const target = as.side > 0 ? Math.max(4, Math.min(L / 2 - 2, bx + 3)) : Math.min(-4, Math.max(-L / 2 + 2, bx - 3));
+          const dx2 = target - as.x, st2 = Math.sign(dx2) * Math.min(Math.abs(dx2), (Math.abs(dx2) > 6 ? 6.5 : Math.abs(dx2) > 1 ? 2.2 : 0) * dt);
+          as.x += st2; as.fig.position.x = as.x;
+          const faceIn = as.z < 0 ? -Math.PI / 2 : Math.PI / 2;
+          turn(ux, faceIn, dt * 6); as.fig.rotation.y = ux.face;
+          pose(ux, { speed: Math.abs(st2) / dt, rel: Math.sign(st2) * (as.z < 0 ? 1 : -1) * Math.PI / 2, power: 1, look: wrap(Math.atan2(-(bz - as.fig.position.z), bx - as.x) - ux.face), flag: true }, dt, t, 40 + as.side);
+        }
+        const boardUp = boardShown && now < boardShown.until;
+        subBoard.visible = !!boardUp;
+        if (boardUp) subBoard.position.set(0.5, 2.55 * S, W / 2 + 3.2);
+        pose(fourth.userData, { speed: 0, power: 1, look: wrap(Math.atan2(-(bz - W / 2 - 3.2), bx) - fourth.userData.face), boardUp }, dt, t, 50);
       }
 
       // Ball: position, spin from its movement, shadow, trail
@@ -692,6 +856,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         camera.position.lerp(camTarget, ease(2.6));
       } else {
         if (mode === 'high') { camTarget.set(bx * 0.25, 88, 36); tmp.set(bx * 0.3, 0, 0); look.lerp(tmp, ease(5)); }
+        else if (mode === 'wide') { camTarget.set(bx * 0.55, 30, 64); tmp.set(bx * 0.7, 0, bz * 0.25); look.lerp(tmp, ease(4)); }
         else if (mode === 'goal') { const s = bx >= 0 ? 1 : -1; camTarget.set(s * (L / 2 + 15), 10, bz * 0.25); tmp.set(bx - s * 6, 1, bz * 0.6); look.lerp(tmp, ease(5)); }
         else if (mode === 'close') { camTarget.set(bx * 0.93, 8.5, bz + 23); tmp.set(bx, 1.1, bz * 0.92); look.lerp(tmp, ease(6)); }
         else { const zoom = (Math.abs(bx) > 30 ? 0.92 : 1) * near; camTarget.set(bx * 0.88, 12 * zoom, 28 * zoom + bz * 0.42); tmp.set(bx * 0.95, 0.6, bz * 0.66); look.lerp(tmp, ease(4.5)); }

@@ -1,6 +1,7 @@
 // src/engine/transferEngine.js — valuation, AI market, incoming bids, forced sales, free agents.
 // Every fee moves through finance.post() so both clubs' ledgers explain it.
 
+const HIST = require('./historyEngine');
 const { POS_GROUP, wageFor } = require('../utils');
 const { post, spendingFrozen, DIVISION_WAGE } = require('./financeEngine');
 const AW = require('./awardsEngine');
@@ -43,6 +44,7 @@ function squadAverage(club) {
 
 // Moves a player and posts the fee to both ledgers. fromClub may be null (free agent).
 function executeTransfer(world, p, fromClub, toClub, fee, kind = 'transfer') {
+  HIST.move(world, p, fromClub ? fromClub.id : null, toClub.id, fee, fromClub ? 'T' : 'F');
   if (fromClub) {
     fromClub.squad = fromClub.squad.filter(x => x.id !== p.id);
     fromClub.youth = fromClub.youth.filter(x => x.id !== p.id);
@@ -274,6 +276,7 @@ function forcedSales(world, club) {
 }
 
 function releasePlayer(world, club, p) {
+  HIST.move(world, p, club.id, null, 0, 'X');
   club.squad = club.squad.filter(x => x.id !== p.id);
   club.youth = club.youth.filter(x => x.id !== p.id);
   p.clubId = null;

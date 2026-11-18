@@ -19,7 +19,10 @@ MongoDB saves with a gzip-file fallback.
   matchdays, a final), World Nations Cup every second summer, Elo world rankings, caps and international goals.
 - **Matchday:** **3D stadium view** (three.js: day games and floodlit night games, stands and crowd, TV / close /
   tactical / behind-goal cameras, full-screen landscape on phones) with a broadcast score bug and clock, a radar
-  minimap, a pre-match fly-over and slow-motion goal replays; or full 2D, key moments, commentary or instant;
+  minimap, a pre-match fly-over and slow-motion goal replays. Referee (shows cards), two assistant referees
+  with flags, a fourth official with the substitution board; headers, first touches, keeper catches, punches
+  and dives, shot blocks, injuries and per-player celebrations; a wide camera and a graphics-quality setting.
+  Or full 2D, key moments, commentary or instant;
   1×–8×. **Sound** (crowd, whistles, goal roars, near-miss "ooh"s),
   synthesised in the browser. A half-time dressing room with **team talks**,
   subs, tactic and formation; assistant subs; cards and bans.
@@ -45,7 +48,17 @@ MongoDB saves with a gzip-file fallback.
   pressing, keeper dives); every shot is built up to and struck on its minute; goals end in the conceding
   side's net, followed by a celebration and a kick-off. Player ratings and a man of the match after every game.
 - **Golden Ball:** a live race for the world's player of the year, a top ten, Golden Boot, Golden Boy and a
-  team of the season; a player-of-the-season race in your own league.
+  team of the season; a player-of-the-season race in your own league; a Golden Glove in every league.
+- **History archive:** every season is archived, never overwritten — every league's final table (with
+  promotions, relegations and club balances), every honour and award, every player's season-by-season career
+  (clubs, loans, appearances, goals, assists, clean sheets, cards, injuries, ratings), every transfer and loan,
+  managerial changes at every club, your career (clubs, matches, win rate, trophies, promotions) and every
+  match you managed (lineups, formations, scorers, assists, cards, subs, stats). Notable players are kept after
+  they retire. The History screen browses it all by career, club, player, competition and match, with search.
+- **Player identity:** every player has a permanent look (skin, hair style and colour, beard, head shape,
+  eyes, height, build, celebration) saved with him, so he looks the same in every match, season and club.
+  Portraits on the squad list, profiles, lineup chooser and history match his 3D figure; hair greys and beards
+  fill in with age.
 - **Progress:** player form (last five ratings) and ▲ growth this season, a sortable squad list (position, rating, potential, value, age, wage, form, goals, condition).
 - **Play anywhere:** installs as a PWA; **offline mode** runs the whole game in the browser (Web Worker,
   saves in IndexedDB) and starts by itself when the server is unreachable; careers move between modes.
@@ -128,6 +141,7 @@ src/
     regionalEngine.js  Re-election and generated regional clubs
     newsEngine.js      The newspaper
     challengeEngine.js Weekly and season challenges, manager score, challenge codes
+    historyEngine.js   The permanent archive: seasons, careers, moves, honours, stints, matches
 public/index.html      UI (two inline scripts: core screens, then next-level screens)
 public/match3d.js      3D match view (three.js from public/vendor)
 public/sound.js        WebAudio sound engine

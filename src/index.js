@@ -30,6 +30,8 @@ const DR = require('./engine/dressingRoomEngine');
 const INTL = require('./engine/internationalEngine');
 const NEWS = require('./engine/newsEngine');
 const CH = require('./engine/challengeEngine');
+const H = require('./engine/historyEngine');
+const LOOK = require('./look');
 const REGIONAL = require('./engine/regionalEngine');
 const RENAMES = require('./data/renames.json');
 const { migrate, SAVE_VERSION } = require('./migrations');
@@ -210,6 +212,7 @@ class GameWorld {
     selected.facilities = { training: this.rng.int(1, 2), youth: this.rng.int(1, 2), medical: 1, stadium: this.rng.int(2500, 3500) };
     FIN.syncBudgets(selected);
     this.manager.clubId = selected.id;
+    H.openStint(this, selected.id);
     this.manager.joinedSeason = this.season;
     this.manager.delegate = { contracts: false, bids: false };
     // Career identity and a shareable challenge code (same seed + start club = same world).
@@ -521,10 +524,16 @@ class GameWorld {
     for (const rep of SCOUT.weekly(this)) this.notify('scout', `🔭 Scout report: ${rep.name} (${rep.position}, ${rep.age}) — ability ${rep.ovr}, potential ${rep.pot}. Verdict: ${rep.verdict}.`, { playerId: rep.playerId });
     // Dressing room
     for (const e of DR.weekly(this, me, ws.reports)) this.notify(e.type, e.text, { playerId: e.playerId });
-    // Form: each of your players keeps his last five match ratings.
-    for (const rep of ws.reports) if (rep.myKey && rep.ratings) for (const x of rep.ratings[rep.myKey]) {
-      const p = this.players.get(x.playerId);
-      if (p && p.clubId === me.id) p.ratings = [...(p.ratings || []), x.rating].slice(-5);
+    // Form: each of your players keeps his last five match ratings; every rated player builds a
+    // season average, and every match you managed goes into the history archive.
+    for (const rep of ws.reports) if (rep.myKey && rep.ratings) {
+      for (const side of ['home', 'away']) for (const x of rep.ratings[side] || []) {
+        const p = this.players.get(x.playerId);
+        if (!p) continue;
+        p.seasonStats.rs = (p.seasonStats.rs || 0) + x.rating; p.seasonStats.rn = (p.seasonStats.rn || 0) + 1;
+        if (side === rep.myKey && p.clubId === me.id) p.ratings = [...(p.ratings || []), x.rating].slice(-5);
+      }
+      H.recordMatch(this, rep);
     }
     // Challenges (paid in prize money)
     const myReport = ws.reports.find(r => r.myKey);
@@ -581,6 +590,8 @@ class GameWorld {
     this.manager.sacks = (this.manager.sacks || 0) + 1;
     this.manager.reputation = clamp(this.manager.reputation - 8, 1, 99);
     this.history.sackings.push({ season: this.season, week: this.currentWeek, club: club.name });
+    H.closeStint(this, 'sacked');
+    H.managerChange(this, club, this.manager.name, '', 'sacked');
     let offers = BOARD.jobOffers(this, 'sacked');
     if (!offers.length) offers = [this._fallbackOffer()];
     this.jobOffers = offers;
@@ -600,7 +611,10 @@ class GameWorld {
     const old = this.club();
     const c = this.clubById(clubId);
     old.manualXI = null; old.manualBench = null; old.badgeBonus = 0;
+    H.closeStint(this, 'left');
+    H.managerChange(this, c, c.managerName || this._aiManagerName(c, 0), this.manager.name, 'appointed');
     this.manager.clubId = c.id;
+    H.openStint(this, c.id);
     this.manager.joinedSeason = this.season + (this.currentWeek >= this.totalWeeks - 2 ? 1 : 0);
     this.manager.status = 'employed';
     this.jobOffers = [];
@@ -893,6 +907,8 @@ class GameWorld {
       if (c.sponsor) c.sponsor.years -= 1;
     }
 
+    // History: archive the whole season before loans end and players age.
+    H.archiveSeason(this, finalTables, moves, { wnc: intlEnd.wnc });
     // Loans end. Your own players come home with a report on how they did.
     for (const p of this.players.values()) {
       if (p.loan && p.loan.parentClubId === this.manager.clubId && p.clubId !== this.manager.clubId && !p.retired) this.notify('squad', `↩️ ${p.name} returns from his loan at ${this.clubById(p.clubId)?.name || 'his club'}: ${this._loanLine(p)}.`, { playerId: p.id });
@@ -902,6 +918,7 @@ class GameWorld {
       const parent = this.clubById(p.loan.parentClubId);
       const cur = this.clubById(p.clubId);
       if (cur) { cur.squad = cur.squad.filter(x => x.id !== p.id); cur.youth = cur.youth.filter(x => x.id !== p.id); }
+      H.move(this, p, cur ? cur.id : null, parent ? parent.id : null, 0, 'R');
       if (parent) { parent.squad.push(p); p.clubId = parent.id; }
       else p.clubId = null;
       p.loan = null;
@@ -964,6 +981,7 @@ class GameWorld {
       if (r.country === me.country) this.notify('news', `🗳 Re-election: ${r.out.join(' and ')} drop out of ${r.league}; ${r.in.join(' and ')} join.`);
       if (r.spared === me.name) this.notify('board', '⚖️ The club finished in the re-election places. It survived the vote — with a fine.');
     }
+    H.markReElection(this, this.season, regional);
     this.jobOffers = (this.jobOffers || []).filter(o => this.clubById(o.clubId));
     if (this.manager.status === 'sacked' && !this.jobOffers.length) this.jobOffers = [this._fallbackOffer()];
 
@@ -971,7 +989,7 @@ class GameWorld {
     for (const c of this.clubs) if (c.id !== me.id) FIN.aiInvest(c, this.rng);
     TR.aiMarketRound(this, 1);
     TR.enforceFreeAgentCap(this);
-    for (const [id, p] of this.players) if (p.retired) this.players.delete(id);
+    for (const [id, p] of this.players) if (p.retired) { H.retire(this, p); this.players.delete(id); }
     SCOUT.prune(this);
     for (const id of Object.keys(this.negotiations)) if (!this.players.has(Number(id))) delete this.negotiations[id];
     for (const c of this.clubs) this._ensureMatchSquad(c);
@@ -1295,6 +1313,7 @@ class GameWorld {
             c.sackedSeason = this.season;
             c.boardTrust = 50;
             c.managerName = this._aiManagerName(c, 1);
+            H.managerChange(this, c, old, c.managerName, 'sacked');
             NEWS.sacking(this, c, old);
           }
         }
@@ -1393,7 +1412,168 @@ class GameWorld {
     me.squad.push(p);
     p.clubId = me.id;
     p.loan = { parentClubId: from.id, fee, wageContribution: wage, startSeason: this.season, endSeason: this.season + 1 };
+    H.move(this, p, from.id, me.id, fee, 'L');
     return { ok: true, player: p.name, loanFee: fee, wageContribution: wage, action: 'loaned' };
+  }
+
+  // ── history archive views (src/engine/historyEngine.js holds the data) ─────────
+  _histName(id) { return H.nameOf(this, id); }
+  _compKind(k) { return k[0] === 'L' ? 'league' : k[0] === 'C' ? 'cup' : k[0] === 'K' ? 'continental' : k === 'GB' ? 'awards' : 'international'; }
+
+  historyIndex() {
+    const a = H.ensure(this);
+    const seasons = Object.keys(a.seasons).map(Number).sort((x, y) => y - x);
+    const comps = new Map();
+    for (const lg of this.leagues) comps.set(`L${lg.id}`, { key: `L${lg.id}`, name: `${lg.country} ${lg.name}`, country: lg.country, kind: 'league', level: lg.level });
+    for (const c of this.cups || []) comps.set(`C${c.name}`, { key: `C${c.name}`, name: c.name, country: c.country, kind: 'cup' });
+    for (const c of this.continental || []) comps.set(`K${c.name}`, { key: `K${c.name}`, name: c.name, country: c.continent, kind: 'continental' });
+    for (const s of seasons) for (const h of a.seasons[s].honours) if (!comps.has(h.k)) comps.set(h.k, { key: h.k, name: h.comp, country: '', kind: this._compKind(h.k) });
+    comps.set('N', { key: 'N', name: 'Nations League', country: 'World', kind: 'international' });
+    comps.set('W', { key: 'W', name: 'World Nations Cup', country: 'World', kind: 'international' });
+    comps.set('GB', { key: 'GB', name: 'Golden Ball & world awards', country: 'World', kind: 'awards' });
+    const myClubs = [...new Set(a.stints.map(s => s.clubId).filter(x => x != null))].map(id => ({ id, name: this._histName(id) }));
+    return { ok: true, seasons, currentSeason: this.season, competitions: [...comps.values()], myClubs, clubId: this.manager.clubId,
+      counts: { seasons: seasons.length, matches: a.matches.length, retired: Object.keys(a.retired).length } };
+  }
+
+  competitionHistory(key) {
+    const a = H.ensure(this);
+    const kind = this._compKind(key);
+    const rows = [], titles = new Map();
+    const nm = id => (id == null ? null : this._histName(id));
+    for (const s of Object.keys(a.seasons).map(Number).sort((x, y) => y - x)) {
+      const rec = a.seasons[s];
+      if (key === 'GB') {
+        const f = k => rec.awards.find(x => x.comp === 'world' && x.k === k);
+        const gb = f('GB'); if (!gb) continue;
+        const pick = x => x ? { id: x.id, name: x.name, club: x.club || nm(x.clubId), clubId: x.clubId, n: x.n } : null;
+        rows.push({ season: s, label: rec.label, goldenBall: pick(gb), goldenBoot: pick(f('WB')), goldenBoy: pick(f('WY')),
+          team: ((rec.awards.find(x => x.k === 'TEAM') || {}).team || []).map(([id, name, pos, clubId]) => ({ id, name, pos, club: nm(clubId) })) });
+        titles.set(gb.name, (titles.get(gb.name) || 0) + 1);
+        continue;
+      }
+      const h = rec.honours.find(x => x.k === key);
+      if (!h) continue;
+      const row = { season: s, label: rec.label, partial: !!rec.partial,
+        winner: h.nation || nm(h.winner), winnerId: h.winner ?? null, runnerUp: h.runnerUpNation || nm(h.runnerUp) || h.runnerUpName || null, runnerUpId: h.runnerUp ?? null };
+      if (kind === 'league') {
+        const lr = rec.leagues[key.slice(1)];
+        const aw = k => { const x = rec.awards.find(y => y.comp === key && y.k === k); return x ? { id: x.id, name: x.name, club: x.club || nm(x.clubId), n: x.n } : null; };
+        Object.assign(row, { top: lr && lr.top ? { id: lr.top[0], name: lr.top[1], club: nm(lr.top[2]), n: lr.top[3] } : null,
+          glove: lr && lr.glove ? { id: lr.glove[0], name: lr.glove[1], club: nm(lr.glove[2]), n: lr.glove[3] } : null,
+          best: aw('P'), young: aw('Y'),
+          table: lr ? lr.rows.map((r, i) => ({ pos: i + 1, clubId: r[0], club: nm(r[0]), p: r[1], w: r[2], d: r[3], l: r[4], gf: r[5], ga: r[6], pts: r[7], flag: r[8] })) : null });
+      }
+      rows.push(row);
+      titles.set(row.winner, (titles.get(row.winner) || 0) + 1);
+    }
+    const name = (this.historyIndex().competitions.find(c => c.key === key) || {}).name || key;
+    return { ok: true, key, name, kind, seasons: rows, titles: [...titles.entries()].sort((x, y) => y[1] - x[1]).map(([club, n]) => ({ club, n })) };
+  }
+
+  clubHistory(clubId) {
+    const a = H.ensure(this);
+    const c = this.clubById(clubId);
+    const name = this._histName(clubId);
+    const seasons = [], trophies = [], finals = [];
+    for (const s of Object.keys(a.seasons).map(Number).sort((x, y) => y - x)) {
+      const rec = a.seasons[s];
+      for (const [lid, lg] of Object.entries(rec.leagues)) {
+        const i = lg.rows.findIndex(r => r[0] === clubId);
+        if (i < 0) continue;
+        const r = lg.rows[i];
+        seasons.push({ season: s, label: rec.label, league: `${lg.country} ${lg.name}`, leagueKey: `L${lid}`, level: lg.level, pos: i + 1, size: lg.rows.length, p: r[1], w: r[2], d: r[3], l: r[4], gf: r[5], ga: r[6], pts: r[7], flag: r[8], balance: r[9] });
+      }
+      for (const h of rec.honours) {
+        if (h.winner === clubId) trophies.push({ season: s, label: rec.label, comp: h.comp, kind: this._compKind(h.k), key: h.k });
+        else if (h.runnerUp === clubId) finals.push({ season: s, label: rec.label, comp: h.comp, kind: this._compKind(h.k), key: h.k });
+      }
+    }
+    // Players who made their name here: appearances and goals for this club across their careers.
+    const agg = new Map();
+    const take = (id, pname, rows, live) => {
+      for (const r of rows || []) if (r[1] === clubId) {
+        const x = agg.get(id) || { id, name: pname, apps: 0, goals: 0, assists: 0, seasons: 0, from: r[0], to: r[0], live };
+        x.apps += r[2] + r[3]; x.goals += r[4]; x.assists += r[5]; x.seasons++; x.from = Math.min(x.from, r[0]); x.to = Math.max(x.to, r[0]);
+        agg.set(id, x);
+      }
+    };
+    for (const p of this.players.values()) take(p.id, p.name, p.career, true);
+    for (const r of Object.values(a.retired)) take(r.id, r.name, r.career, false);
+    const list = [...agg.values()];
+    const managers = a.changes.filter(x => x[2] === clubId).map(x => ({ season: x[0], week: x[1], out: x[3], in: x[4], why: x[5] })).reverse();
+    const mine = a.stints.filter(s => s.clubId === clubId).map(s => this._stintView(s));
+    const current = c ? { name: c.name, country: c.country, division: c.division, league: (this.leagueOf(c.id) || {}).name || '', prestige: c.prestige, balance: Math.round(c.finance.balance),
+      manager: c.id === this.manager.clubId ? this.manager.name : (c.managerName || this._aiManagerName(c, 0)), stadium: (c.facilities || {}).stadium || null } : null;
+    const count = k => trophies.filter(t => t.kind === k).length;
+    return { ok: true, clubId, name, current, seasons, trophies, finals, counts: { league: count('league'), cup: count('cup'), continental: count('continental') },
+      topApps: list.slice().sort((x, y) => y.apps - x.apps).slice(0, 10), topScorers: list.filter(x => x.goals > 0).sort((x, y) => y.goals - x.goals).slice(0, 10),
+      managers, myStints: mine, records: (this.records || {})[clubId] || null };
+  }
+
+  _stintView(s) {
+    const pct = s.p ? Math.round(s.w / s.p * 100) : null;
+    return { club: s.club, clubId: s.clubId, from: s.from, to: s.to, current: !s.to, how: s.how, p: s.p, w: s.w, d: s.d, l: s.l, gf: s.gf, ga: s.ga, winPct: pct,
+      honours: s.honours.map(([season, comp]) => ({ season, comp })), promotions: s.promotions, relegations: s.relegations, partial: !!s.partial };
+  }
+
+  managerCareer() {
+    const a = H.ensure(this);
+    const stints = a.stints.map(s => this._stintView(s)).reverse();
+    const sum = k => a.stints.reduce((t, s) => t + (s[k] || 0), 0);
+    const p = sum('p'), w = sum('w');
+    return { ok: true, name: this.manager.name, reputation: this.manager.reputation, trophies: this.manager.trophies, sacks: this.manager.sacks || 0,
+      totals: { clubs: new Set(a.stints.map(s => s.clubId)).size, p, w, d: sum('d'), l: sum('l'), gf: sum('gf'), ga: sum('ga'), winPct: p ? Math.round(w / p * 100) : null, promotions: sum('promotions'), relegations: sum('relegations'), honours: a.stints.reduce((t, s) => t + s.honours.length, 0) },
+      stints, seasons: this.managerHistory.slice().reverse(), achievements: Object.keys(this.achievements || {}) };
+  }
+
+  playerHistory(id) {
+    const a = H.ensure(this);
+    const live = this.players.get(id);
+    const src = live || a.retired[id];
+    if (!src) return { ok: false, error: 'No record of that player' };
+    const nm = cid => (cid == null ? 'Free agent' : this._histName(cid));
+    const rows = (src.career || []).map(r => ({ season: r[0], label: `${r[0]}/${r[0] + 1}`, clubId: r[1], club: nm(r[1]), apps: r[2], sub: r[3], goals: r[4], assists: r[5], yel: r[6], red: r[7], cs: r[8], inj: r[9], mins: r[10], rating: r[11] ? r[11] / 10 : null, loan: !!r[12] }));
+    if (live && live.seasonStats && live.seasonStats.apps + (live.seasonStats.subApps || 0) > 0 && !rows.some(r => r.season === this.season)) {
+      const ss = live.seasonStats;
+      rows.push({ season: this.season, label: `${this.season}/${this.season + 1}`, clubId: live.clubId, club: nm(live.clubId), apps: ss.apps, sub: ss.subApps || 0, goals: ss.goals, assists: ss.assists, yel: ss.yellows || 0, red: ss.reds || 0, cs: ss.cs || 0, inj: ss.inj || 0, mins: ss.minutes || 0, rating: ss.rn ? Math.round(ss.rs / ss.rn * 10) / 10 : null, loan: !!(live.loan && live.loan.parentClubId !== live.clubId), current: true });
+    }
+    rows.sort((x, y) => y.season - x.season);
+    const t = { apps: 0, sub: 0, goals: 0, assists: 0, yel: 0, red: 0, cs: 0, inj: 0 };
+    for (const r of rows) for (const k of Object.keys(t)) t[k] += r[k] || 0;
+    const kindLabel = { T: 'Transfer', F: 'Free transfer', L: 'Loan', R: 'Back from loan', X: 'Released', Y: 'Promoted from the academy' };
+    const moves = (src.moves || []).map(m => ({ season: m[0], week: m[1], from: nm(m[2]), fromId: m[2], to: nm(m[3]), toId: m[3], fee: m[4], kind: m[5], label: kindLabel[m[5]] || m[5] })).reverse();
+    const honourLabel = { L: 'League champion', C: 'Cup winner', K: 'Continental champion', P: 'Player of the season', B: 'Golden Boot', Y: 'Young player of the season', G: 'Golden Glove', GB: 'Golden Ball', WB: 'World Golden Boot', WY: 'Golden Boy', T: 'World team of the year' };
+    const honours = (src.honours || []).map(h => ({ season: h[0], code: h[1], title: honourLabel[h[1]] || h[1], comp: h[2] })).sort((x, y) => y.season - x.season);
+    const clubs = [...new Set(rows.slice().reverse().map(r => r.club))];
+    const life = live ? live.history : null;
+    return { ok: true, id, name: src.name, nation: src.nation, position: src.position, age: src.age, retired: !live, retiredSeason: live ? null : src.retiredSeason,
+      club: live ? nm(live.clubId) : null, clubId: live ? live.clubId : null, ovr: live ? Math.round(live.currentAbility) : src.ability, look: src.look != null ? LOOK.describe(src.look, src.age) : null,
+      career: rows, totals: t, moves, honours, clubs, caps: live ? (live.history.caps || 0) : (src.caps || 0),
+      lifetime: life ? { apps: life.appearances, sub: life.subApps || 0, goals: life.goals, assists: life.assists, trophies: life.trophies, injuries: life.injuries || 0, cs: life.cs || 0 } : null };
+  }
+
+  historySearch(q) {
+    const a = H.ensure(this);
+    const s = String(q || '').trim().toLowerCase();
+    if (s.length < 2) return { ok: true, players: [], clubs: [] };
+    const players = [];
+    for (const p of this.players.values()) { if (!p.retired && p.name.toLowerCase().includes(s)) players.push({ id: p.id, name: p.name, position: p.position, age: p.age, club: this._histName(p.clubId), retired: false, ovr: Math.round(p.currentAbility) }); if (players.length >= 30) break; }
+    for (const r of Object.values(a.retired)) if (players.length < 40 && r.name.toLowerCase().includes(s)) players.push({ id: r.id, name: r.name, position: r.position, age: r.age, club: `Retired ${r.retiredSeason}`, retired: true, ovr: r.ability });
+    const clubs = Object.entries(a.clubNames).filter(([, n]) => n.toLowerCase().includes(s)).slice(0, 20).map(([id, n]) => ({ id: Number(id), name: n, active: !!this.clubById(Number(id)) }));
+    for (const c of this.clubs) if (c.name.toLowerCase().includes(s) && !clubs.some(x => x.id === c.id) && clubs.length < 20) clubs.push({ id: c.id, name: c.name, active: true });
+    return { ok: true, players, clubs };
+  }
+
+  matchArchive(season, clubId) {
+    const a = H.ensure(this);
+    const list = a.matches.filter(m => (season == null || m.s === season) && (clubId == null || m.h === clubId || m.a === clubId));
+    return { ok: true, seasons: [...new Set(a.matches.map(m => m.s))].sort((x, y) => y - x),
+      matches: list.slice().reverse().map(m => ({ id: m.id, season: m.s, week: m.w, comp: m.c, home: m.hn, away: m.an, homeId: m.h, awayId: m.a, hg: m.hg, ag: m.ag, pens: m.pens, result: m.r, mk: m.mk })) };
+  }
+  matchRecord(id) {
+    const m = H.ensure(this).matches.find(x => x.id === id);
+    return m ? { ok: true, match: m } : { ok: false, error: 'Match not found' };
   }
 
   // ── loaning your own players out ──────────────────────────────────
@@ -1462,6 +1642,7 @@ class GameWorld {
     this.pendingBids = (this.pendingBids || []).filter(b => b.playerId !== p.id);
     p.loan = { parentClubId: me.id, fee: o.fee, wageContribution: o.wagePaid, startSeason: this.season, endSeason: this.season + 1, role: o.role,
       start: { apps: p.seasonStats.apps, subApps: p.seasonStats.subApps || 0, goals: p.seasonStats.goals, assists: p.seasonStats.assists, ovr: p.currentAbility, week: this.currentWeek } };
+    H.move(this, p, me.id, to.id, o.fee, 'L');
     if (o.fee) { FIN.post(me, 'Loan fees', o.fee, `${p.name} loaned to ${to.name}`); FIN.post(to, 'Loan fees', -o.fee, `${p.name} on loan from ${me.name}`); }
     this.notify('squad', `🔁 ${p.name} joins ${to.name} on loan until the end of the season (${o.role === 'starter' ? 'expected to start' : 'squad rotation'}). They cover ${o.wageShare}% of his wages${o.fee ? ` and paid a $${Math.round(o.fee / 1000)}K fee` : ''}.`, { playerId: p.id });
     return { ok: true, action: 'loaned_out', player: p.name, club: to.name, fee: o.fee, wageShare: o.wageShare };
@@ -1475,6 +1656,7 @@ class GameWorld {
     const at = this.clubById(p.clubId);
     if (at) at.squad = at.squad.filter(x => x.id !== p.id);
     const line = this._loanLine(p);
+    H.move(this, p, at ? at.id : null, me.id, 0, 'R');
     me.squad.push(p); p.clubId = me.id; p.loan = null;
     this.notify('squad', `↩️ ${p.name} is back from ${at ? at.name : 'his loan'}: ${line}.`, { playerId: p.id });
     return { ok: true, action: 'recalled', player: p.name };
@@ -1705,7 +1887,7 @@ class GameWorld {
       hg: r.hg, ag: r.ag, pens: r.pens, hx: r.hx, ax: r.ax, hs: r.hs, as: r.as, pos: r.pos,
       homeGoals: r.hg, awayGoals: r.ag, ourClub: this.club().name, result, myKey, events,
       halftime: applied ? { subs: applied.subs, tactic: applied.tactic, formation: applied.formation, talk: applied.talk || null } : null,
-      lineups: this._lineups(m), ratings, motm: ratings.motm,
+      lineups: this._lineups(m), ratings, motm: ratings.motm, formations: { home: m.home.formation, away: m.away.formation },
     };
   }
 
@@ -1740,10 +1922,13 @@ class GameWorld {
 
   // Starting XIs and club colours for the 2D match view.
   _lineups(m) {
-    const side = key => m[key].startXI.map(s => { const p = this.players.get(s.playerId); return { slotKey: s.slotKey, slot: s.slotKey.split('-')[0], playerId: s.playerId, name: p ? p.name : '?' }; });
+    const side = key => m[key].startXI.map(s => { const p = this.players.get(s.playerId); return { slotKey: s.slotKey, slot: s.slotKey.split('-')[0], playerId: s.playerId, name: p ? p.name : '?', look: p && p.look != null ? LOOK.describe(p.look, p.age) : null }; });
     const hue = id => (id * 137) % 360;
     const h = hue(m.home.clubId), a = hue(m.away.clubId);
-    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a };
+    // Looks for the substitutes too, so a player coming on appears as himself.
+    const looks = {};
+    for (const id of [...(m.home.bench || []), ...(m.away.bench || [])]) { const p = this.players.get(id); if (p && p.look != null) looks[id] = { ...LOOK.describe(p.look, p.age), gk: p.position === 'GK' }; }
+    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks };
   }
 
   halftimeView() {
@@ -2002,7 +2187,7 @@ class GameWorld {
       cups: this.cups, achievements: this.achievements, records: this.records, jobOffers: this.jobOffers, staffMarket: this.staffMarket,
       sponsorOffers: this.sponsorOffers, flags: this.flags,
       knowledge: this.knowledge, scouting: this.scouting, negotiations: this.negotiations, news: this.news, newsSeq: this.newsSeq,
-      challenges: this.challenges, intl: this.intl,
+      challenges: this.challenges, intl: this.intl, archive: this.archive,
       clubs: this.clubs.map(c => c.toData()),
       players: [...this.players.values()].map(p => p.toData()),
       leagues: this.leagues.map(l => l.toData()),
@@ -2036,6 +2221,7 @@ class GameWorld {
     w.cups = data.cups || [];
     w.achievements = data.achievements || {};
     w.records = data.records || {};
+    w.archive = data.archive || null; H.ensure(w);
     w.jobOffers = data.jobOffers || [];
     w.staffMarket = data.staffMarket || {};
     w.sponsorOffers = data.sponsorOffers || null;

@@ -1,10 +1,11 @@
 // src/migrations.js — save-schema migrations. Every schema change gets a step here; saves are
 // never silently dropped. A save from a newer version is refused with a clear message.
 
-const SAVE_VERSION = 10;
+const SAVE_VERSION = 11;
 const RENAMES = require('./data/renames.json');
 const { RNG, hashString } = require('./utils');
 const { nameFromHash } = require('./names');
+const { makeLook } = require('./look');
 const { generateClubStaff } = require('./engine/staffEngine');
 
 // v6 (server built for the old engine) → v7 (Phase 0 engine).
@@ -194,7 +195,40 @@ function v9to10(d) {
   return d;
 }
 
-const STEPS = { 6: v6to7, 7: v7to8, 8: v8to9, 9: v9to10 };
+// v10 → v11: the history archive (src/engine/historyEngine.js). Seasons played before this update
+// keep what the old save knew: league, cup and continental winners, and your season summaries
+// (turned into managerial stints). Player career lines start from the current season.
+function v10to11(d) {
+  const a = { seasons: {}, clubNames: {}, matches: [], matchSeq: 0, stints: [], changes: [], retired: {} };
+  for (const c of d.clubs || []) a.clubNames[c.id] = c.name;
+  const h = d.history || {};
+  const season = s => a.seasons[s] || (a.seasons[s] = { label: `${s}/${s + 1}`, leagues: {}, honours: [], awards: [], partial: true });
+  const leagueKey = name => { const l = (d.leagues || []).find(x => `${x.country} ${x.name}` === name); return l ? `L${l.id}` : `L:${name}`; };
+  for (const w of h.leagueWinners || []) season(w.season).honours.push({ k: leagueKey(w.league), comp: w.league, winner: w.clubId, runnerUp: null });
+  for (const w of h.cupWinners || []) season(w.season).honours.push({ k: `C${w.cup}`, comp: w.cup, winner: w.clubId, runnerUp: null, runnerUpName: w.runnerUp || null });
+  for (const w of h.continentalWinners || []) season(w.season).honours.push({ k: `K${w.comp}`, comp: w.comp, winner: w.clubId, runnerUp: null });
+  for (const w of ((d.intl || {}).winners) || []) season(w.season).honours.push({ k: 'N', comp: w.comp || 'Nations League', nation: w.winner, runnerUpNation: w.runnerUp });
+  // Your earlier seasons become stints (match counts were not recorded then).
+  const byName = new Map((d.clubs || []).map(c => [c.name, c.id]));
+  for (const m of d.managerHistory || []) {
+    const last = a.stints[a.stints.length - 1];
+    const id = byName.get(m.club) ?? null;
+    if (last && last.club === m.club) { last.to = [m.season, 99]; last.promotions += m.promotion ? 1 : 0; last.relegations += m.relegation ? 1 : 0; continue; }
+    a.stints.push({ clubId: id, club: m.club, from: [m.season, 0], to: [m.season, 99], p: null, w: null, d: null, l: null, gf: null, ga: null, honours: [], promotions: m.promotion ? 1 : 0, relegations: m.relegation ? 1 : 0, how: null, partial: true });
+  }
+  const cur = (d.manager || {}).clubId;
+  const last = a.stints[a.stints.length - 1];
+  if (cur != null && last && last.clubId === cur) last.to = null;
+  else if (cur != null) a.stints.push({ clubId: cur, club: a.clubNames[cur] || '', from: [d.season, d.currentWeek || 0], to: null, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, honours: [], promotions: 0, relegations: 0, how: null });
+  d.archive = a;
+  for (const p of d.players || []) if (p.look == null) p.look = makeLook(p.id, p.nation, p.position);   // permanent appearance
+  d.inbox = (d.inbox || []).concat([{ id: (d.inboxSeq || 0) + 1, season: d.season, week: d.currentWeek, type: 'system', text: 'Game updated: a full history archive now records every season, every player\'s career, every competition and every match you manage. Open History to explore it.' }]);
+  d.inboxSeq = (d.inboxSeq || 0) + 1;
+  d._v = 11;
+  return d;
+}
+
+const STEPS = { 6: v6to7, 7: v7to8, 8: v8to9, 9: v9to10, 10: v10to11 };
 
 function migrate(raw, deps) {
   let d = raw;

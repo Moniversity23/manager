@@ -10,6 +10,7 @@ const PERSONALITY = ['Professional', 'Ambitious', 'Lazy', 'Leader', 'Temperament
 
 // Names come from the player's nation (src/names.js).
 const { poolFor } = require('./names');
+const LOOK = require('./look');
 
 const POS_BOOSTS = {
   GK: ['strength', 'defending', 'vision'],
@@ -30,7 +31,7 @@ const YOUTH_CAPS = { ovr: 55, attr: 75, wonderkidOvr: 60, wonderkidAttr: 82 };
 
 // Fields only some players/clubs have (dressing room, agents, scouting): saved only when set, so
 // 14,000 players do not carry empty keys and a save/load round trip stays identical.
-const PLAYER_OPTIONAL = ['releaseClause', 'promise', 'playLog', 'unhappy', 'unhappyWeeks', 'talkWeek', 'talksBlockedUntil', 'seasonStartAbility', 'ratings'];
+const PLAYER_OPTIONAL = ['releaseClause', 'promise', 'playLog', 'unhappy', 'unhappyWeeks', 'talkWeek', 'talksBlockedUntil', 'seasonStartAbility', 'ratings', 'career', 'moves', 'honours', 'look'];
 const CLUB_OPTIONAL = ['captainId', 'unbeatenRun', 'sackedSeason', 'managerName'];
 function withOptional(obj, out, keys) {
   for (let i = 0; i < keys.length; i++) {
@@ -53,6 +54,7 @@ class Player {
     this.age = age;
     this.clubId = clubId ?? null;
     this.position = position || rng.pick(POS_ALL);
+    this.look = LOOK.makeLook(this.id, this.nation, this.position);   // permanent appearance (src/look.js)
     this.personality = rng.pick(PERSONALITY);
     this.morale = rng.int(55, 80);
     this.fitness = 100;
@@ -146,7 +148,7 @@ class Player {
       hiddenPotential: this.hiddenPotential, currentAbility: ovr, attributes: attrs,
       history: this.history, seasonStats: this.seasonStats, region: this.region,
       hint: this.hint(), marketValue: value ?? null,
-      ovr, pot: this.hiddenPotential, fit: Math.round(this.fitness), mor: Math.round(this.morale),
+      ovr, pot: this.hiddenPotential, fit: Math.round(this.fitness), mor: Math.round(this.morale), look: LOOK.describe(this.look ?? LOOK.makeLook(this.id, this.nation, this.position), this.age),
       pers: this.personality, attrs,
       form: this.ratings && this.ratings.length ? Math.round(this.ratings.reduce((a, b) => a + b, 0) / this.ratings.length * 10) / 10 : null,
       progress: this.seasonStartAbility != null ? ovr - this.seasonStartAbility : null,

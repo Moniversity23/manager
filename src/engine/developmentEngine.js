@@ -93,6 +93,7 @@ function trainWeek(club, rng, events) {
     p.morale = clamp(p.morale + (66 - p.morale) * 0.04, 20, 100);
     if (!p.injury && rng.chance(0.002 * (0.5 + p.injuryRisk / 15) * (intensity / 3))) {
       p.injury = { type: 'training knock', weeks: rng.int(1, 3) };
+      p.seasonStats.inj = (p.seasonStats.inj || 0) + 1; p.history.injuries = (p.history.injuries || 0) + 1;
       if (events) events.push({ type: 'knock', playerId: p.id, weeks: p.injury.weeks });
     }
     trainPlayer(p, club, rng);

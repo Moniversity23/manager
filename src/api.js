@@ -270,6 +270,14 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   }), { world: true });
 
   route('GET', '/api/history', read((b, m, q) => ({ ok: true, ...world.historySnapshot(q.get('limit') || '10') })), { world: true });
+  route('GET', '/api/hist', read(() => world.historyIndex()), { world: true });
+  route('GET', '/api/hist/comp', read((b, m, q) => world.competitionHistory(q.get('key') || '')), { world: true });
+  route('GET', /^\/api\/hist\/club\/(\d+)$/, read((b, m) => world.clubHistory(Number(m[1]))), { world: true });
+  route('GET', /^\/api\/hist\/player\/(\d+)$/, read((b, m) => world.playerHistory(Number(m[1]))), { world: true });
+  route('GET', '/api/hist/manager', read(() => world.managerCareer()), { world: true });
+  route('GET', '/api/hist/search', read((b, m, q) => world.historySearch(q.get('q'))), { world: true });
+  route('GET', '/api/hist/matches', read((b, m, q) => world.matchArchive(q.get('season') ? Number(q.get('season')) : null, q.get('club') ? Number(q.get('club')) : null)), { world: true });
+  route('GET', /^\/api\/hist\/match\/(\d+)$/, read((b, m) => world.matchRecord(Number(m[1]))), { world: true });
   route('GET', '/api/export-save', async () => ({ ok: true, gameState: world.toSave(), meta: buildMeta() }), { world: true });
 
   route('POST', '/api/import-save', async (m, body) => {

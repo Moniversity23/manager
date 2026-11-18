@@ -100,6 +100,7 @@ function injure(ctx, p) {
   const r = rng.next();
   const weeks = r < 0.6 ? rng.int(1, 2) : r < 0.9 ? rng.int(3, 6) : rng.int(7, 16);
   p.injury = { type: rng.pick(INJURY_TYPES), weeks };
+  p.seasonStats.inj = (p.seasonStats.inj || 0) + 1; p.history.injuries = (p.history.injuries || 0) + 1;
   return p.injury;
 }
 
@@ -346,7 +347,10 @@ function finalizeMatch(m, ctx) {
       p.history.minutes = (p.history.minutes || 0) + mins;
       p.seasonStats.minutes += mins;
       p.recentMinutes = (p.recentMinutes || 0) + mins;
-      if (a.start) { p.history.appearances++; p.seasonStats.apps++; }
+      if (a.start) {
+        p.history.appearances++; p.seasonStats.apps++;
+        if ((key === 'home' ? m.away.goals : m.home.goals) === 0) { p.seasonStats.cs = (p.seasonStats.cs || 0) + 1; p.history.cs = (p.history.cs || 0) + 1; }   // clean sheet
+      }
       else { p.history.subApps = (p.history.subApps || 0) + 1; p.seasonStats.subApps++; }
     }
   }
