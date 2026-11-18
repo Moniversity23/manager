@@ -1928,7 +1928,10 @@ class GameWorld {
     // Looks for the substitutes too, so a player coming on appears as himself.
     const looks = {};
     for (const id of [...(m.home.bench || []), ...(m.away.bench || [])]) { const p = this.players.get(id); if (p && p.look != null) looks[id] = { ...LOOK.describe(p.look, p.age), gk: p.position === 'GK' }; }
-    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks };
+    // Expected crowd for the announcer (same formula as the gate receipts, without posting money).
+    const hc = this.clubById(m.home.clubId), ac = this.clubById(m.away.clubId);
+    const attendance = hc && hc.facilities ? Math.round(Math.max(500, hc.facilities.stadium || 1000) * clamp((0.3 + hc.fanMood / 220 + hc.prestige / 260 + (ac ? ac.prestige : 30) / 700) * (1 - 0.4 * (clamp(hc.ticketPrice || 1, 0.5, 2) - 1)), 0.1, 1)) : null;
+    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks, attendance };
   }
 
   halftimeView() {
