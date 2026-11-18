@@ -1,0 +1,316 @@
+{
+ "when": "2026-11-18T02:35:18.199Z",
+ "report": [
+  {
+   "file": "model.glb",
+   "bytes": 531504,
+   "asset": {
+    "generator": "glTF-Transform v4.5.1",
+    "version": "2.0"
+   },
+   "nodes": 68,
+   "skins": [
+    {
+     "joints": 66,
+     "root": "root",
+     "names": [
+      "root",
+      "pelvis",
+      "spine_01",
+      "spine_02",
+      "spine_03",
+      "clavicle_l",
+      "upperarm_l",
+      "lowerarm_l",
+      "hand_l",
+      "index_01_l",
+      "index_02_l",
+      "index_03_l",
+      "index_04_leaf_l",
+      "middle_01_l",
+      "middle_02_l",
+      "middle_03_l",
+      "middle_04_leaf_l",
+      "pinky_01_l",
+      "pinky_02_l",
+      "pinky_03_l",
+      "pinky_04_leaf_l",
+      "ring_01_l",
+      "ring_02_l",
+      "ring_03_l",
+      "ring_04_leaf_l",
+      "thumb_01_l",
+      "thumb_02_l",
+      "thumb_03_l",
+      "thumb_04_leaf_l",
+      "clavicle_r",
+      "upperarm_r",
+      "lowerarm_r",
+      "hand_r",
+      "index_01_r",
+      "index_02_r",
+      "index_03_r",
+      "index_04_leaf_r",
+      "middle_01_r",
+      "middle_02_r",
+      "middle_03_r",
+      "middle_04_leaf_r",
+      "pinky_01_r",
+      "pinky_02_r",
+      "pinky_03_r",
+      "pinky_04_leaf_r",
+      "ring_01_r",
+      "ring_02_r",
+      "ring_03_r",
+      "ring_04_leaf_r",
+      "thumb_01_r",
+      "thumb_02_r",
+      "thumb_03_r",
+      "thumb_04_leaf_r",
+      "neck_01",
+      "head",
+      "head_leaf",
+      "thigh_l",
+      "calf_l",
+      "foot_l",
+      "ball_l",
+      "ball_leaf_l",
+      "thigh_r",
+      "calf_r",
+      "foot_r",
+      "ball_r",
+      "ball_leaf_r"
+     ]
+    }
+   ],
+   "meshes": [
+    {
+     "name": "Mannequin.001",
+     "primitives": [
+      {
+       "vertices": 7399,
+       "material": "Main",
+       "skinned": true
+      }
+     ]
+    }
+   ],
+   "animations": [],
+   "scale": null
+  },
+  {
+   "file": "sprint.glb",
+   "bytes": 59252,
+   "asset": {
+    "generator": "glTF-Transform v4.5.1",
+    "version": "2.0"
+   },
+   "nodes": 67,
+   "skins": [
+    {
+     "joints": 66,
+     "root": "root",
+     "names": [
+      "root",
+      "pelvis",
+      "spine_01",
+      "spine_02",
+      "spine_03",
+      "clavicle_l",
+      "upperarm_l",
+      "lowerarm_l",
+      "hand_l",
+      "index_01_l",
+      "index_02_l",
+      "index_03_l",
+      "index_04_leaf_l",
+      "middle_01_l",
+      "middle_02_l",
+      "middle_03_l",
+      "middle_04_leaf_l",
+      "pinky_01_l",
+      "pinky_02_l",
+      "pinky_03_l",
+      "pinky_04_leaf_l",
+      "ring_01_l",
+      "ring_02_l",
+      "ring_03_l",
+      "ring_04_leaf_l",
+      "thumb_01_l",
+      "thumb_02_l",
+      "thumb_03_l",
+      "thumb_04_leaf_l",
+      "clavicle_r",
+      "upperarm_r",
+      "lowerarm_r",
+      "hand_r",
+      "index_01_r",
+      "index_02_r",
+      "index_03_r",
+      "index_04_leaf_r",
+      "middle_01_r",
+      "middle_02_r",
+      "middle_03_r",
+      "middle_04_leaf_r",
+      "pinky_01_r",
+      "pinky_02_r",
+      "pinky_03_r",
+      "pinky_04_leaf_r",
+      "ring_01_r",
+      "ring_02_r",
+      "ring_03_r",
+      "ring_04_leaf_r",
+      "thumb_01_r",
+      "thumb_02_r",
+      "thumb_03_r",
+      "thumb_04_leaf_r",
+      "neck_01",
+      "head",
+      "head_leaf",
+      "thigh_l",
+      "calf_l",
+      "foot_l",
+      "ball_l",
+      "ball_leaf_l",
+      "thigh_r",
+      "calf_r",
+      "foot_r",
+      "ball_r",
+      "ball_leaf_r"
+     ]
+    }
+   ],
+   "meshes": [],
+   "animations": [
+    {
+     "name": "Sprint",
+     "duration": 4.519391411596397e+37,
+     "fps": 0,
+     "channels": 198,
+     "paths": {
+      "translation": 66,
+      "rotation": 66,
+      "scale": 66
+     },
+     "rootMotion": {
+      "bone": "root",
+      "dx": 0,
+      "dy": 0,
+      "dz": 0
+     }
+    }
+   ],
+   "scale": null
+  },
+  {
+   "file": "walk.glb",
+   "bytes": 62692,
+   "asset": {
+    "generator": "glTF-Transform v4.5.1",
+    "version": "2.0"
+   },
+   "nodes": 67,
+   "skins": [
+    {
+     "joints": 66,
+     "root": "root",
+     "names": [
+      "root",
+      "pelvis",
+      "spine_01",
+      "spine_02",
+      "spine_03",
+      "clavicle_l",
+      "upperarm_l",
+      "lowerarm_l",
+      "hand_l",
+      "index_01_l",
+      "index_02_l",
+      "index_03_l",
+      "index_04_leaf_l",
+      "middle_01_l",
+      "middle_02_l",
+      "middle_03_l",
+      "middle_04_leaf_l",
+      "pinky_01_l",
+      "pinky_02_l",
+      "pinky_03_l",
+      "pinky_04_leaf_l",
+      "ring_01_l",
+      "ring_02_l",
+      "ring_03_l",
+      "ring_04_leaf_l",
+      "thumb_01_l",
+      "thumb_02_l",
+      "thumb_03_l",
+      "thumb_04_leaf_l",
+      "clavicle_r",
+      "upperarm_r",
+      "lowerarm_r",
+      "hand_r",
+      "index_01_r",
+      "index_02_r",
+      "index_03_r",
+      "index_04_leaf_r",
+      "middle_01_r",
+      "middle_02_r",
+      "middle_03_r",
+      "middle_04_leaf_r",
+      "pinky_01_r",
+      "pinky_02_r",
+      "pinky_03_r",
+      "pinky_04_leaf_r",
+      "ring_01_r",
+      "ring_02_r",
+      "ring_03_r",
+      "ring_04_leaf_r",
+      "thumb_01_r",
+      "thumb_02_r",
+      "thumb_03_r",
+      "thumb_04_leaf_r",
+      "neck_01",
+      "head",
+      "head_leaf",
+      "thigh_l",
+      "calf_l",
+      "foot_l",
+      "ball_l",
+      "ball_leaf_l",
+      "thigh_r",
+      "calf_r",
+      "foot_r",
+      "ball_r",
+      "ball_leaf_r"
+     ]
+    }
+   ],
+   "meshes": [],
+   "animations": [
+    {
+     "name": "Walk",
+     "duration": 2144447872,
+     "fps": 0,
+     "channels": 198,
+     "paths": {
+      "translation": 66,
+      "rotation": 66,
+      "scale": 66
+     },
+     "rootMotion": {
+      "bone": "root",
+      "dx": 0,
+      "dy": 0,
+      "dz": 0
+     }
+    }
+   ],
+   "scale": null
+  }
+ ],
+ "failed": [
+  {
+   "file": "assets/animations/source/mesh2motion/animations/kick-front.glb",
+   "error": "Offset is outside the bounds of the DataView"
+  }
+ ]
+}

@@ -6,3 +6,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.local
+
+# KinemIQ pack: downloaded for inspection only (not used). Re-download with the URL and hash in assets/animations/licenses/REGISTER.md
+/assets/animations/source/kinemiq/

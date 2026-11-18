@@ -9,7 +9,9 @@
     "build": "node scripts/build-web.js",
     "lint": "eslint src test",
     "test": "node scripts/build-web.js && eslint src test && vitest run",
-    "soak": "node scripts/soak.js"
+    "soak": "node scripts/soak.js",
+    "build:anim": "node scripts/anim/build-footballer.js",
+    "inspect:anim": "node scripts/anim/inspect.js assets/animations/source/mesh2motion/model.glb assets/animations/source/mesh2motion/animations --out assets/animations/processed/inspect-mesh2motion.json"
   },
   "dependencies": {
     "dotenv": "^16.3.1",

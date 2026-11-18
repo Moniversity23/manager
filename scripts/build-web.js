@@ -28,3 +28,14 @@ if (fs.existsSync(three)) {
   fs.copyFileSync(three, vendor);
   console.log(`vendor/three.module.min.js: ${(fs.statSync(vendor).size / 1024).toFixed(0)} KB`);
 } else if (!fs.existsSync(vendor)) console.warn('three.js not installed: the 3D match view falls back to 2D');
+
+// The glTF loader and skeleton tools for the motion-captured players (three.js add-ons). Their
+// "from 'three'" imports are pointed at the vendored build so no import map is needed.
+const jsm = path.join(root, 'node_modules', 'three', 'examples', 'jsm');
+for (const rel of ['loaders/GLTFLoader.js', 'utils/SkeletonUtils.js', 'utils/BufferGeometryUtils.js']) {
+  const src = path.join(jsm, rel), dst = path.join(root, 'public', 'vendor', 'jsm', rel);
+  if (!fs.existsSync(src)) { if (!fs.existsSync(dst)) console.warn(`three.js add-on missing: ${rel} (the 3D view uses classic figures)`); continue; }
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  fs.writeFileSync(dst, fs.readFileSync(src, 'utf8').replace(/from 'three';/g, "from '../../three.module.min.js';"));
+}
+console.log('vendor/jsm: GLTFLoader, SkeletonUtils, BufferGeometryUtils');

@@ -60,7 +60,7 @@ html[data-size="large"]{font-size:16px}
 .mv-replay::before{content:'';position:absolute;left:8px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#fff;animation:blink 1s steps(2) infinite}
 .mv-replay.on{opacity:1}
 .mv-cap{position:absolute;left:50%;transform:translateX(-50%);max-width:86%;padding:4px 10px;border-radius:6px;background:rgba(6,10,18,.72);color:#fff;font-size:12px;line-height:1.35;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;z-index:3}
-.mv-cap.on{opacity:1}.mv-cap.pa{color:#ffe28a;font-style:italic}.mv3d .mv-cap.top{top:42px;bottom:auto;z-index:5}
+.mv-cap.on{opacity:1}.mv-cap.pa{color:#ffe28a;font-style:italic}.mv3d .mv-cap.top{top:42px;bottom:auto;z-index:5}.mv3d:has(.mv-intro.on) .mv-cap{top:42px;bottom:auto;z-index:5}
 .mv3d .mv-cap{bottom:96px}.mv-wrap .mv-cap{bottom:8px}
 @media(max-width:640px){.mv3d .mv-cap{bottom:70px;font-size:11px}}
 @keyframes blink{50%{opacity:0}}
@@ -546,6 +546,7 @@ async function advance(){
   if (STATE.manager && STATE.manager.status === 'sacked') { navTo('career'); return notify('You were sacked — choose a new club in Career & Board.', 'w'); }
   if (STATE.liveMatch) return showHalftime(STATE.liveMatch);
   audioStop(); try { window.GafferCommentary && window.GafferCommentary.unlock(); } catch {}
+  if ((PREFS.viewMode || '3d') === '3d' && PREFS.models !== 'classic') import('./match3d.js').then(m => m.loadFootballer()).catch(() => {});   // warm up while the week simulates
   sfx('click');
   busy = true; updateTopbar();
   const r = await post('/api/step-week', { interactive: true });
@@ -739,7 +740,7 @@ async function start3D(v){
   try {
     const mod = await import('./match3d.js');
     if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto' });
+    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap' });
     document.getElementById('genMoContent').classList.add('mvx');
     hudInit(v);
     if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
@@ -2087,6 +2088,7 @@ function rSettings(){
       <label class="lbl">Text size</label><div class="row" style="margin-bottom:10px">${['normal', 'large'].map(t => `<button class="btn bsm ${(PREFS.size || 'normal') === t ? 'bact' : 'bg'}" onclick="PREFS.size='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D graphics quality</label><select onchange="PREFS.gfx=this.value;savePrefs()">${[['auto', 'Automatic (decides from your device)'], ['low', 'Low — smoothest on older phones'], ['high', 'High — sharper, with shadows']].map(([k, l]) => `<option value="${k}" ${(PREFS.gfx || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">3D players</label><select onchange="PREFS.models=this.value;savePrefs()">${[['mocap', 'Motion-captured — natural running, kicking and celebrating'], ['classic', 'Classic — lighter figures for very old phones']].map(([k, l]) => `<option value="${k}" ${(PREFS.models || 'mocap') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Match audio mixer</label>
       <div class="card" style="padding:10px">${[['crowd', '🏟 Crowd'], ['ref', '🟨 Referee'], ['ball', '⚽ Ball and boots'], ['voices', '🗣 Player voices'], ['commentary', '🎙 Commentary'], ['announcer', '📢 Stadium announcer']].map(([k, l]) => { const val = { ...MIX_DEFAULT, ...(PREFS.mix || {}) }[k]; return `<div class="row" style="gap:8px;margin-bottom:6px"><span class="small" style="width:132px">${l}</span><input type="range" min="0" max="1" step="0.05" value="${val}" style="flex:1" oninput="PREFS.mix={...MIX_DEFAULT,...(PREFS.mix||{}),'${k}':+this.value};savePrefs();applyAudioPrefs();this.nextElementSibling.textContent=this.value>0?Math.round(this.value*100)+'%':'off'"><span class="small dim" style="width:34px;text-align:right">${val > 0 ? Math.round(val * 100) + '%' : 'off'}</span></div>`; }).join('')}
         <div class="row mt8"><button class="btn bsm ${PREFS.speech === false ? 'bg' : 'bact'}" onclick="toggleCommentary();renderSection('settings')">${PREFS.speech === false ? '🎙 Spoken commentary off' : '🎙 Spoken commentary on'}</button><button class="btn bsm ${PREFS.captions === false ? 'bg' : 'bact'}" onclick="PREFS.captions=PREFS.captions===false;savePrefs();applyAudioPrefs();renderSection('settings')">${PREFS.captions === false ? 'Captions off' : 'Captions on'}</button></div>

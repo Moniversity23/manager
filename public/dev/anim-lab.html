@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Animation lab</title>
+<style>html,body{margin:0;height:100%;background:#203040;color:#fff;font:12px system-ui,sans-serif}#v{position:fixed;inset:0}.lbl{position:fixed;transform:translate(-50%,-100%);background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;pointer-events:none;white-space:nowrap}#status{position:fixed;left:8px;top:8px}</style>
+</head><body><div id="v"></div><div id="status">Loading the footballer…</div>
+<script type="module">
+// Development page: every animation clip on its own footballer (see match3d.js animLab).
+import { animLab } from '../match3d.js';
+const q = new URLSearchParams(location.search);
+const keys = q.get('clips') ? q.get('clips').split(',') : null;
+try {
+  const lab = await animLab(document.getElementById('v'), { keys, cols: +(q.get('cols') || 7) });
+  document.getElementById('status').textContent = `${lab.figs.length} clips`;
+  const place = () => lab.figs.forEach((k, i) => { const [x, y] = lab.project(i); let el = document.getElementById('l' + i); if (!el) { el = document.createElement('div'); el.className = 'lbl'; el.id = 'l' + i; el.textContent = k; document.body.appendChild(el); } el.style.left = x * 100 + '%'; el.style.top = y * 100 + '%'; });
+  place(); addEventListener('resize', place);
+  window.LAB = lab;
+} catch (e) { document.getElementById('status').textContent = 'Failed: ' + e.message; console.error(e); }
+</script></body></html>

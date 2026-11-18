@@ -1,0 +1,386 @@
+{
+ "when": "2026-11-18T02:54:04.386Z",
+ "model": {
+  "vertices": 7399,
+  "triangles": 13757,
+  "up": "y",
+  "side": "x",
+  "heights": {
+   "ankle": 0.09796395409418215,
+   "knee": 0.5258670460908438,
+   "hip": 0.9321000286638154,
+   "spine": 1.0173801363618864,
+   "neck": 1.4523152823321037,
+   "head": 1.5684911350946513
+  },
+  "armX": {
+   "shoulder": 0.17374216851541302,
+   "elbow": 0.47022859076009005,
+   "wrist": 0.7499280099678405
+  },
+  "hems": {
+   "shorts": 0.71,
+   "socks": 0.455
+  },
+  "regions": {
+   "shirt": 1534,
+   "shorts": 500,
+   "skin": 855,
+   "socks": 362,
+   "boots": 352,
+   "hands": 9804,
+   "head": 350
+  },
+  "bytes": 341188
+ },
+ "clips": [
+  {
+   "key": "idle",
+   "source": "idle-subtle.glb",
+   "sourceName": "Idle_Subtle",
+   "duration": 2.5417,
+   "tracks": 67,
+   "animated": 13,
+   "staticCollapsed": 54
+  },
+  {
+   "key": "idle2",
+   "source": "idle-a.glb",
+   "sourceName": "Idle_A",
+   "duration": 3.0833,
+   "tracks": 67,
+   "animated": 13,
+   "staticCollapsed": 54
+  },
+  {
+   "key": "walk",
+   "source": "walk.glb",
+   "sourceName": "Walk",
+   "duration": 1.625,
+   "tracks": 67,
+   "animated": 22,
+   "staticCollapsed": 45
+  },
+  {
+   "key": "jog",
+   "source": "jog.glb",
+   "sourceName": "Jog",
+   "duration": 1.1667,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "sprint",
+   "source": "sprint.glb",
+   "sourceName": "Sprint",
+   "duration": 0.7917,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "back",
+   "source": "walk-backwards.glb",
+   "sourceName": "Walk_Backwards",
+   "duration": 0.9583,
+   "tracks": 67,
+   "animated": 21,
+   "staticCollapsed": 46
+  },
+  {
+   "key": "strafeL",
+   "source": "strafe-left.glb",
+   "sourceName": "Strafe_left",
+   "duration": 0.9583,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "strafeR",
+   "source": "strafe-right.glb",
+   "sourceName": "Strafe_right",
+   "duration": 0.9583,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "ready",
+   "source": "fighting-idle.glb",
+   "sourceName": "Fighting Idle",
+   "duration": 1.625,
+   "tracks": 67,
+   "animated": 14,
+   "staticCollapsed": 53
+  },
+  {
+   "key": "crouch",
+   "source": "crouch-idle.glb",
+   "sourceName": "Crouch_Idle",
+   "duration": 3.625,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "injuredWalk",
+   "source": "walk-injured.glb",
+   "sourceName": "Walk Injured",
+   "duration": 1.625,
+   "tracks": 67,
+   "animated": 22,
+   "staticCollapsed": 45
+  },
+  {
+   "key": "kickFront",
+   "source": "kick-front.glb",
+   "sourceName": "Kick Front",
+   "duration": 1.3333,
+   "tracks": 67,
+   "animated": 20,
+   "staticCollapsed": 47,
+   "contact": 0.333,
+   "foot": "l"
+  },
+  {
+   "key": "kickSide",
+   "source": "kick-side.glb",
+   "sourceName": "Kick Side",
+   "duration": 1.3333,
+   "tracks": 67,
+   "animated": 21,
+   "staticCollapsed": 46,
+   "contact": 0.317,
+   "foot": "r"
+  },
+  {
+   "key": "slide",
+   "source": "slide.glb",
+   "sourceName": "Slide",
+   "duration": 1.9583,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "header",
+   "source": "jump-2.glb",
+   "sourceName": "Jump_2",
+   "duration": 1.6667,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "jumpStart",
+   "source": "jump-start.glb",
+   "sourceName": "Jump_Start",
+   "duration": 1.6667,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "jumpAir",
+   "source": "jump-air.glb",
+   "sourceName": "Jump_air",
+   "duration": 3.0833,
+   "tracks": 67,
+   "animated": 16,
+   "staticCollapsed": 51
+  },
+  {
+   "key": "jumpLand",
+   "source": "jump-land.glb",
+   "sourceName": "Jump_Land",
+   "duration": 1.5833,
+   "tracks": 67,
+   "animated": 21,
+   "staticCollapsed": 46
+  },
+  {
+   "key": "diveL",
+   "source": "dodge-left.glb",
+   "sourceName": "Dodge_left",
+   "duration": 1,
+   "tracks": 67,
+   "animated": 21,
+   "staticCollapsed": 46
+  },
+  {
+   "key": "diveR",
+   "source": "dodge-right.glb",
+   "sourceName": "Dodge_right",
+   "duration": 1,
+   "tracks": 67,
+   "animated": 21,
+   "staticCollapsed": 46
+  },
+  {
+   "key": "block",
+   "source": "defend.glb",
+   "sourceName": "Defend",
+   "duration": 0.9167,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "pickUp",
+   "source": "pick-up.glb",
+   "sourceName": "Pick Up",
+   "duration": 2.3333,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "chest",
+   "source": "hit-chest.glb",
+   "sourceName": "Hit_Chest",
+   "duration": 0.375,
+   "tracks": 67,
+   "animated": 15,
+   "staticCollapsed": 52
+  },
+  {
+   "key": "celFist",
+   "source": "victory-fist-pump.glb",
+   "sourceName": "Victory Fist Pump",
+   "duration": 2.4583,
+   "tracks": 67,
+   "animated": 20,
+   "staticCollapsed": 47
+  },
+  {
+   "key": "celVictory",
+   "source": "victory.glb",
+   "sourceName": "Victory",
+   "duration": 1.8333,
+   "tracks": 67,
+   "animated": 24,
+   "staticCollapsed": 43
+  },
+  {
+   "key": "celFlip",
+   "source": "backflip.glb",
+   "sourceName": "Backflip",
+   "duration": 2.5,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "celDab",
+   "source": "dab.glb",
+   "sourceName": "Dab",
+   "duration": 1.9167,
+   "tracks": 67,
+   "animated": 20,
+   "staticCollapsed": 47
+  },
+  {
+   "key": "celPower",
+   "source": "power-up.glb",
+   "sourceName": "Power Up",
+   "duration": 0.6667,
+   "tracks": 67,
+   "animated": 20,
+   "staticCollapsed": 47
+  },
+  {
+   "key": "clap",
+   "source": "clapping.glb",
+   "sourceName": "Clapping",
+   "duration": 1.4583,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "angry",
+   "source": "angry.glb",
+   "sourceName": "Angry",
+   "duration": 0.75,
+   "tracks": 67,
+   "animated": 20,
+   "staticCollapsed": 47
+  },
+  {
+   "key": "reject",
+   "source": "reject.glb",
+   "sourceName": "Reject",
+   "duration": 3.7083,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  },
+  {
+   "key": "call",
+   "source": "greeting.glb",
+   "sourceName": "Greeting",
+   "duration": 4.9167,
+   "tracks": 67,
+   "animated": 16,
+   "staticCollapsed": 51
+  },
+  {
+   "key": "nod",
+   "source": "head-nod.glb",
+   "sourceName": "Head Nod",
+   "duration": 0.7917,
+   "tracks": 67,
+   "animated": 3,
+   "staticCollapsed": 64
+  },
+  {
+   "key": "yes",
+   "source": "yes.glb",
+   "sourceName": "Yes",
+   "duration": 2.4583,
+   "tracks": 67,
+   "animated": 16,
+   "staticCollapsed": 51
+  },
+  {
+   "key": "tired",
+   "source": "tired-hunched.glb",
+   "sourceName": "Tired Hunched",
+   "duration": 0.9583,
+   "tracks": 67,
+   "animated": 15,
+   "staticCollapsed": 52
+  },
+  {
+   "key": "sitCry",
+   "source": "sit-ground-crying.glb",
+   "sourceName": "Sit_Ground_Crying",
+   "duration": 2.4583,
+   "tracks": 67,
+   "animated": 13,
+   "staticCollapsed": 54
+  },
+  {
+   "key": "fall",
+   "source": "hit-knockback.glb",
+   "sourceName": "Hit_Knockback",
+   "duration": 0.7917,
+   "tracks": 67,
+   "animated": 18,
+   "staticCollapsed": 49
+  },
+  {
+   "key": "getUp",
+   "source": "laytoidle.glb",
+   "sourceName": "LayToIdle",
+   "duration": 1.5417,
+   "tracks": 67,
+   "animated": 19,
+   "staticCollapsed": 48
+  }
+ ],
+ "failed": [],
+ "animsBytes": 846026
+}

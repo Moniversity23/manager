@@ -22,6 +22,8 @@ MongoDB saves with a gzip-file fallback.
   minimap, a pre-match fly-over and slow-motion goal replays. Referee (shows cards), two assistant referees
   with flags, a fourth official with the substitution board; headers, first touches, keeper catches, punches
   and dives, shot blocks, injuries and per-player celebrations; a wide camera and a graphics-quality setting.
+  Players are **motion-captured** (CC0 Mesh2Motion mannequin and clips, processed by `npm run build:anim`):
+  speed-matched running, timed kicks, slide tackles, keeper dives, celebrations — see docs/ANIMATION.md.
   Or full 2D, key moments, commentary or instant;
   1×–8×. **Sound** (crowd, whistles, goal roars, near-miss "ooh"s),
   synthesised in the browser. A half-time dressing room with **team talks**,

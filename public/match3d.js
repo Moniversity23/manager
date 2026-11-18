@@ -289,7 +289,7 @@ function playerGeometry() {
     chest, pelvis: cyl(0.148, 0.17, 0.2, 0, 12),
     neck: new THREE.CylinderGeometry(0.048, 0.058, 0.11, 8), head: new THREE.SphereGeometry(0.115, 18, 14),
     ear: new THREE.SphereGeometry(0.026, 6, 5), nose: new THREE.BoxGeometry(0.03, 0.035, 0.03),
-    hairCap: new THREE.SphereGeometry(0.123, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), hairAfro: new THREE.SphereGeometry(0.152, 12, 10), hairTop: new THREE.BoxGeometry(0.2, 0.07, 0.15),
+    hairCap: new THREE.SphereGeometry(0.123, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), hairAfro: new THREE.SphereGeometry(0.152, 12, 10), hairTop: (() => { const g = new THREE.SphereGeometry(0.1, 12, 8); g.scale(1.05, 0.42, 0.85); return g; })(),
     thigh: cyl(0.086, 0.06, 0.42, -0.21), shortsLeg: cyl(0.098, 0.108, 0.25, -0.1), knee: new THREE.SphereGeometry(0.061, 8, 6),
     shin: cyl(0.057, 0.04, 0.4, -0.2, 8), sock: cyl(0.062, 0.047, 0.3, -0.24, 8), boot,
     shoulder: new THREE.SphereGeometry(0.07, 8, 6), upper: cyl(0.055, 0.045, 0.27, -0.135, 8), sleeve: cyl(0.066, 0.062, 0.15, -0.07, 8),
@@ -300,25 +300,15 @@ function playerGeometry() {
     beard: new THREE.SphereGeometry(0.118, 14, 8, -Math.PI * 0.42, Math.PI * 0.84, Math.PI * 0.55, Math.PI * 0.3),
     calf: (() => { const g = new THREE.SphereGeometry(0.06, 8, 6); g.scale(1, 1.9, 1); g.translate(-0.012, -0.13, 0); return g; })(),
     card: new THREE.PlaneGeometry(0.09, 0.12), flag: (() => { const g = new THREE.PlaneGeometry(0.34, 0.26); g.translate(0.17, 0.13, 0); return g; })(),
-    pole: cyl(0.012, 0.012, 0.6, 0.3, 5), board: new THREE.BoxGeometry(0.62, 0.42, 0.05),
+    pole: cyl(0.012, 0.012, 0.6, 0.3, 5), board: new THREE.BoxGeometry(0.62, 0.42, 0.05), number: new THREE.PlaneGeometry(0.2, 0.2),
   };
 }
 
-function makePlayer(geo, m) {
-  const g = new THREE.Group();
-  const rig = new THREE.Group(); g.add(rig);
-  const lk = m.look || null;
-  const hs = lk ? lk.heightCm / 181 : (m.build ? m.build.h : 1);
-  const bw = lk ? 0.94 + lk.build / 15 * 0.13 : (m.build ? m.build.w : 1);       // broader players fill out the frame
-  rig.scale.set(S * hs * bw, S * hs, S * hs * bw);
-  const limb = lk ? 0.92 + lk.build / 15 * 0.2 : 1;                              // and carry thicker limbs
+// The head: skull with his face, ears, nose, hair and beard from his permanent look (origin at the
+// centre of the skull, +X forward). Used by the procedural figures and the motion-captured ones.
+function buildHead(geo, m, lk) {
   const mesh = (ge, ma, shadow) => { const x = new THREE.Mesh(ge, ma); x.castShadow = !!shadow; return x; };
-  const hips = new THREE.Group(); hips.position.y = 0.94; rig.add(hips);
-  const pelvis = mesh(geo.pelvis, m.shorts, true); pelvis.scale.set(0.72, 1, 1.08); hips.add(pelvis);
-  const torso = new THREE.Group(); torso.position.y = 0.04; hips.add(torso);
-  const chest = mesh(geo.chest, m.shirt, true); chest.scale.set(0.66 * (0.96 + (bw - 1)), 1, 1.12); torso.add(chest);
-  const neck = mesh(geo.neck, m.skin); neck.position.y = 0.63; neck.scale.set(limb, 1, limb); torso.add(neck);
-  const head = new THREE.Group(); head.position.y = 0.78; torso.add(head);
+  const head = new THREE.Group();
   const shape = lk ? [[0.97, 1.15, 0.9], [0.93, 1.21, 0.88], [1.02, 1.1, 0.95], [0.94, 1.17, 0.86]][lk.head] : [0.97, 1.15, 0.9];
   const skull = mesh(geo.head, m.face || m.skin, true); skull.scale.set(...shape); head.add(skull);
   for (const z of [-0.105, 0.105]) { const e = mesh(geo.ear, m.skin); e.position.set(-0.005, 0, z * shape[2] / 0.9); head.add(e); }
@@ -337,6 +327,39 @@ function makePlayer(geo, m) {
   if (style === 'long') { const b = mesh(geo.longBack, m.hair); head.add(b); }
   const beard = lk ? lk.beardStyle : 'none';
   if (beard === 'full' || beard === 'goatee') { const b = mesh(geo.beard, m.beard || m.hair); b.scale.set(shape[0] * 1.04, shape[1] * (beard === 'goatee' ? 0.95 : 1.04), shape[2] * (beard === 'goatee' ? 0.45 : 1.06)); head.add(b); }
+  return head;
+}
+
+// Soft blob shadow under a figure, plus one streak per floodlight at night.
+function addGroundShadows(g, geo, m) {
+  const blob = new THREE.Mesh(geo.blob, m.blob); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.03; blob.renderOrder = 1; g.add(blob);
+  let shadows = null;
+  if (m.streak) {
+    shadows = new THREE.Group(); g.add(shadows);
+    for (const [tx, , tz] of TOWERS) {
+      const len = Math.hypot(tx, tz), dx = -tx / len, dz = -tz / len;
+      const st = new THREE.Mesh(geo.streak, m.streak);
+      st.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx)); st.position.set(dx * 1.05, 0.025, dz * 1.05); st.renderOrder = 1; shadows.add(st);
+    }
+  }
+  return { blob, shadows };
+}
+
+function makePlayer(geo, m) {
+  const g = new THREE.Group();
+  const rig = new THREE.Group(); g.add(rig);
+  const lk = m.look || null;
+  const hs = lk ? lk.heightCm / 181 : (m.build ? m.build.h : 1);
+  const bw = lk ? 0.94 + lk.build / 15 * 0.13 : (m.build ? m.build.w : 1);       // broader players fill out the frame
+  rig.scale.set(S * hs * bw, S * hs, S * hs * bw);
+  const limb = lk ? 0.92 + lk.build / 15 * 0.2 : 1;                              // and carry thicker limbs
+  const mesh = (ge, ma, shadow) => { const x = new THREE.Mesh(ge, ma); x.castShadow = !!shadow; return x; };
+  const hips = new THREE.Group(); hips.position.y = 0.94; rig.add(hips);
+  const pelvis = mesh(geo.pelvis, m.shorts, true); pelvis.scale.set(0.72, 1, 1.08); hips.add(pelvis);
+  const torso = new THREE.Group(); torso.position.y = 0.04; hips.add(torso);
+  const chest = mesh(geo.chest, m.shirt, true); chest.scale.set(0.66 * (0.96 + (bw - 1)), 1, 1.12); torso.add(chest);
+  const neck = mesh(geo.neck, m.skin); neck.position.y = 0.63; neck.scale.set(limb, 1, limb); torso.add(neck);
+  const head = buildHead(geo, m, lk); head.position.y = 0.78; torso.add(head);
   const leg = z => {
     const hip = new THREE.Group(); hip.position.set(0, -0.03, z); hips.add(hip);
     const th = mesh(geo.thigh, m.skin, true); th.scale.set(limb, 1, limb);
@@ -357,18 +380,7 @@ function makePlayer(geo, m) {
     const hand = mesh(geo.hand, m.glove || m.skin); hand.position.y = -0.285; el.add(hand);
     return { sh, el, hand };
   };
-  const blob = new THREE.Mesh(geo.blob, m.blob); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.03; blob.renderOrder = 1; g.add(blob);
-  // Night: one shadow from each floodlight. They sit in a group that cancels the player's turn,
-  // so they always point away from the towers.
-  let shadows = null;
-  if (m.streak) {
-    shadows = new THREE.Group(); g.add(shadows);
-    for (const [tx, , tz] of TOWERS) {
-      const len = Math.hypot(tx, tz), dx = -tx / len, dz = -tz / len;
-      const st = new THREE.Mesh(geo.streak, m.streak);
-      st.rotation.set(-Math.PI / 2, 0, Math.atan2(-dz, dx)); st.position.set(dx * 1.05, 0.025, dz * 1.05); st.renderOrder = 1; shadows.add(st);
-    }
-  }
+  const { blob, shadows } = addGroundShadows(g, geo, m);
   g.userData = { rig, hips, torso, chest, head, blob, shadows, legL: leg(0.096), legR: leg(-0.096), armL: arm(0.245), armR: arm(-0.245), sy: S * hs, cel: lk ? lk.cel : 0,
     face: 0, ph: Math.random() * 6, spd: 0, mv: 0, lx: null, lz: 0, bank: 0, acc: 0, look: 0, lastSpd: 0, fwd: 1, side: 0 };
   return g;
@@ -481,7 +493,185 @@ function pose(u, a, dt, t, i) {
   u.blob.scale.setScalar(1 - Math.min(0.6, y * 0.9));
 }
 
-export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto' } = {}) {
+
+// ── Motion-captured footballers ─────────────────────────────────────
+// A CC0 skinned mannequin (Mesh2Motion) with CC0 clips, prepared by scripts/anim/build-footballer.js:
+// public/models/footballer.glb (mesh split into kit regions) and footballer-anims.json. Each player
+// is a clone of the mannequin wearing his club's colours, with his own head (face, hair, beard from
+// his permanent look) on the head bone and his number on his back. An AnimationMixer per player
+// blends idle / walk / jog / sprint / backwards / strafe by his real speed and direction, with
+// stride speed matched to ground speed, and plays one-shot actions on match events: kicks timed
+// so the foot meets the ball when it leaves, slide tackles, headers, keeper dives and saves,
+// celebrations, disappointment, appeals, falls and getting up. If the files cannot be loaded the
+// view falls back to the procedural figures above.
+let FOOTBALLER = null, FOOTBALLER_P = null;
+// One shared download: the match screen starts it when you press Play, the 3D view waits for it.
+export function loadFootballer(base) { if (!FOOTBALLER_P) FOOTBALLER_P = fetchFootballer(base).catch(e => { FOOTBALLER_P = null; throw e; }); return FOOTBALLER_P; }
+async function fetchFootballer(base = new URL('./models/', import.meta.url).href) {
+  if (FOOTBALLER) return FOOTBALLER;
+  const [{ GLTFLoader }, SU] = await Promise.all([import('./vendor/jsm/loaders/GLTFLoader.js'), import('./vendor/jsm/utils/SkeletonUtils.js')]);
+  const [gltf, anims] = await Promise.all([new GLTFLoader().loadAsync(base + 'footballer.glb'), fetch(base + 'footballer-anims.json').then(r => { if (!r.ok) throw new Error('animations ' + r.status); return r.json(); })]);
+  const clips = {};
+  for (const [k, c] of Object.entries(anims.clips)) clips[k] = { clip: THREE.AnimationClip.parse({ name: k, duration: c.duration, tracks: c.tracks, uuid: THREE.MathUtils.generateUUID() }), loop: c.loop, contact: c.contact, foot: c.foot };
+  // Model height (bind pose) for scaling players to their real heights.
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  FOOTBALLER = { scene: gltf.scene, clips, height: box.max.y - box.min.y || 1.83, clone: SU.clone };
+  return FOOTBALLER;
+}
+
+const LOCO = ['idle', 'walk', 'jog', 'sprint', 'back', 'strafeL', 'strafeR', 'ready', 'tired', 'injuredWalk'];
+const CEL = ['celFist', 'celVictory', 'celFlip', 'celDab'];
+// Ground speed (m/s at our figure scale) at which each locomotion clip's feet don't slide.
+const STRIDE = { walk: 1.7, jog: 3.9, sprint: 7.2, back: 1.5, strafeL: 1.6, strafeR: 1.6, injuredWalk: 1.0 };
+
+// Keeps an object upright in the figure's frame while it rides on a bone (head, shirt number…).
+// worldOffset is in the figure's frame (+X forward, +Y up); worldScale is the size the object should
+// have in the world (the bone's own scale is cancelled). The object's own rotation is kept.
+function attachToBone(fig, bone, obj, worldOffset, worldScale = 1) {
+  fig.updateMatrixWorld(true);
+  const qb = new THREE.Quaternion(), qf = new THREE.Quaternion(), pb = new THREE.Vector3(), sb = new THREE.Vector3();
+  bone.matrixWorld.decompose(pb, qb, sb);
+  fig.getWorldQuaternion(qf);
+  const own = obj.quaternion.clone();
+  obj.quaternion.copy(qb.clone().invert().multiply(qf).multiply(own));
+  const want = pb.clone().add(worldOffset.clone().applyQuaternion(qf));
+  bone.add(obj);
+  obj.position.copy(bone.worldToLocal(want));
+  obj.scale.set(worldScale / sb.x, worldScale / sb.y, worldScale / sb.z);
+}
+
+function numberTexture(n, light) {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const g = c.getContext('2d');
+  g.font = 'bold 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.lineWidth = 6; g.strokeStyle = light ? 'rgba(0,0,0,.8)' : 'rgba(255,255,255,.9)'; g.fillStyle = light ? '#fff' : '#111';
+  g.strokeText(String(n), 32, 34); g.fillText(String(n), 32, 34);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function makeFootballer(F, geo, m) {
+  const g = new THREE.Group();
+  const lk = m.look || null;
+  const hs = (lk ? lk.heightCm / 100 : 1.8) / F.height;
+  const bw = lk ? 0.95 + lk.build / 15 * 0.11 : 1;
+  const holder = new THREE.Group(); holder.scale.set(S * hs * bw, S * hs, S * hs * bw); g.add(holder);
+  const model = F.clone(F.scene);
+  model.rotation.y = Math.PI / 2;                               // the mannequin faces +Z; our figures face +X
+  holder.add(model);
+  const kit = { shirt: m.sleeve, shorts: m.shorts, socks: m.sock, boots: m.boot, skin: m.skin, hands: m.glove || m.skin };
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    o.frustumCulled = false; o.castShadow = true;
+    const region = o.material && o.material.name;
+    if (region === 'head') { o.visible = false; return; }
+    o.material = kit[region] || m.skin;
+  });
+  const bone = name => model.getObjectByName(name);
+  const headBone = bone('head'), spine = bone('spine_03'), handR = bone('hand_r');
+  // His own head: face, ears, nose, hair and beard from his permanent look.
+  const head = buildHead(geo, m, lk);
+  const headScale = S * (lk ? lk.heightCm : 181) / 181;
+  if (headBone) attachToBone(g, headBone, head, new THREE.Vector3(0.012 * headScale, 0.085 * headScale, 0), headScale);
+  // Shirt number on his back
+  if (spine && m.number != null) {
+    const plate = new THREE.Mesh(geo.number, new THREE.MeshBasicMaterial({ map: numberTexture(m.number, m.lightNumber !== false), transparent: true, depthWrite: false }));
+    plate.rotation.y = -Math.PI / 2;
+    attachToBone(g, spine, plate, new THREE.Vector3(-0.15 * headScale * bw, 0.02, 0), headScale);
+  }
+  const { blob, shadows } = addGroundShadows(g, geo, m);
+  const mixer = new THREE.AnimationMixer(model);
+  const act = {};
+  for (const [k, c] of Object.entries(F.clips)) {
+    const a = mixer.clipAction(c.clip);
+    if (c.loop) { a.setLoop(THREE.LoopRepeat, Infinity); } else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    a.enabled = false; act[k] = a;
+  }
+  for (const k of LOCO) if (act[k]) { act[k].enabled = true; act[k].setEffectiveWeight(k === 'idle' ? 1 : 0); act[k].time = Math.random() * act[k].getClip().duration; act[k].play(); }
+  g.userData = { mixer, act, model, holder, head, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F,
+    armR: { hand: handR || head }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(k => [k, k === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004 };
+  return g;
+}
+
+// Starts a one-shot clip (fades out locomotion) unless the same one is already running.
+function oneShot(u, key, { at = 0, speed = 1, hold = 0, fade = 0.12 } = {}) {
+  const a = u.act[key]; if (!a) return;
+  if (u.one && u.one.key === key && !u.one.done) return;
+  if (u.one && u.one.a !== a) u.one.a.fadeOut(fade);
+  a.enabled = true; a.reset(); a.time = Math.max(0, at); a.timeScale = speed; a.setEffectiveWeight(1); a.fadeIn(fade); a.play();
+  u.one = { key, a, until: (a.getClip().duration - a.time) / Math.max(0.1, speed) + hold, age: 0, done: false };
+  const L = globalThis.__animLog; if (L) L[key] = (L[key] || 0) + 1;   // test hook: which actions played
+}
+
+// Called every frame instead of pose() for a mocap figure. `a` is the same action description.
+function animateFootballer(u, a, dt, t, simRate) {
+  u.spd += (a.speed - u.spd) * Math.min(1, dt * 8);
+  const F = u.F, sp = u.spd / (u.sy / S), k = simRate || 1;              // speed in model metres
+  // ── one-shot actions from match events ──
+  let want = null, opts = {};
+  if (a.injured != null) { want = a.injured < 2.4 ? 'fall' : 'getUp'; opts = { hold: 0.6 }; }
+  else if (a.dive) { want = a.dive.sign > 0 ? 'diveL' : 'diveR'; opts = { speed: 1.6 * k }; }
+  else if (a.catchBall != null || a.punch != null) { want = 'block'; opts = { speed: 1.4 * k }; }
+  else if (a.slide != null) { want = 'slide'; opts = { at: 0.15, speed: 1.5 * k }; }
+  else if (a.strike != null && a.strike < 0.3) {
+    // Time the kick so the foot meets the ball as it leaves (the ball leaves 0.11 s of match time after the strike starts).
+    const key = (a.power || 0.6) >= 0.85 ? 'kickFront' : 'kickSide', c = F.clips[key];
+    // The mixer advances by this frame's dt straight after the kick starts, hence the - dt * k.
+    want = key; opts = { at: Math.max(0, (c.contact || 0.3) - (0.11 - a.strike) - dt * k), speed: k };
+  }
+  else if (a.header) { want = 'header'; opts = { at: 0.25, speed: 1.3 * k }; }
+  else if (a.block != null) { want = 'block'; opts = { speed: 1.2 * k }; }
+  else if (a.cel === 'scorer' && u.spd < 1.6) want = CEL[u.cel % CEL.length];
+  else if (a.cel === 'mate' && u.spd < 1.6) want = u.cel % 2 ? 'clap' : 'celPower';
+  else if (a.card) want = 'call';
+  else if (a.boardUp) want = 'block';
+  else if (a.appeal) want = u.cel % 2 ? 'angry' : 'reject';
+  if (want && F.clips[want]) oneShot(u, want, opts);
+  // A finished one-shot hands back to locomotion (held poses stay while their trigger lasts).
+  if (u.one) {
+    u.one.age += dt;
+    const holding = (want === u.one.key) && (a.injured != null || a.boardUp || a.card || a.cel);
+    if (!holding && u.one.age >= u.one.until) { u.one.a.fadeOut(0.2); u.one.done = true; u.one = null; }
+  }
+  // ── locomotion blend by speed and direction ──
+  const active = u.one ? 0 : 1;
+  const sad = a.cel === 'sad', fwd = Math.cos(a.rel || 0), side = Math.sin(a.rel || 0);
+  const w = { idle: 0, walk: 0, jog: 0, sprint: 0, back: 0, strafeL: 0, strafeR: 0, ready: 0, tired: 0, injuredWalk: 0 };
+  if (sad && sp < 1) w.tired = 1;
+  else if (a.ready && sp < 2) w.ready = 1;
+  else if (sp < 0.35) w.idle = 1;
+  else if (fwd < -0.35 && sp < 4.5) { w.back = 1; }
+  else if (Math.abs(side) > 0.7 && sp < 4) { w[side > 0 ? 'strafeL' : 'strafeR'] = 1; }
+  else if (sp < 1.9) { const x = (sp - 0.35) / 1.55; w.idle = 1 - x; w.walk = x; }
+  else if (sp < 4.4) { const x = (sp - 1.9) / 2.5; w.walk = 1 - x; w.jog = x; }
+  else { const x = Math.min(1, (sp - 4.4) / 2.6); w.jog = 1 - x; w.sprint = x; }
+  for (const key of LOCO) {
+    const ac = u.act[key]; if (!ac) continue;
+    u.w[key] += ((w[key] || 0) * active - u.w[key]) * Math.min(1, dt * 7);
+    const wt = u.w[key];
+    ac.enabled = wt > 0.003;
+    ac.setEffectiveWeight(wt);
+    if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
+  }
+  u.mixer.update(dt);
+  // Test hook: how far the kicking foot is from its contact frame when the ball leaves.
+  if (globalThis.__animLog && a.strike != null && u.one && /^kick/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
+  // Lean into turns at speed, and keeper dives fly sideways off the ground.
+  u.bank = (u.bank || 0) + ((Math.max(-0.22, Math.min(0.22, (a.turn || 0) * u.spd * 0.014))) - (u.bank || 0)) * Math.min(1, dt * 6);
+  let roll = -u.bank, lift = 0;
+  if (a.dive) { const wv = Math.min(1, a.dive.age / 0.2), far = Math.min(1, Math.abs(a.dive.reach) * 9); roll = a.dive.sign * 1.25 * wv * far; lift = 0.5 * wv * far; }
+  if (a.header) lift = Math.max(lift, Math.sin(Math.PI * Math.min(1, a.header)) * 0.35);
+  u.holder.rotation.set(roll, 0, 0);
+  u.holder.position.y = lift * u.sy;
+  u.blob.scale.setScalar(1 - Math.min(0.6, lift));
+}
+
+export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap' } = {}) {
+  let F = null;
+  if (models !== 'classic') {
+    try { F = await Promise.race([loadFootballer(), new Promise((_, no) => setTimeout(() => no(new Error('timed out')), 30000))]); }
+    catch (e) { console.warn('Motion-captured players unavailable, using classic figures:', e.message); }
+  }
   if (!container) throw new Error('no container');
   // Graphics quality: 'low' for older phones, 'high' for strong devices, 'auto' decides from the device.
   const weak = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
@@ -556,19 +746,22 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const gloves = lam(0xffffff);
   const players = { home: [], away: [] };
   const refMats = { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, null, '#16181c') }), sleeve: lam(0x16181c), shorts: lam(0x16181c), sock: lam(0x16181c), skin: skins[1], face: faces[1], hair: hairs[0], hairSoft: hairs[0], hairStyle: 0, boot: boots[0], blob: blobMat };
-  const official = (lkSkin, style) => makePlayer(geo, { ...refMats, skin: skins[lkSkin], face: faces[lkSkin], hairStyle: style });
+  const official = (lkSkin, style) => {
+    const mats = { ...refMats, skin: skins[lkSkin], face: faces[lkSkin], hairStyle: style };
+    return F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
+  };
   const referee = official(1, 0); referee.position.set(-6, 0, 8); scene.add(referee);
   // Cards in the referee's hand
   const cardY = new THREE.Mesh(geo.card, new THREE.MeshBasicMaterial({ color: 0xffd400, side: THREE.DoubleSide }));
   const cardR = new THREE.Mesh(geo.card, new THREE.MeshBasicMaterial({ color: 0xe0161f, side: THREE.DoubleSide }));
-  for (const cd of [cardY, cardR]) { cd.position.set(0.02, -0.11, 0); cd.visible = false; referee.userData.armR.hand.add(cd); }
+  for (const cd of [cardY, cardR]) { cd.visible = false; if (referee.userData.mocap) attachToBone(referee, referee.userData.armR.hand, cd, new THREE.Vector3(0.04, 0.12, 0), S); else { cd.position.set(0.02, -0.11, 0); referee.userData.armR.hand.add(cd); } }
   // Two assistant referees on the touchlines, each covering a half, with a flag
   const flagMat = new THREE.MeshBasicMaterial({ color: 0xffd23f, side: THREE.DoubleSide });
   const assistants = [{ fig: official(4, 2), side: 1, z: -(W / 2 + 1.2), x: 20 }, { fig: official(6, 1), side: -1, z: W / 2 + 1.2, x: -20 }];
   for (const as of assistants) {
     const pole = new THREE.Mesh(geo.pole, refMats.sleeve), fl = new THREE.Mesh(geo.flag, flagMat);
     pole.rotation.z = -Math.PI / 2; fl.position.set(0, 0.6, 0); pole.add(fl);
-    pole.position.set(0, -0.05, 0); as.fig.userData.armR.hand.add(pole);
+    if (as.fig.userData.mocap) { pole.rotation.set(0, 0, 0.35); attachToBone(as.fig, as.fig.userData.armR.hand, pole, new THREE.Vector3(0.05, -0.02, 0), S); } else { pole.position.set(0, -0.05, 0); as.fig.userData.armR.hand.add(pole); }
     as.fig.position.set(as.x, 0, as.z); scene.add(as.fig);
   }
   // Fourth official at halfway with the substitution board
@@ -642,7 +835,8 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
       : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
     const n = Math.abs(Number(d.id) || i * 7 + 3);
-    const p = makePlayer(geo, { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat });
+    const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk };
+    const p = F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
     p.userData.gk = gk; p.userData.pid = d.id; p.userData.number = number;
     p.userData.face = side === 'home' ? 0 : Math.PI;
     scene.add(p);
@@ -680,6 +874,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       ensurePlayers(v);
       const t = now / 1000, sim = v.sim || {};
       const dt = lastNow ? Math.min(0.1, Math.max(0.001, (now - lastNow) / 1000)) : 0.016; lastNow = now;
+      const simRate = lastSimT == null ? 1 : Math.max(0.3, Math.min(3, (sim.t - lastSimT) / dt));
       const frozen = sim.t === lastSimT; lastSimT = sim.t;                 // paused: hold the pose
       const cel = sim.phase === 'celebrate' ? sim.celebrate : null;
       const bx = (v.ball.x - 0.5) * L, bz = (v.ball.y - 0.5) * W, by = BALL_R + (v.ball.z || 0) * 6;
@@ -728,7 +923,8 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           if (u.shadows) u.shadows.rotation.y = -u.face;
           a.turn = turned / dt; a.rel = speed > 0.5 ? wrap(moveAng - u.face) : 0; a.look = wrap(ballAng - u.face); a.near = ballDist < 7 && by < 1.2; a.dribble = dribble;
           if (!a.header) u.hd = 0;
-          pose(u, a, dt, t, i);
+          if (sim.card && sim.t - sim.card.t0 < 2.5 && sim.card.side === side && i !== sim.card.idx && !cel) { const bk = (v.dots[side] || [])[sim.card.idx]; if (bk && Math.hypot(bk.x - d.x, (bk.y - d.y) * 0.65) < 0.08) a.appeal = true; }
+          if (u.mocap) animateFootballer(u, a, dt, t, simRate); else pose(u, a, dt, t, i);
         });
       }
 
@@ -747,7 +943,8 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         referee.rotation.y = u.face;
         const showing = booked && dist < 2.2;
         if (showing) (card.color === 'red' ? cardR : cardY).visible = true;
-        pose(u, { speed: stepLen / dt, power: 1, turn: refTurn / dt, look: wrap(Math.atan2(-(bz - refPos.z), bx - refPos.x) - u.face), card: showing }, dt, t, 30);
+        const refA = { speed: stepLen / dt, power: 1, turn: refTurn / dt, rel: 0, look: wrap(Math.atan2(-(bz - refPos.z), bx - refPos.x) - u.face), card: showing };
+        if (u.mocap) animateFootballer(u, refA, dt, t, simRate); else pose(u, refA, dt, t, 30);
         // Assistants run the line, level with play in their half
         for (const as of assistants) {
           const ux = as.fig.userData;
@@ -756,12 +953,14 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           as.x += st2; as.fig.position.x = as.x;
           const faceIn = as.z < 0 ? -Math.PI / 2 : Math.PI / 2;
           turn(ux, faceIn, dt * 6); as.fig.rotation.y = ux.face;
-          pose(ux, { speed: Math.abs(st2) / dt, rel: Math.sign(st2) * (as.z < 0 ? 1 : -1) * Math.PI / 2, power: 1, look: wrap(Math.atan2(-(bz - as.fig.position.z), bx - as.x) - ux.face), flag: true }, dt, t, 40 + as.side);
+          const asA = { speed: Math.abs(st2) / dt, rel: Math.sign(st2) * (as.z < 0 ? 1 : -1) * Math.PI / 2, power: 1, look: wrap(Math.atan2(-(bz - as.fig.position.z), bx - as.x) - ux.face), flag: true };
+          if (ux.mocap) animateFootballer(ux, asA, dt, t, simRate); else pose(ux, asA, dt, t, 40 + as.side);
         }
         const boardUp = boardShown && now < boardShown.until;
         subBoard.visible = !!boardUp;
         if (boardUp) subBoard.position.set(0.5, 2.55 * S, W / 2 + 3.2);
-        pose(fourth.userData, { speed: 0, power: 1, look: wrap(Math.atan2(-(bz - W / 2 - 3.2), bx) - fourth.userData.face), boardUp }, dt, t, 50);
+        const fA = { speed: 0, power: 1, rel: 0, look: wrap(Math.atan2(-(bz - W / 2 - 3.2), bx) - fourth.userData.face), boardUp };
+        if (fourth.userData.mocap) animateFootballer(fourth.userData, fA, dt, t, simRate); else pose(fourth.userData, fA, dt, t, 50);
       }
 
       // Ball: position, spin from its movement, shadow, trail
@@ -873,4 +1072,45 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       renderer.domElement.remove();
     },
   };
+}
+
+// ── Animation lab (public/dev/anim-lab.html): every clip on its own footballer, for checking
+// orientation, foot contact and distortion without playing a match.
+export async function animLab(container, { keys = null, cols = 6 } = {}) {
+  const F = await loadFootballer();
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x203040);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x335533, 1.4));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(5, 10, 8); scene.add(sun);
+  const geo = playerGeometry();
+  const lam = c => new THREE.MeshLambertMaterial({ color: c });
+  const list = keys || Object.keys(F.clips);
+  const rows = Math.ceil(list.length / cols), gap = 2.6;
+  const grid = new THREE.GridHelper(cols * gap + 4, (cols * gap + 4) * 2, 0x88aa88, 0x446644); grid.position.set(((cols - 1) * gap) / 2, 0, ((rows - 1) * gap) / 2); scene.add(grid);
+  const figs = [];
+  list.forEach((key, i) => {
+    const look = { heightCm: 178 + (i % 5) * 4, build: 7, skin: i % 8, hairStyle: ['crop', 'afro', 'swept', 'fade', 'curly', 'long', 'buzz'][i % 7], hairCol: i % 6, beardStyle: ['none', 'stubble', 'full', 'goatee'][i % 4], head: i % 4, eyes: 0, brows: 1, grey: 0, cel: i % 4 };
+    const blob = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false });
+    const m = { shirt: lam(0xc0392b), sleeve: lam(0xc0392b), shorts: lam(0xf4f4f4), sock: lam(0xc0392b), boot: lam(0x111111), skin: lam(new THREE.Color(SKIN_PAL[look.skin])), face: new THREE.MeshLambertMaterial({ map: faceTexture(SKIN_PAL[look.skin]) }), hair: lam(new THREE.Color(HAIR_PAL[look.hairCol])), hairSoft: lam(new THREE.Color(HAIR_PAL[look.hairCol])), look, blob, number: i + 2 };
+    const f = makeFootballer(F, geo, m);
+    f.position.set((i % cols) * gap, 0, Math.floor(i / cols) * gap);
+    f.rotation.y = -Math.PI / 2;                                       // face the camera (+Z)
+    const u = f.userData;
+    for (const k of Object.keys(u.w)) { u.w[k] = 0; u.act[k] && u.act[k].setEffectiveWeight(0); }
+    const a = u.act[key]; a.enabled = true; a.setLoop(THREE.LoopRepeat, Infinity); a.clampWhenFinished = false; a.setEffectiveWeight(1); a.play();
+    scene.add(f); figs.push({ f, key });
+  });
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+  const cx = ((cols - 1) * gap) / 2, cz = ((rows - 1) * gap) / 2;
+  camera.position.set(cx, 4.5 + rows * 0.8, cz + rows * gap + 6); camera.lookAt(cx, 0.9, cz);
+  const resize = () => { const w = container.clientWidth, h = container.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+  resize();
+  let last = performance.now();
+  const loop = now => { const dt = Math.min(0.05, (now - last) / 1000); last = now; for (const { f } of figs) f.userData.mixer.update(dt); renderer.render(scene, camera); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  return { objs: figs, figs: figs.map(x => x.key), camera, project: (i) => { camera.updateMatrixWorld(); const v = new THREE.Vector3(); figs[i].f.getWorldPosition(v); v.y = 2.3; v.project(camera); return [(v.x + 1) / 2, (1 - v.y) / 2]; },
+    setTime: (sec) => { for (const { f, key } of figs) { const ac = f.userData.act[key]; ac.time = (sec % ac.getClip().duration); f.userData.mixer.update(0); } renderer.render(scene, camera); } };
 }
