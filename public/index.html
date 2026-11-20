@@ -703,7 +703,8 @@ function basePositions(lineup, mirror){
 }
 function normalizeMatch(x){
   const name = v => (typeof v === 'string' ? v : v && v.name);
-  return { home: name(x.home), away: name(x.away), compName: x.compName, events: (x.events || []).slice().sort((a, b) => a.min - b.min), lineups: x.lineups || { home: [], away: [] }, pos: x.pos, myKey: x.myKey || null };
+  return { home: name(x.home), away: name(x.away), compName: x.compName, events: (x.events || []).slice().sort((a, b) => a.min - b.min), lineups: x.lineups || { home: [], away: [] }, pos: x.pos, myKey: x.myKey || null,
+    tl: unpackTimeline(x.timeline), spells: x.timeline ? x.timeline.spells : null, ts: x.ts || null };
 }
 function playHalf(match, fromMin, toMin, done){
   const mode = PREFS.viewMode || '3d';
@@ -811,7 +812,10 @@ function statsRender(){
   const st = k => { const s = seen.filter(e => e.side === k && (e.type === 'shot' || e.type === 'goal')); return { shots: s.length, xg: s.reduce((a, e) => a + (e.xg || 0), 0) }; };
   const h = st('home'), a = st('away');
   const cards = k => seen.filter(e => e.side === k && (e.type === 'yellow' || e.type === 'red')).length;
-  el.innerHTML = [['shots', h.shots, a.shots], ['xG', h.xg.toFixed(2), a.xg.toFixed(2)], ['cards', cards('home'), cards('away')]].map(([l, x, y]) => `<div class="l"><b>${x}</b></div><div class="c">${l}</div><div><b>${y}</b></div>`).join('');
+  const ls = tlLiveStats(v);
+  const rows = [['shots', h.shots, a.shots], ['xG', h.xg.toFixed(2), a.xg.toFixed(2)], ['cards', cards('home'), cards('away')]];
+  if (ls) rows.unshift(['possession', ls.pos + '%', (100 - ls.pos) + '%']), rows.push(['passes', `${ls.passes.home[1]}/${ls.passes.home[0]}`, `${ls.passes.away[1]}/${ls.passes.away[0]}`]);
+  el.innerHTML = rows.map(([l, x, y]) => `<div class="l"><b>${x}</b></div><div class="c">${l}</div><div><b>${y}</b></div>`).join('');
 }
 function viewTick(now){
   const v = VIEW; if (!v || v.finished) return;
@@ -819,7 +823,7 @@ function viewTick(now){
   if (v.three && (v.intro != null || v.replay) && cinematic(v, now, dt)) return;
   const nextEv = v.m.events[v.idx];
   if (!v.paused) {
-    let rate = (PREFS.speed || 2) * 1.5;
+    let rate = (PREFS.speed || 2) * 0.75;   // match minutes per second: 1× is a two-minute match, room for real passing between chances
     if (v.mode === 'key') rate *= nextEv && nextEv.min - v.minute < 2.5 ? 0.5 : 8;
     v.rate = rate;
     if (v.hold > 0) v.hold -= dt; else v.minute = Math.min(v.to, v.minute + rate * dt);
@@ -828,6 +832,7 @@ function viewTick(now){
   while (v.idx < v.m.events.length && v.m.events[v.idx].min <= v.minute && v.m.events[v.idx].min <= v.to) { markEvent(v.m.events[v.idx], false); v.idx++; changed = true; }
   if (changed) { feedRender(); statsRender(); }
   const clock = document.getElementById('mvClock'); if (clock) clock.textContent = `${Math.floor(v.minute)}'`;
+  if (v.m.tl && Math.floor(v.minute) !== v.statsMin) { v.statsMin = Math.floor(v.minute); statsRender(); }
   stepPositions(now, v.paused ? 0 : dt);
   if (v.three) { recFrame(v); v.three.render(v, now); hudRender(v); } else drawPitch(now);
   if (v.minute >= v.to && !(v.hold > 0)) {
@@ -910,12 +915,113 @@ function simForward(team, side){
   return best;
 }
 function simGive(v, side, idx, wait = 0.7){ const s = v.sim; s.poss = side; s.holder = Math.max(0, idx); s.pass = null; s.nextAt = s.t + wait; }
+
+// ── The match timeline (src/engine/timeline.js) ──
+// The engine sends every match you watch as a second-by-second timeline of real actions between
+// the actual players: possession spells, passes (who to whom, and who intercepted a lost one),
+// tackles, fouls, the build-up to each shot. The view follows it instead of inventing its own
+// passes and turnovers; it shows a subset when the clock runs faster than the ball can travel.
+function unpackTimeline(p){
+  if (!p || !p.events) return null;
+  return p.events.map(a => ({ t: a[0], type: p.types[a[1]], side: a[2] ? 'away' : 'home', pid: a[3], tid: a[4], from: [a[5], a[6]], to: [a[7], a[8]], out: p.outs[a[9]] || '', kind: a[10], by: a[11] }));
+}
+const dotOf = (v, side, id) => (id == null ? -1 : v.dots[side].findIndex(d => d.id === id && !d.off));
+// The pass to show next: a real timeline pass by the player on the ball near the current clock if
+// there is one, otherwise the side's next pass (the ball goes to that passer first).
+function tlNextPass(v, side){
+  const tl = v.m.tl; if (!tl) return null;
+  const clock = v.minute * 60, holderId = (v.dots[side][v.sim.holder] || {}).id;
+  let first = null;
+  for (let i = v.tlPass || 0; i < tl.length; i++) {
+    const e = tl[i];
+    if (e.t > clock + 40) break;
+    if (e.type !== 'PASS' || e.side !== side || e.t < clock - 45) continue;
+    if (e.pid === holderId) return { e, i };
+    if (!first) first = { e, i };
+  }
+  return first;
+}
+// The timeline's build-up to a shot: the players who had the ball in its last passes, ending with
+// the shooter (on a goal the final pass comes from the assister). The view plays exactly that chain.
+function tlBuildUp(v, ev){
+  const tl = v.m.tl; if (!tl) return null;
+  const sec = ev.min * 60;
+  const i = tl.findIndex(e => e.type === 'SHOT' && e.side === ev.side && e.pid === ev.playerId && e.t > sec - 60 && e.t <= sec + 0.5);
+  if (i < 0) return null;
+  const ids = [];
+  for (let j = i - 1; j >= 0 && ids.length < 4; j--) {
+    const e = tl[j];
+    if (e.type !== 'PASS' || e.side !== ev.side || e.out !== 'complete') break;
+    if (!ids.length) ids.unshift(e.tid);
+    ids.unshift(e.pid);
+  }
+  const chain = ids.map(id => dotOf(v, ev.side, id)).filter((x, k, arr) => x >= 0 && arr.indexOf(x) === k);
+  return chain.length ? chain : null;
+}
+// Possession changes in the timeline (tackles, interceptions) that the view has not shown yet.
+function tlTurnovers(v){
+  const tl = v.m.tl, sp = v.m.spells, s = v.sim;
+  if (!tl || !sp || !sp.length || !s || s.phase !== 'play' || s.pass) return;
+  if (s.t - (v.lastTurn ?? -9) < 1.2) return;            // at most one change of possession per 1.2 s of view time
+  const clock = v.minute * 60;
+  if (s.attack && clock / 60 > s.attack.ev.min - 0.6) return;   // the build-up to the shot is settled
+  // Who has the ball in the timeline right now
+  let k = v.spellIdx || 0;
+  while (k < sp.length - 1 && sp[k][2] <= clock) k++;
+  v.spellIdx = k;
+  const side = sp[k][0] ? 'away' : 'home';
+  if (side === s.poss) return;
+  // The real action that won it: the tackle, interception, goal kick, save or free kick that began the spell
+  const start = sp[k][1];
+  let e = null;
+  for (let i = v.tlPoss || 0; i < tl.length && tl[i].t <= start + 1.5; i++) {
+    const x = tl[i];
+    if (x.side === side && Math.abs(x.t - start) < 1.6 && ['TACKLE', 'INTERCEPTION', 'RECOVERY', 'THROW_IN', 'GOAL_KICK', 'SAVE', 'FREE_KICK', 'KICKOFF'].includes(x.type)) e = x;
+    v.tlPoss = i;
+  }
+  let idx = e ? dotOf(v, side, e.pid) : -1;
+  if (idx < 0) idx = simNearest(v.dots[side], v.ball.x, v.ball.y, s.gk[side])[0];
+  if (idx < 0) return;
+  if (!e || e.type === 'TACKLE') s.tackle = { side, idx, t0: s.t };
+  simGive(v, side, idx, e && e.type === 'THROW_IN' ? rnd(1.2, 1.8) : rnd(0.5, 1.1));   // a throw-in takes a moment to set up
+  v.lastTurn = s.t;
+  if (window.__tlDebug) { const D = window.__tlDebug; const kk = e ? 'turnover:' + e.type : 'turnover:spell'; D[kk] = (D[kk] || 0) + 1; }
+  if (!e || e.type === 'TACKLE') audioEv('TACKLE', { side, x: v.ball.x, slide: !!(e && e.kind === 'sliding') });
+}
+// Live possession and passing from the timeline, up to the current clock.
+function tlLiveStats(v){
+  if (!v.m.tl || !v.m.spells) return null;
+  const clock = v.minute * 60;
+  let h = 0, a = 0;
+  for (const [side, t0, t1] of v.m.spells) { if (t0 >= clock) break; const d = Math.min(t1, clock) - t0; if (side) a += d; else h += d; }
+  const passes = { home: [0, 0], away: [0, 0] };
+  for (const e of v.m.tl) { if (e.t > clock) break; if (e.type === 'PASS') { passes[e.side][0]++; if (e.out === 'complete') passes[e.side][1]++; } }
+  return { pos: h + a > 0 ? Math.round(h / (h + a) * 100) : 50, passes };
+}
 function simPass(v, secsTo){
   const s = v.sim, team = v.dots[s.poss], opp = v.dots[otherSide(s.poss)], dir = sideDir(s.poss), h = team[s.holder];
   const a = s.attack && s.attack.side === s.poss ? s.attack : null;
   let to = -1;
-  if (a && s.holder === a.shooter) { s.nextAt = s.t + 0.25; return; }
-  if (a && secsTo < 2) to = a.shooter;
+  const finalBall = a && secsTo < (a.chain ? 2.6 : 2);
+  if (a && s.holder === a.shooter && (finalBall || !v.m.tl)) { s.nextAt = s.t + 0.25; return; }
+  let tlSteal = null, viaChain = false;
+  const next = !finalBall ? tlNextPass(v, s.poss) : null;
+  { const D = window.__tlDebug; if (D) { D.calls = (D.calls || 0) + 1; if (next) D.nextFound = (D.nextFound || 0) + 1; if (a) D.inAttack = (D.inAttack || 0) + 1; } }   // test hook
+  if (a && a.chain && finalBall) {
+    // The real build-up: get the ball to the first man in the chain, then along it to the shooter.
+    const k = a.chain.indexOf(s.holder);
+    const nx = k >= 0 ? a.chain[k + 1] : a.chain[0];
+    if (nx == null || nx === s.holder) { s.nextAt = s.t + 0.25; return; }
+    to = nx; viaChain = true;
+  }
+  else if (finalBall) to = a.shooter;
+  else if (next) {
+    // The timeline's pass: if someone else has the ball there, get it to him first; then his real pass.
+    const passer = dotOf(v, s.poss, next.e.pid), recv = dotOf(v, s.poss, next.e.tid);
+    if (passer >= 0 && passer !== s.holder) { to = passer; v.tlPass = next.i; }
+    else if (recv >= 0 && recv !== s.holder) { to = recv; v.tlPass = next.i + 1; if (next.e.out === 'intercepted' || next.e.out === 'lost') { const by = dotOf(v, otherSide(s.poss), next.e.by); if (by >= 0) tlSteal = by; } }
+    else { v.tlPass = next.i + 1; s.nextAt = s.t + 0.4; return; }
+  }
   else {
     let total = 0; const w = team.map((r, i) => {
       if (r.off || i === s.holder) return 0;
@@ -930,11 +1036,13 @@ function simPass(v, secsTo){
     if (to < 0) to = w.findIndex(x => x > 0);
     if (to < 0) { s.nextAt = s.t + 0.5; return; }
   }
+  { const D = window.__tlDebug; if (D) { const k = viaChain ? 'timelineBuildUp' : a && secsTo < 2 ? 'buildUpToShooter (no timeline chain)' : next && v.tlPass === next.i ? 'feedToTimelinePasser' : next ? 'timelinePass' : a ? 'attackSupportPass' : 'invented'; D[k] = (D[k] || 0) + 1; if (tlSteal != null) D.timelineInterceptions = (D.timelineInterceptions || 0) + 1; } }   // test hook
   const r = team[to];
   const tp = [Math.max(0.03, Math.min(0.97, r.x + ((r.tx ?? r.x) - r.x) * 0.6)), Math.max(0.04, Math.min(0.96, r.y + ((r.ty ?? r.y) - r.y) * 0.6))];
   const share = v.m.pos ? (s.poss === 'home' ? v.m.pos : 100 - v.m.pos) / 100 : 0.5;
-  let steal = null;
-  if (!a && Math.random() < Math.max(0.08, Math.min(0.24, 0.27 - 0.2 * share))) {
+  let steal = tlSteal;
+  if (tlSteal != null) { tp[0] += (opp[tlSteal].x - tp[0]) * 0.5; tp[1] += (opp[tlSteal].y - tp[1]) * 0.5; }
+  if (!v.m.tl && !a && Math.random() < Math.max(0.08, Math.min(0.24, 0.27 - 0.2 * share))) {
     const [oi] = simNearest(opp, tp[0], tp[1], s.gk[otherSide(s.poss)]);
     if (oi >= 0) { steal = oi; tp[0] += (opp[oi].x - tp[0]) * 0.5; tp[1] += (opp[oi].y - tp[1]) * 0.5; }
   }
@@ -1004,14 +1112,16 @@ function stepPositions(now, dt){
 
   // Build-up to the next shot: that side wins the ball and works it to the shooter.
   if (s.phase === 'play') {
-    if (isShot && secsTo < 4.5 && (!s.attack || s.attack.ev !== ev)) {
+    if (isShot && secsTo < (v.m.tl ? 3.4 : 4.5) && (!s.attack || s.attack.ev !== ev)) {
       const team = v.dots[ev.side];
       let sh = team.findIndex(d => d.id === ev.playerId && !d.off); if (sh < 0) sh = simForward(team, ev.side);
-      s.attack = { ev, side: ev.side, shooter: sh, spot: [goalX(ev.side) - sideDir(ev.side) * rnd(0.09, 0.17), 0.5 + rnd(-0.16, 0.16)] };
+      s.attack = { ev, side: ev.side, shooter: sh, spot: [goalX(ev.side) - sideDir(ev.side) * rnd(0.09, 0.17), 0.5 + rnd(-0.16, 0.16)], chain: tlBuildUp(v, ev) };
       say('attack', { club: clubOf(v, ev.side), player: surname((team[sh] || {}).name) });
       audioEv('GK_SHOUT', { side: otherSide(ev.side), x: goalX(otherSide(ev.side)) });
-      if (s.poss !== ev.side) simGive(v, ev.side, simNearest(team, ball.x, ball.y, s.gk[ev.side])[0], 0.4);
+      if (s.poss !== ev.side && !v.m.tl) simGive(v, ev.side, simNearest(team, ball.x, ball.y, s.gk[ev.side])[0], 0.4);
     } else if (s.attack && (!isShot || s.attack.ev !== ev)) s.attack = null;
+    // With a timeline, the attacking side gets the ball when its real build-up starts (at the latest now).
+    if (s.attack && v.m.tl && s.poss !== s.attack.side && !s.pass && secsTo < 2.6) { const c = s.attack.chain; simGive(v, s.attack.side, c ? c[0] : s.attack.shooter, 0.15); }
     if (s.attack && secsTo <= 0.55) simShoot(v, secsTo / 1);
   }
 
@@ -1032,6 +1142,7 @@ function stepPositions(now, dt){
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
       ball.x += (h.x + ox - ball.x) * 0.5; ball.y += (h.y + oy - ball.y) * 0.5; ball.z *= 0.6;
       if (s.t >= s.nextAt) simPass(v, secsTo);
+      else if (v.m.tl) tlTurnovers(v);
       else if (!s.attack) { const [oi, od] = simNearest(opp, h.x, h.y, s.gk[otherSide(s.poss)]); if (oi >= 0 && od < 0.022 && Math.random() < 0.4 * dt) { s.tackle = { side: otherSide(s.poss), idx: oi, t0: s.t }; audioEv('TACKLE', { side: otherSide(s.poss), x: ball.x, slide: true }); simGive(v, otherSide(s.poss), oi, rnd(0.7, 1.5)); }
         else if (oi >= 0 && od < 0.035) audioEv('PRESS', { side: s.poss, x: h.x }); }
     }
@@ -1118,7 +1229,7 @@ function showHalftime(h){
   document.getElementById('genMoContent').innerHTML = `
     <div class="mo-title">⏸ Half-time · ${esc(h.compName)}</div>
     <div class="score">${esc(h.home.name)} ${h.home.goals} – ${h.away.goals} ${esc(h.away.name)}</div>
-    <div class="small dim" style="text-align:center;margin-bottom:10px">xG ${h.home.xg} – ${h.away.xg} · Shots ${h.home.shots} – ${h.away.shots}</div>
+    <div class="small dim" style="text-align:center;margin-bottom:10px">xG ${h.home.xg} – ${h.away.xg} · Shots ${h.home.shots} – ${h.away.shots}${h.ts ? ` · Possession ${h.ts.possession}% – ${100 - h.ts.possession}% · Passes ${h.ts.passes[0]} – ${h.ts.passes[1]} (${h.ts.passAccuracy[0]}% – ${h.ts.passAccuracy[1]}%)` : ''}</div>
     ${h.events.filter(e => e.type !== 'shot').length ? `<div class="card" style="padding:10px">${h.events.filter(e => e.type !== 'shot').map(e => `<div class="small">${e.min}' ${esc(e.text)} <span class="dim">(${e.side === my ? 'us' : 'them'})</span></div>`).join('')}</div>` : ''}
     <div class="card" style="padding:0;overflow:hidden" id="htSubs"></div>
     <div class="g2">
@@ -1167,6 +1278,7 @@ function matchReportHTML(m){
     <div class="g4" style="margin-bottom:10px">
       ${[['xG', `${m.hx} – ${m.ax}`], ['Shots', `${m.hs} – ${m.as}`], ['Possession', `${m.pos}% – ${100 - m.pos}%`], ['Venue', m.myKey === 'home' ? 'Home' : 'Away']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:16px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}
     </div>
+    ${m.ts ? `<div class="g4" style="margin-bottom:10px">${[['Passes', `${m.ts.passes[0]} – ${m.ts.passes[1]}`], ['Pass accuracy', `${m.ts.passAccuracy[0]}% – ${m.ts.passAccuracy[1]}%`], ['Tackles won', `${m.ts.tackles[0]} – ${m.ts.tackles[1]}`], ['Interceptions', `${m.ts.interceptions[0]} – ${m.ts.interceptions[1]}`]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:16px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>` : ''}
     ${m.motm ? `<div style="text-align:center;margin-bottom:8px" class="small">⭐ Man of the match: <b>${esc(m.motm.name)}</b> ${rb10(m.motm.rating)}</div>` : ''}
     ${m.ratings && m.myKey ? `<div style="margin-bottom:10px;text-align:center">${m.ratings[m.myKey].slice(0, 11).map(x => `<span class="rt">${esc(x.name.split(' ').slice(-1)[0])} ${rb10(x.rating)}${x.goals ? ' ⚽'.repeat(Math.min(3, x.goals)) : ''}</span>`).join('')}</div>` : ''}
     ${m.halftime && m.halftime.talk ? `<div class="small" style="text-align:center;margin-bottom:8px">Half-time talk: <b>${esc(m.halftime.talk.kind)}</b> — the team came out <b>${esc(m.halftime.talk.effect)}</b>.</div>` : ''}
@@ -1953,7 +2065,7 @@ function histMatch(r){
   const icon = { goal: '⚽', yellow: '🟨', red: '🟥', sub: '🔁', injury: '🏥' };
   return `<div class="row" style="margin-bottom:8px"><button class="btn bg bsm" onclick="histGo('matches')">‹ Matches</button><span class="small dim" style="flex:1">${esc(m.c)} · ${m.s}/${String(m.s + 1).slice(2)} week ${m.w}</span></div>
   <div class="card"><div class="score">${clubLink(m.h, m.hn)} ${m.hg} – ${m.ag} ${clubLink(m.a, m.an)}</div>${m.pens ? `<div class="small" style="text-align:center">Penalties ${m.pens.home}–${m.pens.away}</div>` : ''}
-    <div class="g4 mt8">${[['xG', `${m.x[0]} – ${m.x[1]}`], ['Shots', `${m.sh[0]} – ${m.sh[1]}`], ['Possession', `${m.pos}% – ${100 - m.pos}%`], ['Formations', m.f ? `${m.f[0]} · ${m.f[1]}` : '–']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+    <div class="g4 mt8">${[['xG', `${m.x[0]} – ${m.x[1]}`], ['Shots', `${m.sh[0]} – ${m.sh[1]}`], ['Possession', `${m.pos}% – ${100 - m.pos}%`], ['Formations', m.f ? `${m.f[0]} · ${m.f[1]}` : '–'], ...(m.st ? [['Passes', `${m.st.passes[0]} – ${m.st.passes[1]}`], ['Pass accuracy', `${m.st.acc[0]}% – ${m.st.acc[1]}%`], ['Tackles won', `${m.st.tackles[0]} – ${m.st.tackles[1]}`], ['Interceptions', `${m.st.interceptions[0]} – ${m.st.interceptions[1]}`]] : [])].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
     ${m.motm ? `<div class="small" style="text-align:center;margin-top:6px">⭐ Man of the match: <b>${esc(m.motm)}</b></div>` : ''}</div>
   <div class="card"><div class="ch">Events</div>${m.ev.map(e => `<div class="small" style="padding:3px 0">${e[0]}' ${esc(e[3])} <span class="dim">· ${esc(e[2] ? m.an : m.hn)}</span></div>`).join('') || '<div class="small dim">A quiet game.</div>'}</div>
   <div class="g2"><div class="card"><div class="ch">${esc(m.hn)}</div>${side(0)}</div><div class="card"><div class="ch">${esc(m.an)}</div>${side(1)}</div></div>`;

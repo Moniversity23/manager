@@ -97,6 +97,7 @@ function recordMatch(world, rep) {
   const rt = side => ((rep.ratings || {})[side] || []).map(r => [r.playerId, Math.round(r.rating * 10)]);
   a.matches.push({ id: ++a.matchSeq, s: rep.season, w: rep.week, c: rep.compName, h: rep.homeId, a: rep.awayId, hn: rep.home, an: rep.away,
     hg: rep.hg, ag: rep.ag, pens: rep.pens || null, x: [rep.hx, rep.ax], sh: [rep.hs, rep.as], pos: rep.pos, mk: rep.myKey, r: rep.result,
+    st: rep.ts ? { passes: rep.ts.passes, acc: rep.ts.passAccuracy, tackles: rep.ts.tackles, interceptions: rep.ts.interceptions } : null,
     f: rep.formations ? [rep.formations.home, rep.formations.away] : null,
     ev: (rep.events || []).filter(e => e.type !== 'shot').map(e => [e.min, e.type, e.side === 'home' ? 0 : 1, e.text]),
     xi: [xi('home'), xi('away')], rt: [rt('home'), rt('away')], motm: rep.motm ? rep.motm.name : null });

@@ -31,6 +31,7 @@ const INTL = require('./engine/internationalEngine');
 const NEWS = require('./engine/newsEngine');
 const CH = require('./engine/challengeEngine');
 const H = require('./engine/historyEngine');
+const TL = require('./engine/timeline');
 const LOOK = require('./look');
 const REGIONAL = require('./engine/regionalEngine');
 const RENAMES = require('./data/renames.json');
@@ -569,7 +570,7 @@ class GameWorld {
     this._weeklyNews();
     this.currentWeek = week;
     const reports = ws.reports;
-    if (reports.length) this.lastMatch = reports[reports.length - 1];
+    if (reports.length) this.lastMatch = { ...reports[reports.length - 1], timeline: null };   // the save keeps the report, not the play-by-play
     const out = { seasonComplete: false, week, totalWeeks: this.totalWeeks, events: ws.events, matchReport: reports[reports.length - 1] || null, reports };
     if (this.currentWeek >= this.totalWeeks) {
       out.endSummary = this._endSeason();
@@ -1894,6 +1895,7 @@ class GameWorld {
       homeGoals: r.hg, awayGoals: r.ag, ourClub: this.club().name, result, myKey, events,
       halftime: applied ? { subs: applied.subs, tactic: applied.tactic, formation: applied.formation, talk: applied.talk || null } : null,
       lineups: this._lineups(m), ratings, motm: ratings.motm, formations: { home: m.home.formation, away: m.away.formation },
+      timeline: m.tl ? TL.pack(m) : null, ts: r.ts || null,
     };
   }
 
@@ -1955,6 +1957,7 @@ class GameWorld {
         playerId: e.playerId ?? e.onId, offId: e.offId, xg: e.xg, outcome: e.outcome,
         text: e.type === 'goal' ? `⚽ ${name(e.playerId)}` : e.type === 'injury' ? `🏥 ${name(e.playerId)} injured` : e.type === 'shot' ? `🎯 ${name(e.playerId)} — ${e.outcome === 'saved' ? 'saved' : 'off target'}` : e.type === 'yellow' ? `🟨 ${name(e.playerId)} booked` : e.type === 'red' ? `🟥 ${name(e.playerId)} sent off` : `🔁 ${name(e.onId)} on for ${name(e.offId)}` })),
       lineups: this._lineups(m),
+      timeline: TL.pack(m), ts: TL.summary(m),
       tactic: side.tactic, formation: side.formation, subsUsed: side.subsUsed, maxSubs: ME.MAX_SUBS,
       onPitch: side.onPitch.map(s => ({ slot: s.slot, slotKey: s.slotKey, playerId: s.playerId, name: name(s.playerId), position: p(s.playerId).position, fit: Math.round(p(s.playerId).fitness), ovr: p(s.playerId).currentAbility, rating: positionAbility(p(s.playerId), s.slot) })),
       bench: side.bench.filter(id => !side.apps[id]).map(id => ({ playerId: id, name: name(id), position: p(id).position, fit: Math.round(p(id).fitness), ovr: p(id).currentAbility, injured: p(id).isInjured() })),

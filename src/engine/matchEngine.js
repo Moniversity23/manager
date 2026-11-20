@@ -12,6 +12,7 @@
 
 const { clamp, round2, positionAbility, buildSlotMap, POS_COMPAT } = require('../utils');
 const { pickXI, pickBench, slotScore } = require('./selection');
+const TL = require('./timeline');
 
 const TACTIC_MATRIX = {
   high_press: { high_press: 1.0, counter: 0.95, possession: 1.05, low_block: 1.03 },
@@ -257,6 +258,7 @@ function playSegment(m, from, to, ctx) {
 function playFirstHalf(m, ctx) {
   m.phase = 'first';
   for (const [a, b] of SEGMENTS_H1) playSegment(m, a, b, ctx);
+  if (m.recordShots) TL.extend(m, ctx, 0, 45);           // the authoritative action timeline (src/engine/timeline.js)
   m.phase = 'halftime';
 }
 
@@ -311,6 +313,7 @@ function playSecondHalf(m, ctx) {
     for (const [a, b] of SEGMENTS_ET) playSegment(m, a, b, ctx);
     if (m.home.goals === m.away.goals) m.pens = shootout(m, ctx);
   }
+  if (m.recordShots) TL.extend(m, ctx, 45, m.minute);
   m.phase = 'full';
 }
 
@@ -402,11 +405,14 @@ function finalizeMatch(m, ctx) {
     club.lastXI = m[key].startXI.map(s => ({ ...s }));
   }
   const sh = Math.max(m.home.shots, hg), sa = Math.max(m.away.shots, ag);
-  const totalXg = m.home.xg + m.away.xg;
+
   return {
     id: m.id, comp: m.comp, week: m.week, h: m.home.clubId, a: m.away.clubId, hg, ag,
     hx: round2(m.home.xg), ax: round2(m.away.xg), hs: sh, as: sa,
-    pos: totalXg > 0 ? clamp(Math.round(50 + (m.home.xg - m.away.xg) / totalXg * 20), 30, 70) : 50,
+    // Possession: measured from the timeline's possession spells where there is one; otherwise the
+    // expected share from both midfields and tactics (never from expected goals).
+    pos: m.tl ? TL.possession(m) : Math.round(TL.possessionShare(m, ctx) * 100),
+    ...(m.tl ? { ts: TL.summary(m) } : {}),
     pens: m.pens, winner: homeWon ? m.home.clubId : awayWon ? m.away.clubId : null,
   };
 }
