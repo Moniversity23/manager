@@ -8,4 +8,4 @@ Current position (2026-11-20):
 
 * Phase 0 (audit and baseline): done.
 * Phase 1 (authoritative match timeline): done.
-* Next: Phase 2, which fixes the engine's event order and adds on-ball decisions.
+* Phases 2–12: done on 2026-11-20 (reports in the roadmap), with the open items listed under "Still to do".

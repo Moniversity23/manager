@@ -129,10 +129,21 @@ function buildGoal(scene, side) {
   return net;
 }
 
-function buildStands(scene, homeHue, awayHue, low) {
+// The ground: its size follows the club's capacity — a small ground has low terraces and open
+// ends, a mid-sized one covered stands, a big one a second tier — and the crowd fills it to the
+// expected attendance. The design (roof colour) is fixed per club by its name.
+function groundDesign(ground = {}) {
+  const cap = ground.capacity || 20000;
+  const size = cap < 9000 ? 'small' : cap < 32000 ? 'mid' : 'big';
+  let h = 7; for (const c of String(ground.name || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return { size, fill: Math.max(0.15, Math.min(1, (ground.attendance || cap * 0.7) / cap)), roof: [0xdfe6ee, 0x3a4250, 0x9aa6b4][h % 3], seed: (h % 1000) + 7 };
+}
+function buildStands(scene, homeHue, awayHue, low, ground) {
+  const design = groundDesign(ground);
   const concrete = new THREE.MeshLambertMaterial({ color: 0x55606f });
   const wall = new THREE.MeshLambertMaterial({ color: new THREE.Color().setHSL(homeHue / 360, 0.6, 0.32) });
-  const roofMat = new THREE.MeshLambertMaterial({ color: 0xdfe6ee });
+  const roofMat = new THREE.MeshLambertMaterial({ color: design.roof });
+  const tiersFor = (end) => design.size === 'small' ? (end ? 3 : 5) : design.size === 'mid' ? (end ? 6 : 8) : 9;
   const stands = [
     { cx: 0, cz: -(PZ / 2 + 9), w: PX + 10, rot: 0 }, { cx: 0, cz: PZ / 2 + 9, w: PX + 10, rot: Math.PI },
     { cx: -(PX / 2 + 9), cz: 0, w: PZ, rot: Math.PI / 2 }, { cx: PX / 2 + 9, cz: 0, w: PZ, rot: -Math.PI / 2 },
@@ -142,20 +153,34 @@ function buildStands(scene, homeHue, awayHue, low) {
   for (const st of stands) {
     const grp = new THREE.Group(); grp.position.set(st.cx, 0, st.cz); grp.rotation.y = st.rot; scene.add(grp);
     const front = new THREE.Mesh(new THREE.BoxGeometry(st.w, 1.3, 0.3), wall); front.position.set(0, 0.65, 8.1); grp.add(front);
-    for (let tier = 0; tier < 9; tier++) {
+    const end = Math.abs(st.rot) === Math.PI / 2, tiers = tiersFor(end);
+    for (let tier = 0; tier < tiers; tier++) {
       const step = new THREE.Mesh(new THREE.BoxGeometry(st.w, 1.2, 2), concrete);
       step.position.set(0, 0.6 + tier * 1.2, 7 - tier * 2);
       grp.add(step);
       for (let i = -st.w / 2 + 1; i < st.w / 2 - 1; i += gap) seats.push({ grp, x: i, y: 1.6 + tier * 1.2, z: -tier * 2 + 7 });
     }
-    const back = new THREE.Mesh(new THREE.BoxGeometry(st.w, 14, 0.5), concrete); back.position.set(0, 7, -10.2); grp.add(back);
-    // The main stand (where the TV camera sits) has no roof in shot.
-    if (st.cz <= 0 || st.rot !== Math.PI) { const roof = new THREE.Mesh(new THREE.BoxGeometry(st.w, 0.4, 17), roofMat); roof.position.set(0, 14.4, -2); roof.rotation.x = 0.06; grp.add(roof); }
+    const top = 0.6 + tiers * 1.2;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(st.w, top + 2.6, 0.5), concrete); back.position.set(0, (top + 2.6) / 2, 7 - tiers * 2 - 1.2); grp.add(back);
+    // A big ground has an upper tier above the side stands.
+    if (design.size === 'big' && !end) {
+      for (let tier = 0; tier < 5; tier++) {
+        const step = new THREE.Mesh(new THREE.BoxGeometry(st.w, 1.2, 2), concrete);
+        step.position.set(0, top + 3.2 + tier * 1.3, -8 - tier * 2);
+        grp.add(step);
+        if (!low) for (let i = -st.w / 2 + 1; i < st.w / 2 - 1; i += gap * 1.15) seats.push({ grp, x: i, y: top + 4.2 + tier * 1.3, z: -8 - tier * 2 });
+      }
+    }
+    // Roofs: none over a small ground's ends; the main stand (where the TV camera sits) has none in shot.
+    const roofY = design.size === 'big' && !end ? top + 10.5 : top + 2.4;
+    if ((st.cz <= 0 || st.rot !== Math.PI) && !(design.size === 'small' && end)) { const roof = new THREE.Mesh(new THREE.BoxGeometry(st.w, 0.4, 17), roofMat); roof.position.set(0, roofY, -2 - (design.size === 'big' && !end ? 6 : 0)); roof.rotation.x = 0.06; grp.add(roof); }
   }
+  // Fill to the expected attendance (the same seats stay empty for the whole match).
+  { let sd = design.seed; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; }; for (let i = seats.length - 1; i >= 0; i--) if (r() > design.fill) seats.splice(i, 1); }
   // Crowd: two instanced meshes (alternate fans) so they can bounce out of step.
   const fan = new THREE.BoxGeometry(0.6, 0.95, 0.45);
   const fanMat = new THREE.MeshLambertMaterial();
-  const half = [Math.ceil(seats.length / 2), Math.floor(seats.length / 2)];
+  const half = [Math.max(1, Math.ceil(seats.length / 2)), Math.max(1, Math.floor(seats.length / 2))];
   const crowds = [new THREE.InstancedMesh(fan, fanMat, half[0]), new THREE.InstancedMesh(fan, fanMat, half[1])];
   const m = new THREE.Matrix4(), col = new THREE.Color(), v = new THREE.Vector3();
   const palette = [new THREE.Color().setHSL(homeHue / 360, 0.75, 0.5), new THREE.Color().setHSL(awayHue / 360, 0.75, 0.48), new THREE.Color(0xe6e6e6), new THREE.Color(0x3a4050), new THREE.Color(0x8a6a4c)];
@@ -559,7 +584,7 @@ function makeFootballer(F, geo, m) {
   const model = F.clone(F.scene);
   model.rotation.y = Math.PI / 2;                               // the mannequin faces +Z; our figures face +X
   holder.add(model);
-  const kit = { shirt: m.sleeve, shorts: m.shorts, socks: m.sock, boots: m.boot, skin: m.skin, hands: m.glove || m.skin };
+  const kit = { shirt: m.shirt3d || m.sleeve, shorts: m.shorts, socks: m.sock, boots: m.boot, skin: m.skin, hands: m.glove || m.skin };
   model.traverse(o => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = true;
@@ -593,6 +618,29 @@ function makeFootballer(F, geo, m) {
   return g;
 }
 
+// Club shirt for the motion-captured model. The model has no texture coordinates, so the pattern
+// (1 stripes, 2 hoops, 3 dark yoke) is painted in the shader from each vertex's bind-pose position,
+// which moves with the cloth as the skeleton animates.
+function kitShirtMaterial(color, pattern, second, height) {
+  const mat = new THREE.MeshLambertMaterial({ color });
+  if (!pattern) return mat;
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uKit2 = { value: new THREE.Color(second) };
+    sh.uniforms.uPat = { value: pattern };
+    sh.uniforms.uH = { value: height || 1.8 };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vKitPos;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvKitPos = position;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vKitPos;\nuniform vec3 uKit2;\nuniform float uPat;\nuniform float uH;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float kitH = vKitPos.y / uH, kitM = 0.0;
+        if (uPat < 1.5) kitM = step(0.5, fract(vKitPos.x / uH * 14.0));
+        else if (uPat < 2.5) kitM = step(0.62, fract(kitH * 16.0));
+        else kitM = step(0.77, kitH);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uKit2, kitM);`);
+  };
+  mat.customProgramCacheKey = () => 'kit-shirt';
+  return mat;
+}
+
 // Starts a one-shot clip (fades out locomotion) unless the same one is already running.
 function oneShot(u, key, { at = 0, speed = 1, hold = 0, fade = 0.12 } = {}) {
   const a = u.act[key]; if (!a) return;
@@ -613,6 +661,7 @@ function animateFootballer(u, a, dt, t, simRate) {
   else if (a.dive) { want = a.dive.sign > 0 ? 'diveL' : 'diveR'; opts = { speed: 1.6 * k }; }
   else if (a.catchBall != null || a.punch != null) { want = 'block'; opts = { speed: 1.4 * k }; }
   else if (a.slide != null) { want = 'slide'; opts = { at: 0.15, speed: 1.5 * k }; }
+  else if (a.poke != null && a.poke < 0.3) { want = 'kickSide'; opts = { at: 0.08, speed: 1.4 * k }; }   // standing tackle: a foot in
   else if (a.strike != null && a.strike < 0.3) {
     // Time the kick so the foot meets the ball as it leaves (the ball leaves 0.11 s of match time after the strike starts).
     const key = (a.power || 0.6) >= 0.85 ? 'kickFront' : 'kickSide', c = F.clips[key];
@@ -666,7 +715,7 @@ function animateFootballer(u, a, dt, t, simRate) {
   u.blob.scale.setScalar(1 - Math.min(0.6, lift));
 }
 
-export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap' } = {}) {
+export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear' } = {}) {
   let F = null;
   if (models !== 'classic') {
     try { F = await Promise.race([loadFootballer(), new Promise((_, no) => setTimeout(() => no(new Error('timed out')), 30000))]); }
@@ -686,9 +735,10 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   container.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const fogCol = night ? 0x16243b : 0xbfe0fb;
+  const rain = weather === 'rain';
+  const fogCol = night ? 0x16243b : rain ? 0x9aa7b4 : 0xbfe0fb;
   scene.background = new THREE.Color(fogCol);
-  scene.fog = new THREE.Fog(fogCol, 220, 560);
+  scene.fog = new THREE.Fog(fogCol, rain ? 140 : 220, rain ? 420 : 560);
   const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.5, 900);
   camera.position.set(0, 17, 40);
   const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 16, 12), new THREE.MeshBasicMaterial({ map: skyTexture(night), side: THREE.BackSide, fog: false, depthWrite: false }));
@@ -708,7 +758,16 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(PX + 400, PZ + 400), new THREE.MeshLambertMaterial({ color: 0x6f7c88 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; scene.add(ground);
   const nets = { '-1': buildGoal(scene, -1), '1': buildGoal(scene, 1) };
-  const { crowds, flashSpots } = buildStands(scene, homeHue, awayHue, low);
+  const { crowds, flashSpots } = buildStands(scene, homeHue, awayHue, low, venue);
+  // Rain: streaks falling through the floodlights, recycled around the pitch.
+  let rainDrops = null;
+  if (rain) {
+    const n = low ? 700 : 1800, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 150; pos[i * 3 + 1] = Math.random() * 40; pos[i * 3 + 2] = (Math.random() - 0.5) * 110; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    rainDrops = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd8e2ee, size: 0.45, transparent: true, opacity: 0.5, depthWrite: false }));
+    rainDrops.frustumCulled = false; scene.add(rainDrops);
+  }
   buildFloodlights(scene, night);
   const boardMat = buildBoards(scene, boards);
   const flags = buildCornerFlags(scene);
@@ -742,6 +801,8 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
     home: { hue: homeHue, pattern: Math.round(homeHue / 7) % 4, sleeve: lam(kitCol(homeHue)), shorts: lam(0xf4f4f4), sock: lam(kitCol(homeHue)) },
     away: { hue: awayHue, pattern: Math.round(awayHue / 11) % 4, sleeve: lam(kitCol(awayHue)), shorts: lam(0x1d2330), sock: lam(0x1d2330) },
   };
+  // The same club pattern as the classic figures' shirts, on the motion-captured model.
+  for (const t of Object.values(team)) t.shirt3d = kitShirtMaterial(kitCol(t.hue), t.pattern, t.pattern === 1 ? 0xf4f4f4 : new THREE.Color().setHSL(t.hue / 360, 0.8, 0.3), F ? F.height : 1.8);
   const gkKit = { home: ['#f2d21f', 0xf2d21f], away: ['#31d17c', 0x31d17c] };
   const gloves = lam(0xffffff);
   const players = { home: [], away: [] };
@@ -833,7 +894,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
     const tm = team[side];
     const kit = gk
       ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
-      : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
+      : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), shirt3d: tm.shirt3d, sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
     const n = Math.abs(Number(d.id) || i * 7 + 3);
     const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk };
     const p = F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
@@ -906,7 +967,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           else if (sim.block && sim.block.side === side && sim.block.idx === i && sim.t - sim.block.t0 < 0.7) a.block = sim.t - sim.block.t0;
           else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); }
           else if (sim.touch && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.35) a.touch = sim.t - sim.touch.t0;
-          else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) a.slide = tackleAge;
+          else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) { if (sim.tackle.kind === 'standing') a.poke = tackleAge; else a.slide = tackleAge; }
           else if (sim.strike && sim.strike.side === side && sim.strike.idx === i && strikeAge < 0.55) { a.strike = strikeAge; a.power = sim.strike.power || 0.7; }
           else if (sim.phase === 'held' && !sim.goalKick && isHolder && u.gk) a.hold = true;
           else if (u.gk && threat && sim.attack.side !== side) a.ready = true;
@@ -1020,6 +1081,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       const amp = cel ? 0.42 : threat ? 0.12 : 0.03, beat = cel ? 7 : 3;
       crowds[0].position.y = Math.abs(Math.sin(t * beat)) * amp;
       crowds[1].position.y = Math.abs(Math.sin(t * beat + 1.3)) * amp;
+      if (rainDrops) { const a = rainDrops.geometry.attributes.position, arr = a.array, fall = Math.min(0.1, dt) * 26; for (let i = 1; i < arr.length; i += 3) { arr[i] -= fall; if (arr[i] < 0) arr[i] += 40; } a.needsUpdate = true; }
       boardMat.map.offset.x = t * 0.012;
       flags.forEach((f, i) => { f.rotation.y = Math.sin(t * 3 + i) * 0.5; });
 

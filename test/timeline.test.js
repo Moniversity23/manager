@@ -75,6 +75,30 @@ describe('authoritative match timeline', () => {
     expect(ev.some(e => e.type === 'THROW_IN')).toBe(true);
   });
 
+  it('dribbles: wingers and playmakers carry the ball and take men on, at realistic rates', () => {
+    const med = games.map(g => g.result.ts.dribbles).flat().sort((a, b) => a - b)[games.length];
+    expect(med).toBeGreaterThan(4); expect(med).toBeLessThan(30);
+    const ev = games.flatMap(g => g.match.tl.events.filter(e => e.type === 'DRIBBLE').map(e => ({ e, slot: TL.lineupAt(g.match, e.side, e.t).get(e.pid) })));
+    const wide = ev.filter(x => ['LW', 'RW', 'CAM'].includes(x.slot)).length, cb = ev.filter(x => x.slot === 'CB').length;
+    expect(wide).toBeGreaterThan(cb * 2);
+    expect(ev.some(x => x.e.kind === 'take-on' && x.e.by != null)).toBe(true);
+  });
+
+  it('in the engine itself, nobody acts after a red card or an injury, and a second yellow follows the first', () => {
+    const all = [...games, ...playMany(5, 25, { knockout: true })];
+    let checked = 0;
+    for (const { match } of all) {
+      for (const e of match.events.filter(x => x.type === 'red' || x.type === 'injury')) {
+        checked++;
+        const later = match.events.filter(x => x.side === e.side && x.min > e.min && (x.playerId === e.playerId || x.assistId === e.playerId) && ['goal', 'shot'].includes(x.type));
+        expect(later, `${match.id} ${e.type} ${e.min}'`).toEqual([]);
+      }
+      const yel = {};
+      for (const e of match.events.filter(x => x.type === 'yellow')) { if (yel[e.playerId] != null) expect(e.min).toBeGreaterThanOrEqual(yel[e.playerId]); yel[e.playerId] = e.min; }
+    }
+    expect(checked).toBeGreaterThan(3);
+  });
+
   it('is deterministic: the same match id and state give the same timeline', () => {
     const a = playMany(41, 3), b = playMany(41, 3);
     for (let i = 0; i < a.length; i++) expect(JSON.stringify(a[i].match.tl.events)).toBe(JSON.stringify(b[i].match.tl.events));

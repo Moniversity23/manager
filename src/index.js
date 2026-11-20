@@ -1917,9 +1917,18 @@ class GameWorld {
         const def = ['GK', 'CB', 'LB', 'RB', 'CDM'].includes(p.position);
         let v = 6.2 + goals * 1.1 + assists * 0.7 - count('yellow', id) * 0.3 - count('red', id) * 1.5 + (won ? 0.5 : lost ? -0.4 : 0)
           + (def ? (opp.goals === 0 ? 0.7 : -0.2 * opp.goals) : 0) + (p.currentAbility - avg) * 0.02 + ((hashString(`${m.id}:${id}`) % 100) / 100 - 0.5) * 0.8;
+        // A match with a timeline adds what he actually did: passes completed and their accuracy,
+        // tackles, interceptions and dribbles, minus fouls. It replaces most of the fixed variation.
+        const st = m.tl && m.tl.players ? m.tl.players[id] : null;
+        if (st) {
+          const acc = st.passes >= 8 ? st.completed / st.passes : 0.84;
+          const perf = 0.004 * st.completed + 1.4 * (acc - 0.84) + 0.06 * ((st.tackles || 0) + (st.interceptions || 0)) + 0.05 * (st.dribbles || 0) - 0.06 * (st.fouls || 0);
+          v += clamp(perf, -0.8, 0.9) - ((hashString(`${m.id}:${id}`) % 100) / 100 - 0.5) * 0.5;
+        }
         const mins = Math.max(0, (a.minOut ?? m.minute) - a.minIn);
         if (mins < 30) v = 6 + (v - 6) * 0.5;
-        out[key].push({ playerId: id, name: p.name, position: p.position, rating: Math.round(clamp(v, 3.5, 10) * 10) / 10, goals, assists, sub: !a.start });
+        out[key].push({ playerId: id, name: p.name, position: p.position, rating: Math.round(clamp(v, 3.5, 10) * 10) / 10, goals, assists, sub: !a.start,
+          ...(st ? { st: { p: st.passes, c: st.completed, t: st.tackles || 0, i: st.interceptions || 0, d: st.dribbles || 0 } } : {}) });
       }
       out[key].sort((x, y) => y.rating - x.rating || x.playerId - y.playerId);
     }
@@ -1939,7 +1948,8 @@ class GameWorld {
     // Expected crowd for the announcer (same formula as the gate receipts, without posting money).
     const hc = this.clubById(m.home.clubId), ac = this.clubById(m.away.clubId);
     const attendance = hc && hc.facilities ? Math.round(Math.max(500, hc.facilities.stadium || 1000) * clamp((0.3 + hc.fanMood / 220 + hc.prestige / 260 + (ac ? ac.prestige : 30) / 700) * (1 - 0.4 * (clamp(hc.ticketPrice || 1, 0.5, 2) - 1)), 0.1, 1)) : null;
-    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks, attendance };
+    const capacity = hc && hc.facilities ? Math.max(500, hc.facilities.stadium || 1000) : null;
+    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks, attendance, capacity };
   }
 
   halftimeView() {

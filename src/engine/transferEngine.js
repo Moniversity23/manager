@@ -154,8 +154,13 @@ function aiMarketRound(world, intensity = 1) {
     // buffer must cover it for a whole season.
     const last = buyer.ledger[buyer.ledger.length - 1];
     const weeklyNet = last ? last.income - last.costs : 0;
-    let choice = null;
+    // Recruitment: look at up to six affordable targets and sign the best fit — quality against the
+    // squad, room to grow (ambitious clubs prefer young players with potential), age and price —
+    // rather than simply the first one found.
+    let choice = null, best = -Infinity, seen = 0;
+    const ambition = buyer.prestige >= 55 ? 1 : 0.5;
     for (const o of byGroup[group]) {
+      if (seen >= 6) break;
       if (sold.has(o.p.id) || (o.seller && o.seller.id === buyer.id)) continue;
       const ca = o.p.currentAbility;
       if (ca > avg + 12 || ca < avg - 3) continue;
@@ -168,7 +173,10 @@ function aiMarketRound(world, intensity = 1) {
       if (o.seller && o.seller.squad.filter(p => !p.retired).length <= MIN_SQUAD) continue;
       const domestic = o.seller ? o.seller.country === buyer.country : true;
       if (!domestic && !rng.chance(0.25)) continue;
-      choice = o; break;
+      seen++;
+      const growth = o.p.age <= 23 ? Math.max(0, (o.p.hiddenPotential || ca) - ca) * 0.35 * ambition : 0;
+      const score = (ca - avg) + growth - (o.p.age >= 31 ? 3 + (o.p.age - 31) : 0) - (budget > 0 ? (fee + signOn) / budget * 4 : 0);
+      if (score > best) { best = score; choice = o; }
     }
     if (!choice) continue;
     sold.add(choice.p.id);

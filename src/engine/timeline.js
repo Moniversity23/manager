@@ -27,23 +27,35 @@ const LINE = { GK: 0, CB: 1, LB: 1, RB: 1, CDM: 2, CM: 2, CAM: 3, LW: 3, RW: 3, 
 const POSSESSION_TILT = { possession: 0.07, high_press: 0.03, counter: -0.05, low_block: -0.06 };
 const PASS_GAP = { possession: [4, 7], high_press: [3, 6], counter: [2.5, 5], low_block: [3.5, 6.5] };   // seconds between passes
 const SPELL_MEAN = { possession: 34, high_press: 24, counter: 18, low_block: 22 };                      // seconds a spell lasts on average
-const TYPES = ['KICKOFF', 'PASS', 'INTERCEPTION', 'TACKLE', 'FOUL', 'FREE_KICK', 'SHOT', 'GOAL', 'SAVE', 'GOAL_KICK', 'YELLOW', 'RED', 'INJURY', 'SUB', 'HALF_TIME', 'FULL_TIME', 'RECOVERY', 'THROW_IN'];   // new types go on the end (packed by index)
+const TYPES = ['KICKOFF', 'PASS', 'INTERCEPTION', 'TACKLE', 'FOUL', 'FREE_KICK', 'SHOT', 'GOAL', 'SAVE', 'GOAL_KICK', 'YELLOW', 'RED', 'INJURY', 'SUB', 'HALF_TIME', 'FULL_TIME', 'RECOVERY', 'THROW_IN', 'DRIBBLE'];   // new types go on the end (packed by index)
 const other = s => (s === 'home' ? 'away' : 'home');
 
 // Who is on the pitch for one side at time t (seconds), from the starting XI and the engine's events.
 // A substitution or red card takes effect at the second the timeline gives it (tl.leaves), or at
 // the end of its minute before the timeline has placed it.
+// Called for every action, so the line-ups after each change are cached per match and side, and
+// rebuilt only when the engine's events or the timeline's leaving times change. Callers must not
+// modify the returned map.
+const LINEUPS = new WeakMap();
 function lineupAt(m, side, t) {
-  const on = new Map(m[side].startXI.map(s => [s.playerId, s.slotKey.split('-')[0]]));
   const leaves = (m.tl && m.tl.leaves) || {};
-  const changes = m.events.filter(e => e.side === side && (e.type === 'sub' || e.type === 'red'))
-    .map(e => ({ e, at: leaves[e.type === 'sub' ? e.offId : e.playerId] ?? e.min * 60 })).sort((a, b) => a.at - b.at);
-  for (const { e, at } of changes) {
-    if (at > t) break;
-    if (e.type === 'sub') { const slot = on.get(e.offId); on.delete(e.offId); on.set(e.onId ?? e.playerId, slot || 'CM'); }
-    else on.delete(e.playerId);
+  let sum = 0, n = 0; for (const k in leaves) { sum += leaves[k]; n++; }
+  const sig = `${m.events.length}|${n}|${sum}`;
+  let c = LINEUPS.get(m); if (!c || c.sig !== sig) { c = { sig }; LINEUPS.set(m, c); }
+  let s = c[side];
+  if (!s) {
+    const on = new Map(m[side].startXI.map(x => [x.playerId, x.slotKey.split('-')[0]]));
+    const changes = m.events.filter(e => e.side === side && (e.type === 'sub' || e.type === 'red'))
+      .map(e => ({ e, at: leaves[e.type === 'sub' ? e.offId : e.playerId] ?? e.min * 60 })).sort((a, b) => a.at - b.at);
+    s = c[side] = { at: changes.map(x => x.at), maps: [new Map(on)] };
+    for (const { e } of changes) {
+      if (e.type === 'sub') { const slot = on.get(e.offId); on.delete(e.offId); on.set(e.onId ?? e.playerId, slot || 'CM'); }
+      else on.delete(e.playerId);
+      s.maps.push(new Map(on));
+    }
   }
-  return on;                                                                          // playerId → slot
+  let k = 0; while (k < s.at.length && s.at[k] <= t) k++;
+  return s.maps[k];                                                                   // playerId → slot
 }
 
 // Where a player stands when his side has the ball, `adv` (0..1) into the attack.
@@ -154,6 +166,25 @@ function extend(m, ctx, from, to) {
     changePossession(t + 0.6, opp, winner);
     adv = clamp(1 - adv - 0.1, 0.05, 0.6);
   };
+  const DRIBBLE_SLOT = { LW: 1.8, RW: 1.8, CAM: 1.5, ST: 1.2, CF: 1.3, CM: 0.8, LB: 0.7, RB: 0.7, CDM: 0.45, CB: 0.25, GK: 0 };
+  const dribble = (t, t1) => {
+    const side = tl.poss, who = tl.holder;
+    if (who == null || t + 4 >= t1) return false;
+    const slot = lineupAt(m, side, t).get(who), p = ctx.getPlayer(who);
+    if (!p || !slot) return false;
+    const skill = (p.attributes.dribbling * 0.7 + p.attributes.pace * 0.3) / 70;
+    if (!rng.chance(0.075 * (DRIBBLE_SLOT[slot] ?? 0.5) * skill * skill * (adv > 0.5 ? 1.4 : 0.8))) return false;
+    const f = posOf(side, t, who, adv), dir = side === 'home' ? 1 : -1;
+    const carry = rng.float(0.04, 0.11), to = [clamp(f[0] + dir * carry, 0.03, 0.97), clamp(f[1] + rng.float(-0.06, 0.06), 0.04, 0.96)];
+    const takeOn = rng.chance(0.45);
+    const beaten = takeOn ? defenderNear(other(side), t, adv) : null;
+    const dur = rng.float(1.6, 3.2);
+    tl.stats[side].dribbles = (tl.stats[side].dribbles || 0) + 1; pstat(who, 'dribbles');
+    push(t, 'DRIBBLE', side, who, { from: f, to, kind: beaten != null ? 'take-on' : 'carry', by: beaten });
+    adv = Math.min(1, adv + carry * 1.6);
+    tl.lastDribbleEnd = t + dur;
+    return true;
+  };
   // Ordinary football between t0 and t1: passes, and the spell ending in a turnover when it runs out.
   const play = (t0, t1) => {
     let t = t0;
@@ -185,6 +216,9 @@ function extend(m, ctx, from, to) {
           continue;
         }
       }
+      // On the ball: carry it forward or take a man on instead of passing, by the player's
+      // dribbling, pace and position, and where he is on the pitch (more in the final third).
+      if (dribble(t, t1)) { t = tl.lastDribbleEnd; continue; }
       pass(t, adv > 0.45);
     }
     tl.spellLeft = spellLeft;
@@ -331,7 +365,7 @@ function possession(m) {
 function summary(m) {
   const tl = m.tl; if (!tl) return null;
   const s = tl.stats, pct = x => (x.passes ? Math.round(x.completed / x.passes * 100) : 0);
-  return { possession: possession(m), passes: [s.home.passes, s.away.passes], passAccuracy: [pct(s.home), pct(s.away)], tackles: [s.home.tackles, s.away.tackles], interceptions: [s.home.interceptions, s.away.interceptions], fouls: [s.home.fouls, s.away.fouls] };
+  return { possession: possession(m), passes: [s.home.passes, s.away.passes], passAccuracy: [pct(s.home), pct(s.away)], tackles: [s.home.tackles, s.away.tackles], interceptions: [s.home.interceptions, s.away.interceptions], fouls: [s.home.fouls, s.away.fouls], dribbles: [s.home.dribbles || 0, s.away.dribbles || 0] };
 }
 
 // Checks that the timeline is a coherent football match and agrees with the engine. Returns a list of problems.
@@ -357,6 +391,9 @@ function validate(m) {
       if (poss && e.side !== poss) out.push(`${e.id}: pass by ${e.side} while ${poss} has the ball`);
       if (holder != null && e.pid !== holder) out.push(`${e.id}: pass by ${e.pid} but ${holder} has the ball`);
       if (e.out === 'complete') { if (!onSide(e.side).has(e.tid)) out.push(`${e.id}: pass to ${e.tid} who is not a team-mate on the pitch`); holder = e.tid; }
+    } else if (e.type === 'DRIBBLE') {
+      if (poss && e.side !== poss) out.push(`${e.id}: dribble by ${e.side} while ${poss} has the ball`);
+      if (holder != null && e.pid !== holder) out.push(`${e.id}: dribble by ${e.pid} but ${holder} has the ball`);
     } else if (e.type === 'INTERCEPTION' || e.type === 'TACKLE' || e.type === 'RECOVERY') {
       if (poss && e.side === poss) out.push(`${e.id}: ${e.type} by the side already in possession`);
       poss = e.side; holder = e.pid;
@@ -392,7 +429,7 @@ function pack(m, fromMin = 0) {
   if (!m.tl) return null;
   const r = v => (v == null ? null : Math.round(v * 100) / 100);          // to the nearest metre or so
   return { v: 1, types: TYPES, outs: OUTS, events: m.tl.events.filter(e => e.t >= fromMin * 60).map(e => [e.t, TYPES.indexOf(e.type), e.side === 'home' ? 0 : 1, e.pid, e.tid ?? null, r(e.from && e.from[0]), r(e.from && e.from[1]), r(e.to && e.to[0]), r(e.to && e.to[1]), OUTS.indexOf(e.out || ''), e.kind || null, e.by ?? null]),
-    spells: m.tl.spells.map(([s, a, b]) => [s === 'home' ? 0 : 1, a, b]), summary: summary(m) };
+    spells: m.tl.spells.map(([s, a, b]) => [s === 'home' ? 0 : 1, a, b]), summary: summary(m), tactics: { home: m.home.tactic, away: m.away.tactic } };
 }
 
 module.exports = { extend, possession, possessionShare, summary, validate, pack, lineupAt, SLOT_POS, TYPES };

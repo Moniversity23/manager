@@ -583,6 +583,12 @@ function abbr(name, other){
   if (a === b && w[1]) a = (w[0][0] + w[1].slice(0, 2)).toUpperCase();
   return a;
 }
+// Rain at about one match in five, fixed per fixture (Settings can turn weather off).
+function matchWeather(m){
+  if (PREFS.weather === 'off') return 'clear';
+  let h = 11; for (const c of `${m.home}|${m.away}|${m.compName || ''}|wx`) h = (h * 37 + c.charCodeAt(0)) >>> 0;
+  return h % 5 === 0 ? 'rain' : 'clear';
+}
 function matchNight(m){
   if (PREFS.light === 'day') return false;
   if (PREFS.light === 'night') return true;
@@ -677,6 +683,15 @@ function recFrame(v){
     const b = document.getElementById('mvReplay'); if (b) b.classList.add('on');
     v.goalAt = null;
   }
+  // Replay of a big save or a shot off the woodwork, once the shot is over.
+  if (v.bigChance && s.phase !== 'shot' && s.phase !== 'celebrate' && s.t > v.bigChance.t + 0.8 && (PREFS.speed || 2) <= 4 && PREFS.replays !== false && R.length > 10) {
+    const from = Math.max(R[0].t, v.bigChance.t - 3);
+    say('replay', {});
+    v.replay = { t: from, to: Math.min(s.t, v.bigChance.t + 1.4), rate: 0.6, side: v.bigChance.side === 'home' ? 1 : -1, cut: true };
+    const b = document.getElementById('mvReplay'); if (b) b.classList.add('on');
+    v.bigChance = null;
+  }
+  if (s.phase === 'celebrate' || (v.bigChance && s.t > v.bigChance.t + 6)) v.bigChance = null;
   v.lastPhase = s.phase;
 }
 function replayFrame(v, t){
@@ -691,6 +706,15 @@ function replayFrame(v, t){
 
 // ── 2D match viewer ─────────────────────────────────────────────────
 const SLOT_POS = { GK: [0.05, [0.5]], CB: [0.2, [0.38, 0.62, 0.5]], LB: [0.25, [0.12]], RB: [0.25, [0.88]], CDM: [0.36, [0.4, 0.6]], CM: [0.46, [0.35, 0.65, 0.5]], CAM: [0.6, [0.5]], LW: [0.7, [0.14]], RW: [0.7, [0.86]], ST: [0.8, [0.42, 0.58]], CF: [0.76, [0.5]] };
+// Team shape by tactic: line height (+ = higher up the pitch), width with the ball, compactness
+// without it, how far full-backs overlap, and how many players press the ball.
+const SHAPE = {
+  high_press: { line: 0.07, width: 1.02, compact: 0.8, overlap: 0.1, press: 2 },
+  possession: { line: 0.03, width: 1.14, compact: 0.9, overlap: 0.12, press: 1 },
+  counter:    { line: -0.05, width: 0.96, compact: 0.84, overlap: 0.05, press: 1 },
+  low_block:  { line: -0.09, width: 0.9, compact: 0.72, overlap: 0.03, press: 1 },
+};
+const shapeOf = (v, side) => SHAPE[(v.m.tactics || {})[side]] || SHAPE.possession;
 let VIEW = null;
 function basePositions(lineup, mirror){
   const used = {};
@@ -698,13 +722,13 @@ function basePositions(lineup, mirror){
     const [x, ys] = SLOT_POS[s.slot] || [0.5, [0.5]];
     const i = used[s.slot] = (used[s.slot] || 0) + 1;
     const y = ys[(i - 1) % ys.length];
-    return { id: s.playerId, name: s.name, bx: mirror ? 1 - x : x, by: y, x: mirror ? 1 - x : x, y, off: false };
+    return { id: s.playerId, name: s.name, slot: s.slot, bx: mirror ? 1 - x : x, by: y, x: mirror ? 1 - x : x, y, off: false };
   });
 }
 function normalizeMatch(x){
   const name = v => (typeof v === 'string' ? v : v && v.name);
   return { home: name(x.home), away: name(x.away), compName: x.compName, events: (x.events || []).slice().sort((a, b) => a.min - b.min), lineups: x.lineups || { home: [], away: [] }, pos: x.pos, myKey: x.myKey || null,
-    tl: unpackTimeline(x.timeline), spells: x.timeline ? x.timeline.spells : null, ts: x.ts || null };
+    tl: unpackTimeline(x.timeline), spells: x.timeline ? x.timeline.spells : null, ts: x.ts || null, tactics: x.timeline ? x.timeline.tactics || null : null };
 }
 function playHalf(match, fromMin, toMin, done){
   const mode = PREFS.viewMode || '3d';
@@ -741,7 +765,7 @@ async function start3D(v){
   try {
     const mod = await import('./match3d.js');
     if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap' });
+    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: v.m.lineups.capacity, attendance: v.m.lineups.attendance, name: v.m.home }, weather: matchWeather(v.m) });
     document.getElementById('genMoContent').classList.add('mvx');
     hudInit(v);
     if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
@@ -778,6 +802,8 @@ function markEvent(e, silent){
   }
   else if (live && e.type === 'shot') {
     const saved = e.outcome === 'saved' || /saved/.test(e.text || ''), sh = v.sim && v.sim.shot, other = e.side === 'home' ? 'away' : 'home';
+    // Big chances get a replay too: a save from a good chance, or a shot off the woodwork.
+    if ((saved && (e.xg || 0) >= 0.2) || (sh && sh.wood)) v.bigChance = { t: v.sim ? v.sim.t : 0, side: e.side };
     const shooter = (side.find(x => x.id === e.playerId) || {}).name || '', keeper = ((v.dots[other] || [])[v.sim ? v.sim.gk[other] : 0] || {}).name || 'the keeper';
     if (!sh) audioEv('SHOOT', { side: e.side, x: goalSideX(e.side), power: 0.9 });   // a strike for every attempt
     if (saved) { const kind = v.sim && v.sim.dive ? v.sim.dive.kind : 'dive'; audioEv('SAVE', { side: e.side, x: goalSideX(e.side), kind }); say(kind === 'punch' ? 'punch' : 'save', { keeper: surname(keeper), player: surname(shooter) }); }
@@ -935,7 +961,7 @@ function tlNextPass(v, side){
   for (let i = v.tlPass || 0; i < tl.length; i++) {
     const e = tl[i];
     if (e.t > clock + 40) break;
-    if (e.type !== 'PASS' || e.side !== side || e.t < clock - 45) continue;
+    if ((e.type !== 'PASS' && e.type !== 'DRIBBLE') || e.side !== side || e.t < clock - 45) continue;
     if (e.pid === holderId) return { e, i };
     if (!first) first = { e, i };
   }
@@ -982,11 +1008,13 @@ function tlTurnovers(v){
   let idx = e ? dotOf(v, side, e.pid) : -1;
   if (idx < 0) idx = simNearest(v.dots[side], v.ball.x, v.ball.y, s.gk[side])[0];
   if (idx < 0) return;
-  if (!e || e.type === 'TACKLE') s.tackle = { side, idx, t0: s.t };
+  if (!e || e.type === 'TACKLE') s.tackle = { side, idx, t0: s.t, kind: e ? e.kind : 'sliding' };
+  s.carry = null;
   simGive(v, side, idx, e && e.type === 'THROW_IN' ? rnd(1.2, 1.8) : rnd(0.5, 1.1));   // a throw-in takes a moment to set up
   v.lastTurn = s.t;
   if (window.__tlDebug) { const D = window.__tlDebug; const kk = e ? 'turnover:' + e.type : 'turnover:spell'; D[kk] = (D[kk] || 0) + 1; }
   if (!e || e.type === 'TACKLE') audioEv('TACKLE', { side, x: v.ball.x, slide: !!(e && e.kind === 'sliding') });
+  if (e && (e.type === 'TACKLE' || e.type === 'INTERCEPTION') && Math.random() < 0.3) say(e.type === 'TACKLE' ? 'tackle' : 'interception', { player: surname((v.dots[side][idx] || {}).name), club: clubOf(v, side) });
 }
 // Live possession and passing from the timeline, up to the current clock.
 function tlLiveStats(v){
@@ -1004,7 +1032,7 @@ function simPass(v, secsTo){
   let to = -1;
   const finalBall = a && secsTo < (a.chain ? 2.6 : 2);
   if (a && s.holder === a.shooter && (finalBall || !v.m.tl)) { s.nextAt = s.t + 0.25; return; }
-  let tlSteal = null, viaChain = false;
+  let tlSteal = null, viaChain = false, tlKind = null;
   const next = !finalBall ? tlNextPass(v, s.poss) : null;
   { const D = window.__tlDebug; if (D) { D.calls = (D.calls || 0) + 1; if (next) D.nextFound = (D.nextFound || 0) + 1; if (a) D.inAttack = (D.inAttack || 0) + 1; } }   // test hook
   if (a && a.chain && finalBall) {
@@ -1015,11 +1043,21 @@ function simPass(v, secsTo){
     to = nx; viaChain = true;
   }
   else if (finalBall) to = a.shooter;
+  else if (next && next.e.type === 'DRIBBLE' && dotOf(v, s.poss, next.e.pid) === s.holder) {
+    // The timeline's dribble: he runs with the ball (taking on the man the timeline says he beat).
+    v.tlPass = next.i + 1;
+    const beat = next.e.by != null ? dotOf(v, otherSide(s.poss), next.e.by) : -1;
+    s.carry = { idx: s.holder, until: s.t + rnd(1.1, 1.7), beat, takeOn: next.e.kind === 'take-on' };
+    s.nextAt = s.carry.until;
+    if (beat >= 0 && Math.random() < 0.35) say('dribble', { player: surname(h.name), club: clubOf(v, s.poss) });
+    { const D = window.__tlDebug; if (D) D.timelineDribble = (D.timelineDribble || 0) + 1; }
+    return;
+  }
   else if (next) {
     // The timeline's pass: if someone else has the ball there, get it to him first; then his real pass.
-    const passer = dotOf(v, s.poss, next.e.pid), recv = dotOf(v, s.poss, next.e.tid);
+    const passer = dotOf(v, s.poss, next.e.pid), recv = next.e.type === 'PASS' ? dotOf(v, s.poss, next.e.tid) : -1;
     if (passer >= 0 && passer !== s.holder) { to = passer; v.tlPass = next.i; }
-    else if (recv >= 0 && recv !== s.holder) { to = recv; v.tlPass = next.i + 1; if (next.e.out === 'intercepted' || next.e.out === 'lost') { const by = dotOf(v, otherSide(s.poss), next.e.by); if (by >= 0) tlSteal = by; } }
+    else if (recv >= 0 && recv !== s.holder) { to = recv; v.tlPass = next.i + 1; tlKind = next.e.kind; if (next.e.out === 'intercepted' || next.e.out === 'lost') { const by = dotOf(v, otherSide(s.poss), next.e.by); if (by >= 0) tlSteal = by; } }
     else { v.tlPass = next.i + 1; s.nextAt = s.t + 0.4; return; }
   }
   else {
@@ -1046,9 +1084,19 @@ function simPass(v, secsTo){
     const [oi] = simNearest(opp, tp[0], tp[1], s.gk[otherSide(s.poss)]);
     if (oi >= 0) { steal = oi; tp[0] += (opp[oi].x - tp[0]) * 0.5; tp[1] += (opp[oi].y - tp[1]) * 0.5; }
   }
+  // A through ball is played into space ahead of the runner.
+  if (tlKind === 'through' && steal == null) tp[0] = Math.max(0.03, Math.min(0.97, tp[0] + dir * 0.04));
   const dist = Math.hypot(tp[0] - v.ball.x, (tp[1] - v.ball.y) * 0.65);
-  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: dist / 0.25 + 0.1, lob: dist > 0.27 ? 0.42 : 0 };
-  s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: dist > 0.27 ? 0.9 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
+  // Ball flight (public/ball.js): the timeline's pass type, or one chosen from the distance and positions.
+  const wide = Math.abs(v.ball.y - 0.5) > 0.27, box = dir * (tp[0] - 0.5) > 0.33 && Math.abs(tp[1] - 0.5) < 0.2;
+  const kind = (tlKind === 'cross' || tlKind === 'long' || tlKind === 'through' || tlKind === 'short') ? tlKind : window.GafferBall ? GafferBall.kindFor(dist, wide, box) : 'short';
+  const plan = window.GafferBall ? GafferBall.plan(kind, dist) : null;
+  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind };
+  s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: kind === 'long' || kind === 'cross' ? 0.9 : kind === 'through' ? 0.75 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
+  s.carry = null;
+  if (kind === 'cross' && Math.random() < 0.5) say('cross', { player: surname(h.name), club: clubOf(v, s.poss) });
+  else if (kind === 'through' && Math.random() < 0.4) say('through', { player: surname(h.name), club: clubOf(v, s.poss) });
+  else if (kind === 'long' && Math.random() < 0.15) say('longball', { player: surname(h.name), club: clubOf(v, s.poss) });
   { const ev = { side: s.poss, x: v.ball.x, power: Math.min(1, 0.3 + dist * 2.2), long: s.pass.lob > 0 }; setTimeout(() => { if (VIEW === v && !v.paused) audioEv('PASS', ev); }, 110 / simSpeed()); }
   if (!a && dir * (h.x - 0.5) < 0.1 && Math.random() < 0.08) say('build', { player: surname(h.name), club: clubOf(v, s.poss) });
 }
@@ -1134,9 +1182,11 @@ function stepPositions(now, dt){
   const team = v.dots[s.poss], opp = v.dots[otherSide(s.poss)], dir = sideDir(s.poss), h = team[s.holder] || team[0];
   if (s.phase === 'play') {
     if (s.pass) {
-      const p0 = Math.max(0, Math.min(1, (s.t - s.pass.t0) / s.pass.dur)), p = s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
-      ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = Math.sin(p * Math.PI) * s.pass.lob;
-      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t }; audioEv(ps.lob > 0.3 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
+      const p0 = Math.max(0, Math.min(1, (s.t - s.pass.t0) / s.pass.dur));
+      const fl = s.pass.plan ? GafferBall.at(s.pass.plan, Math.max(0, s.t - s.pass.t0)) : null;
+      const p = fl ? fl.p : s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
+      ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = fl ? fl.z : Math.sin(p * Math.PI) * s.pass.lob;
+      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
     } else {
       const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
@@ -1155,13 +1205,24 @@ function stepPositions(now, dt){
 
   // Players
   const [pressIdx] = s.phase === 'play' ? simNearest(opp, ball.x, ball.y, s.gk[otherSide(s.poss)]) : [-1];
+  // A pressing side sends a second man at the ball when it is close enough to hunt.
+  let press2 = -1;
+  if (s.phase === 'play' && pressIdx >= 0 && shapeOf(v, otherSide(s.poss)).press > 1) {
+    let best = 0.16;
+    opp.forEach((d, i) => { if (d.off || i === pressIdx || i === s.gk[otherSide(s.poss)]) return; const dd = Math.hypot(d.x - ball.x, (d.y - ball.y) * 0.65); if (dd < best) { best = dd; press2 = i; } });
+  }
+  const carry = s.carry && s.t < s.carry.until && s.phase === 'play' && !s.pass ? s.carry : null;
   for (const side of ['home', 'away']) {
-    const d0 = sideDir(side), inPoss = s.poss === side, shift = (ball.x - 0.5) * 0.42 + (inPoss ? d0 * 0.05 : -d0 * 0.03);
+    const d0 = sideDir(side), inPoss = s.poss === side, shp = shapeOf(v, side), shift = (ball.x - 0.5) * 0.42 + (inPoss ? d0 * 0.05 : -d0 * 0.03) + d0 * shp.line * (inPoss ? 0.6 : 1);
+    const ballInTheirHalf = d0 * (ball.x - 0.5) > 0.02;
     const taker = s.phase === 'reset' && side === s.kick ? simForward(v.dots[side], side) : -1;
     v.dots[side].forEach((d, i) => {
       if (d.off) return;
       const gk = i === s.gk[side];
-      let tx = d.bx + shift * (gk ? 0.07 : 1), ty = gk ? 0.5 + (ball.y - 0.5) * 0.16 : d.by + (ball.y - d.by) * 0.22, sp = 0.05;
+      // Shape: wide in possession, narrow and compact without it, shifted towards the ball.
+      const yb = 0.5 + (d.by - 0.5) * (inPoss ? shp.width : shp.compact);
+      let tx = d.bx + shift * (gk ? 0.07 : 1), ty = gk ? 0.5 + (ball.y - 0.5) * 0.16 : yb + (ball.y - yb) * (inPoss ? 0.2 : 0.3), sp = 0.05;
+      if (inPoss && ballInTheirHalf && (d.slot === 'LB' || d.slot === 'RB') && (s.phase === 'play')) { tx += d0 * shp.overlap; ty += (d.by < 0.5 ? -1 : 1) * 0.03; }
       tx += 0.006 * Math.sin(s.t * 0.9 + i * 1.7); ty += 0.008 * Math.cos(s.t * 0.7 + i * 2.3);
       if (s.phase === 'play' || s.phase === 'shot') {
         const atk = s.attack && s.attack.side === side;
@@ -1169,10 +1230,13 @@ function stepPositions(now, dt){
         if (inPoss && i === s.holder && !s.pass && s.phase === 'play') {
           sp = 0.075;
           if (atk && i === s.attack.shooter) { tx = s.attack.spot[0]; ty = s.attack.spot[1]; sp = 0.09; }
+          else if (carry && carry.idx === i) { tx = d.x + d0 * 0.12; ty = d.y + (carry.takeOn ? Math.sin(s.t * 3 + i) * 0.03 : (d.by - d.y) * 0.05); sp = carry.takeOn ? 0.095 : 0.085; }
           else { tx = d0 * (d.x - 0.5) > 0.34 && !atk ? d.x : d.x + d0 * 0.06; ty = d.y + (d.by - d.y) * 0.03; }
         } else if (atk && i === s.attack.shooter) { tx = s.attack.spot[0]; ty = s.attack.spot[1]; sp = 0.09; }
         if (s.pass && ((inPoss && i === s.pass.toIdx) || (!inPoss && i === s.pass.steal))) { tx = s.pass.to[0]; ty = s.pass.to[1]; sp = 0.09; }
-        if (!inPoss && i === pressIdx) { tx = ball.x - d0 * 0.012; ty = ball.y; sp = 0.08; }
+        if (!inPoss && i === pressIdx) { tx = ball.x - d0 * 0.012; ty = ball.y; sp = carry && carry.beat === i ? 0.06 : 0.08; }
+        if (!inPoss && i === press2) { tx = ball.x - d0 * 0.03; ty = ball.y + (d.y < ball.y ? -0.03 : 0.03); sp = 0.075; }
+        if (!inPoss && carry && carry.beat === i && i !== pressIdx) { tx = ball.x - d0 * 0.01; ty = ball.y; sp = 0.07; }
         if (s.dive && s.dive.side === side && i === s.dive.idx) { ty = s.dive.y; sp = s.dive.kind === 'dive' ? 0.16 : 0.08; }
         if (s.block && s.phase === 'shot' && s.block.side === side && i === s.block.idx) { tx = s.block.x; ty = s.block.y; sp = 0.13; }
       } else if (s.phase === 'celebrate') {
@@ -1280,7 +1344,7 @@ function matchReportHTML(m){
     </div>
     ${m.ts ? `<div class="g4" style="margin-bottom:10px">${[['Passes', `${m.ts.passes[0]} – ${m.ts.passes[1]}`], ['Pass accuracy', `${m.ts.passAccuracy[0]}% – ${m.ts.passAccuracy[1]}%`], ['Tackles won', `${m.ts.tackles[0]} – ${m.ts.tackles[1]}`], ['Interceptions', `${m.ts.interceptions[0]} – ${m.ts.interceptions[1]}`]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:16px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>` : ''}
     ${m.motm ? `<div style="text-align:center;margin-bottom:8px" class="small">⭐ Man of the match: <b>${esc(m.motm.name)}</b> ${rb10(m.motm.rating)}</div>` : ''}
-    ${m.ratings && m.myKey ? `<div style="margin-bottom:10px;text-align:center">${m.ratings[m.myKey].slice(0, 11).map(x => `<span class="rt">${esc(x.name.split(' ').slice(-1)[0])} ${rb10(x.rating)}${x.goals ? ' ⚽'.repeat(Math.min(3, x.goals)) : ''}</span>`).join('')}</div>` : ''}
+    ${m.ratings && m.myKey ? `<div style="margin-bottom:10px;text-align:center">${m.ratings[m.myKey].slice(0, 11).map(x => `<span class="rt" title="${x.st ? `${x.st.c}/${x.st.p} passes · ${x.st.t} tackles · ${x.st.i} interceptions · ${x.st.d} dribbles` : ''}">${esc(x.name.split(' ').slice(-1)[0])} ${rb10(x.rating)}${x.goals ? ' ⚽'.repeat(Math.min(3, x.goals)) : ''}</span>`).join('')}</div>${m.ratings[m.myKey].some(x => x.st) ? `<div class="small dim" style="text-align:center;margin:-4px 0 10px">${(() => { const r = m.ratings[m.myKey].filter(x => x.st); const top = (k, label) => { const b = r.slice().sort((p, q) => q.st[k] - p.st[k])[0]; return b && b.st[k] ? `${label}: <b>${esc(b.name.split(' ').slice(-1)[0])}</b> ${b.st[k]}` : ''; }; return [top('c', 'Most passes'), top('t', 'Most tackles'), top('d', 'Most dribbles')].filter(Boolean).join(' · '); })()}</div>` : ''}` : ''}
     ${m.halftime && m.halftime.talk ? `<div class="small" style="text-align:center;margin-bottom:8px">Half-time talk: <b>${esc(m.halftime.talk.kind)}</b> — the team came out <b>${esc(m.halftime.talk.effect)}</b>.</div>` : ''}
     <div class="card" style="padding:10px;max-height:260px;overflow-y:auto">${m.events.filter(e => e.type !== 'shot').length ? m.events.filter(e => e.type !== 'shot').map(e => `<div class="small" style="padding:3px 0">${e.min}' ${esc(e.text)} <span class="dim">· ${esc(e.club)}</span></div>`).join('') : '<div class="small dim">A quiet game.</div>'}</div>`;
 }
@@ -2204,6 +2268,7 @@ function rSettings(){
       <label class="lbl">Text size</label><div class="row" style="margin-bottom:10px">${['normal', 'large'].map(t => `<button class="btn bsm ${(PREFS.size || 'normal') === t ? 'bact' : 'bg'}" onclick="PREFS.size='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D graphics quality</label><select onchange="PREFS.gfx=this.value;savePrefs()">${[['auto', 'Automatic (decides from your device)'], ['low', 'Low — smoothest on older phones'], ['high', 'High — sharper, with shadows']].map(([k, l]) => `<option value="${k}" ${(PREFS.gfx || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">3D weather</label><select onchange="PREFS.weather=this.value;savePrefs()">${[['on', 'Changes by fixture — some matches are played in the rain'], ['off', 'Always dry']].map(([k, l]) => `<option value="${k}" ${(PREFS.weather || 'on') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D players</label><select onchange="PREFS.models=this.value;savePrefs()">${[['mocap', 'Motion-captured — natural running, kicking and celebrating'], ['classic', 'Classic — lighter figures for very old phones']].map(([k, l]) => `<option value="${k}" ${(PREFS.models || 'mocap') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Match audio mixer</label>
       <div class="card" style="padding:10px">${[['crowd', '🏟 Crowd'], ['ref', '🟨 Referee'], ['ball', '⚽ Ball and boots'], ['commentary', '🎙 Commentary'], ['announcer', '📢 Stadium announcer']].map(([k, l]) => { const val = { ...MIX_DEFAULT, ...(PREFS.mix || {}) }[k]; return `<div class="row" style="gap:8px;margin-bottom:6px"><span class="small" style="width:132px">${l}</span><input type="range" min="0" max="1" step="0.05" value="${val}" style="flex:1" oninput="PREFS.mix={...MIX_DEFAULT,...(PREFS.mix||{}),'${k}':+this.value};savePrefs();applyAudioPrefs();this.nextElementSibling.textContent=this.value>0?Math.round(this.value*100)+'%':'off'"><span class="small dim" style="width:34px;text-align:right">${val > 0 ? Math.round(val * 100) + '%' : 'off'}</span></div>`; }).join('')}
@@ -2618,6 +2683,7 @@ function onKey(e){
 }
 document.addEventListener('keydown', onKey);
 </script>
+<script src="ball.js" defer></script>
 <script src="sound.js" defer></script>
 <script src="commentary.js" defer></script>
 </body>

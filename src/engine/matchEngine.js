@@ -181,6 +181,18 @@ function sendOff(m, key, p, minute, reason) {
   m.events.push({ min: minute, type: 'red', side: key, playerId: p.id, reason });
 }
 
+// A card or injury cannot come before something the player did in this segment (a shot, a goal,
+// an assist, his first booking): its rolled minute is moved after his last action. No extra random
+// draws, so scores never change; only the minute of the card or injury does.
+function afterLastAction(m, key, pid, from, minute) {
+  let last = minute;
+  for (const e of m.events) {
+    if (e.side !== key || e.min <= from) continue;
+    if (e.playerId === pid || e.assistId === pid) last = Math.max(last, e.min);
+  }
+  return last;
+}
+
 // ── simulation ────────────────────────────────────────────────────
 function playSegment(m, from, to, ctx) {
   const rng = ctx.rng;
@@ -231,7 +243,7 @@ function playSegment(m, from, to, ctx) {
       const risk = 0.0011 * (0.5 + p.injuryRisk / 15) * (1 + Math.max(0, 75 - p.fitness) / 25) * (len / 15);
       if (rng.chance(risk)) {
         const inj = injure(ctx, p);
-        const minute = rng.int(from + 1, to);
+        const minute = afterLastAction(m, key, p.id, from, rng.int(from + 1, to));
         m.events.push({ min: minute, type: 'injury', side: key, playerId: p.id, weeks: inj.weeks, injury: inj.type });
         forcedInjurySub(m, key, p, minute, ctx);
         continue;
@@ -242,9 +254,9 @@ function playSegment(m, from, to, ctx) {
       const r = rng.next();
       // Booked players are careful: a second yellow is much rarer than the first.
       const booked = side.cards && side.cards[p.id];
-      if (r < 0.0004 * (len / 15)) sendOff(m, key, p, rng.int(from + 1, to), 'straight red');
+      if (r < 0.0004 * (len / 15)) sendOff(m, key, p, afterLastAction(m, key, p.id, from, rng.int(from + 1, to)), 'straight red');
       else if (r < yellowP * (booked ? 0.3 : 1)) {
-        const minute = rng.int(from + 1, to);
+        const minute = afterLastAction(m, key, p.id, from, rng.int(from + 1, to));
         side.cards = side.cards || {};
         side.cards[p.id] = (side.cards[p.id] || 0) + 1;
         m.events.push({ min: minute, type: 'yellow', side: key, playerId: p.id });

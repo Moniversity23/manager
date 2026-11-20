@@ -1,6 +1,6 @@
 # The Gaffer — full technical audit
 
-*Audit date: 2026-11-20. Baseline commit: `697290d`. Audited by reading the code and running it (tests,
+*Audit date: 2026-11-20 (statuses updated after Phases 2–12). Baseline commit: `697290d`. Audited by reading the code and running it (tests,
 headless Chrome over the DevTools protocol, Node timing scripts). Companion documents:
 [match simulation](GAFFER_MATCH_SIMULATION_AUDIT.md), [visuals](GAFFER_VISUAL_AUDIT.md),
 [assets and licences](GAFFER_ASSET_AND_LICENCE_AUDIT.md), [roadmap](GAFFER_DEVELOPMENT_ROADMAP.md),
@@ -140,13 +140,13 @@ headless Chrome over the DevTools protocol, Node timing scripts). Companion docu
 | 1 | The view invented its own passes and turnovers, unrelated to the engine | What you saw was not the match | **Mostly fixed (Phase 1)**: passes, turnovers and build-ups come from the timeline; off-ball positioning is still the view's own |
 | 2 | Possession derived from xG | A core statistic was wrong | **Fixed (Phase 1)** |
 | 3 | No pass, tackle or interception statistics | Reports had nothing on how a match was played | **Fixed (Phase 1)**: passes, accuracy, tackles and interceptions in the report, the half-time screen and the history |
-| 4 | Engine segment order: shots after a red card or injury | Impossible sequences | **Worked around in the timeline**; the engine change is deferred (it would change results) |
-| 5 | Off-ball players move in formation shape only | No defensive shape, runs or pressing on screen | Open: Phase 3 |
-| 6 | The ball moves in straight lines at fixed speed | Long balls and crosses do not look like football | Open: Phase 4 |
-| 7 | Animation choice is driven by the view's speed and events only | Kick timing, first touch and body orientation are approximate | Open: Phase 5 |
-| 8 | Tactics are four presets | Little tactical depth | Open: Phase 3 and Phase 10 |
-| 9 | Replays only for goals; one stadium design | Presentation feels repetitive | Open: Phases 7 and 9 |
-| 10 | Large saves (12.6 MB JSON) | Slow saves on phones; storage limits | Open: Phase 11 |
+| 4 | Engine segment order: shots after a red card or injury | Impossible sequences | **Fixed (Phase 2)** in the engine without changing scores |
+| 5 | Off-ball players move in formation shape only | No defensive shape, runs or pressing on screen | **Improved (Phase 3)**: shape by tactic, overlaps, a second presser, dribble runs; keyframes in the timeline still open |
+| 6 | The ball moves in straight lines at fixed speed | Long balls and crosses do not look like football | **Fixed for passes (Phase 4)**: friction, lofted flight and bounce, crosses at head height |
+| 7 | Animation choice is driven by the view's speed and events only | Kick timing, first touch and body orientation are approximate | **Improved (Phase 5)**: kick type from the pass, standing and sliding tackles, headers from crosses |
+| 8 | Tactics are four presets | Little tactical depth | Open: shape varies by tactic (Phase 3); new instructions still to do |
+| 9 | Replays only for goals; one stadium design | Presentation feels repetitive | **Improved**: big-chance replays (Phase 9); grounds by capacity and rain (Phase 7) |
+| 10 | Large saves (12.6 MB JSON) | Slow saves on phones; storage limits | Assessed (Phase 11): a compact format saves little after gzip; deferred |
 
 ## 5. Risks
 
