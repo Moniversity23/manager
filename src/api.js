@@ -11,6 +11,7 @@
 const { GameWorld } = require('./index');
 const { SAVE_VERSION } = require('./migrations');
 const { TACTICS, FORMATIONS } = require('./utils');
+const { attachRoutes: attachStudioRoutes } = require('./studio/studioApi');
 
 const MANUAL_SLOTS = ['slot_1', 'slot_2', 'slot_3'];
 const ALL_SLOTS = ['auto', ...MANUAL_SLOTS];
@@ -325,6 +326,8 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
     }
     return { status: 404, payload: { ok: false, error: 'not_found' } };
   }
+
+  attachStudioRoutes(route, store, () => world, { save: () => queueAutoSave() });
 
   return { handle, autoSave, buildMeta, tryRestoreAutoSave, restoreFrom, getWorld: () => world, flush: async () => { await flushSaves(); await store.flush(); } };
 }

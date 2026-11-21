@@ -11,7 +11,7 @@ const divWage = (club) => DIVISION_WAGE[Math.min(4, Math.max(1, club.division)) 
 const MAX_SQUAD = 28;
 const MIN_SQUAD = 18;
 const FREE_AGENT_CAP = 0.03;
-const MAX_PENDING_BIDS = 5;
+const MAX_PENDING_BIDS = 8;
 const BID_LIFETIME_WEEKS = 2;
 
 // Market value: ability first, then age, the potential still to come (counted for as long as he
@@ -140,7 +140,8 @@ function aiMarketRound(world, intensity = 1) {
   const buyers = rng.shuffle(world.clubs.filter(c => c.id !== managerId && !spendingFrozen(c)));
   let deals = 0;
   for (const buyer of buyers) {
-    if (!rng.chance(0.7 * Math.max(intensity, 0.3))) continue;
+    const rich = buyer.finance.balance > 4_000_000;
+    if (!rng.chance(Math.min(0.95, (rich ? 0.9 : 0.7) * Math.max(intensity, 0.3)))) continue;
     const counts = groupCounts(buyer);
     const size = buyer.squad.filter(p => !p.retired).length;
     if (size >= MAX_SQUAD) continue;
@@ -197,6 +198,18 @@ function generateIncomingBids(world, week) {
   const econ = world.econ || 1;
   world.pendingBids = (world.pendingBids || []).filter(b => b.expiresWeek >= week);
   const made = [];
+  // Bidding wars: another club that can afford it may top a bid already on the table.
+  for (const b of world.pendingBids) {
+    const p = world.players.get(b.playerId);
+    if (!p || p.clubId !== club.id || !rng.chance(0.3)) continue;
+    const top = Math.round(b.fee * rng.float(1.08, 1.25) / 1000) * 1000;
+    const rivals = world.clubs.filter(c => c.id !== club.id && c.id !== b.clubId && c.id !== world.manager.ownedClubId && canBuy(c, top * 1.1) && c.prestige >= p.currentAbility - 25);
+    if (!rivals.length) continue;
+    const rival = rng.pick(rivals.sort((x, y) => y.finance.balance - x.finance.balance).slice(0, 4));
+    const prev = b.clubId;
+    Object.assign(b, { clubId: rival.id, fee: top, maxFee: Math.max(b.maxFee || 0, Math.round(top * rng.float(1.05, 1.25) / 1000) * 1000), expiresWeek: week + BID_LIFETIME_WEEKS, outbid: prev, war: (b.war || 0) + 1 });
+    made.push(b);
+  }
   const pool = [...club.squad, ...club.youth.filter(p => p.age >= 20)].filter(p => !p.retired && !p.loan);
   if (!pool.length) return made;
   const sorted = club.squad.filter(p => !p.retired).sort((a, b) => b.currentAbility - a.currentAbility);
@@ -206,8 +219,10 @@ function generateIncomingBids(world, week) {
     if (world.pendingBids.length >= MAX_PENDING_BIDS) break;
     if (world.pendingBids.some(b => b.playerId === p.id)) continue;
     let chance, lo, hi, unsolicited;
-    if (p.listedForSale) { chance = 0.35; lo = 0.85; hi = 1.05; unsolicited = false; }
-    else if (p.currentAbility >= median) { chance = keyIds.has(p.id) ? 0.04 : 0.025; lo = keyIds.has(p.id) ? 1.5 : 1.3; hi = 1.8; unsolicited = true; }
+    const prospect = p.age <= 21 && (p.hiddenPotential || 0) - p.currentAbility >= 12;
+    if (p.listedForSale) { chance = 0.5; lo = 0.9; hi = 1.1; unsolicited = false; }
+    else if (p.currentAbility >= median) { chance = keyIds.has(p.id) ? 0.09 : 0.06; lo = keyIds.has(p.id) ? 1.4 : 1.2; hi = 1.8; unsolicited = true; }
+    else if (prospect) { chance = 0.04; lo = 1.2; hi = 1.7; unsolicited = true; }   // clubs scout young talent too
     else continue;
     if (!rng.chance(chance)) continue;
     const value = playerValue(p, econ);

@@ -70,8 +70,18 @@ describe('team instructions', () => {
   it('the manager sets them from the tactics screen and at half-time', () => {
     const w = new GameWorld({ seed: 12, startCountry: 'England' });
     w.applyDecisions({ line: 'high', tempo: 'fast' });
-    expect(w.snapshot().instructions).toEqual({ line: 'high', width: 'normal', tempo: 'fast' });
+    expect(w.snapshot().instructions).toEqual({ line: 80, width: 50, tempo: 80 });
     w.applyDecisions({ width: 'wide', line: 'nonsense' });
-    expect(w.club().instructions).toEqual({ line: 'high', width: 'wide', tempo: 'fast' });
+    expect(w.club().instructions).toEqual({ line: 80, width: 80, tempo: 80 });
+    // Sliders: any value from 0 to 100; out-of-range values are clamped.
+    w.applyDecisions({ line: 35, width: 140, tempo: '65' });
+    expect(w.club().instructions).toEqual({ line: 35, width: 100, tempo: 65 });
+  });
+
+  it('the sliders are gradual: a stronger setting has a stronger effect, and 50 is exactly normal', () => {
+    const shots = s => s.reduce((t, x) => t + x.match.home.shots + x.match.away.shots, 0) / s.length;
+    const fifty = series({ line: 50, width: 50, tempo: 50 }, 12), none = series(undefined, 12);
+    for (let i = 0; i < none.length; i++) expect([fifty[i].result.hg, fifty[i].result.ag, fifty[i].result.hx]).toEqual([none[i].result.hg, none[i].result.ag, none[i].result.hx]);
+    expect(shots(series({ tempo: 100 }, 60))).toBeGreaterThan(shots(series({ tempo: 65 }, 60)));
   });
 });

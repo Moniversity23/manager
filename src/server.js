@@ -15,7 +15,9 @@ const { createStore, stateHash } = require('./saveStore');
 const PORT = process.env.PORT === undefined ? 3000 : Number(process.env.PORT);
 const SAVE_DIR = process.env.SAVE_DIR || path.join(__dirname, '..', 'data');
 const MONGODB_URI = process.env.SAVE_BACKEND === 'file' ? null : (process.env.MONGODB_URI || null);
-const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const ROOT_DIR = path.join(__dirname, '..');
+const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
+const STUDIO_DIR = path.join(ROOT_DIR, 'studio');
 
 const store = createStore({ dir: SAVE_DIR, mongoUri: MONGODB_URI });
 const PUBLIC = process.env.GAFFER_PUBLIC === '1';
@@ -56,6 +58,19 @@ function serveStatic(res, pathname) {
   return true;
 }
 
+function serveStudio(res, pathname) {
+  if (!pathname.startsWith('/studio')) return false;
+  const rel = pathname === '/studio' || pathname === '/studio/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/studio\/+/, '').replace(/^\/+/, '');
+  const fp = path.resolve(STUDIO_DIR, rel);
+  if (!fp.startsWith(STUDIO_DIR + path.sep) || !TYPES[path.extname(fp)]) return false;
+  fs.readFile(fp, (err, data) => {
+    if (err) return send(res, 404, { ok: false, error: 'not_found' });
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(fp)], 'Cache-Control': 'no-cache' });
+    res.end(data);
+  });
+  return true;
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -72,6 +87,7 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
   if (!url.pathname.startsWith('/api/')) {
+    if (req.method === 'GET' && serveStudio(res, url.pathname)) return;
     if (req.method === 'GET' && serveStatic(res, url.pathname)) return;
     return send(res, 404, { ok: false, error: 'not_found' });
   }

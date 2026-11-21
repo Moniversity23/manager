@@ -87,7 +87,7 @@
   function push(item) {
     const t = performance.now();
     if (opts.speed >= 8 && !IMPORTANT_FAST.has(item.kind) && !item.pa) return;
-    if (opts.speed >= 4 && (PRIORITY[item.kind] || 0) < 6 && !item.pa) return;
+    if (opts.speed >= 4 && (PRIORITY[item.kind] || 0) < 3 && !item.pa) return;
     item.at = t; item.expires = t + (item.pa ? 15000 : (PRIORITY[item.kind] || 0) >= 8 ? 9000 : 3500);
     // A more important line replaces a less important one that is speaking or waiting.
     for (let i = queue.length - 1; i >= 0; i--) if (!queue[i].pa && (queue[i].prio || 0) < (item.prio || 0) && !item.pa) queue.splice(i, 1);

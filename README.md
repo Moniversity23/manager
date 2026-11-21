@@ -192,6 +192,13 @@ All endpoints answer `{ ok, error?, ... }`.
 | GET | `/api/saves`, `/api/history`, `/api/league`, `/api/club/:id`, `/api/export-save` | |
 | POST/DELETE | `/api/saves/:slot`, `/api/load/:slot`, `/api/import-save`, `/api/autosave` | Saves |
 
+## Player Studio
+
+Open the independent **Player Studio** from the main navigation or visit `http://localhost:3000/studio/`.
+It provides natural-language procedural profile generation, appearance and kit controls, the shared footballer preview, animation preview, a save library, JSON import/export and visual linking to existing game players. It does not change player IDs or football attributes.
+
+See `docs/PLAYER_STUDIO_USER_GUIDE.md` and `docs/PLAYER_STUDIO_ARCHITECTURE.md`.
+
 ## Saves
 
 Auto-save after every week, every transfer/contract action, lineup/tactic edits (5 s debounce) and on

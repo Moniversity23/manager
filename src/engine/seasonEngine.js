@@ -4,6 +4,8 @@
 // constant (cd._refs), so two GameWorlds in one process overwrote each other's leagues. Leagues now
 // belong to the world, hold club ids (not object references), and are saved explicitly.
 
+const FIN = require('./financeEngine');
+
 // Top 2 promoted automatically, 3rd–6th play off for the third place; bottom 3 relegated.
 const AUTO_PROMOTED = 2;
 const PROMOTED = 3;
@@ -152,7 +154,8 @@ function promoteAndRelegate(world, finalTables) {
     if (mv.type === 'promoted') {
       c.fanMood = Math.min(100, c.fanMood + 12);
       c.boardTrust = Math.min(100, c.boardTrust + 8);
-      c.finance.sponsorship = Math.round(c.finance.sponsorship * 1.3);
+      // Promotion raises what the shirt is worth (a signed deal pays its promotion bonus instead).
+      if (!(c.sponsor && c.sponsor.years > 0)) c.finance.sponsorship = Math.max(c.finance.sponsorship, FIN.sponsorValue(c));
     } else {
       c.fanMood = Math.max(0, c.fanMood - 10);
       c.boardTrust = Math.max(0, c.boardTrust - 8);

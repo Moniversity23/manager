@@ -22,14 +22,22 @@ const TACTIC_MATRIX = {
 };
 const TACTIC_INTENSITY = { high_press: 1.15, counter: 0.95, possession: 1.0, low_block: 0.9 };
 
-// Team instructions on top of the tactic: line height, width and tempo. Each one trades something
-// for something else, and 'normal' changes nothing (so results without instructions are exactly
-// what they were). They scale a side's shot volume and quality, what it concedes, and how fast its
-// players tire — no extra random draws.
+// Team instructions on top of the tactic: line height, width and tempo, each a slider from 0 to 100
+// (50 = normal). Each trades something for something else; 50 changes nothing, so results without
+// instructions are exactly what they were. They scale a side's shot volume and quality, what it
+// concedes and how fast its players tire — no extra random draws. 20 and 80 are the old
+// deep/narrow/slow and high/wide/fast settings (saved careers that used them keep their meaning).
 const INSTRUCTIONS = { line: ['deep', 'normal', 'high'], width: ['narrow', 'normal', 'wide'], tempo: ['slow', 'normal', 'fast'] };
+const WORD_VALUE = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
+function instrValue(v) {
+  if (typeof v === 'string' && WORD_VALUE[v] != null) return WORD_VALUE[v];
+  if (v == null || v === '') return 50;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 50;
+}
 function normInstr(x) {
   const o = {};
-  for (const [k, vals] of Object.entries(INSTRUCTIONS)) o[k] = x && vals.includes(x[k]) ? x[k] : 'normal';
+  for (const k of Object.keys(INSTRUCTIONS)) o[k] = instrValue(x ? x[k] : null);
   return o;
 }
 const FWD_SLOTS = ['ST', 'CF', 'LW', 'RW'], DEF_SLOTS = ['CB', 'LB', 'RB'], FB_SLOTS = ['LB', 'RB'];
@@ -40,21 +48,22 @@ function avgAttr(side, ctx, slots, attr) {
 }
 function instrMods(m, key, ctx) {
   const side = m[key], opp = m[key === 'home' ? 'away' : 'home'];
-  const me = side.instr || normInstr(null);
+  const me = normInstr(side.instr);
   const r = { vol: 1, qual: 1, concVol: 1, concQual: 1, fatigue: 1 };
+  const l = (me.line - 50) / 30, w = (me.width - 50) / 30, t = (me.tempo - 50) / 30;   // 80 → 1, 20 → −1
   // A high line squeezes the pitch and wins the ball higher, but quick forwards get in behind it.
-  if (me.line === 'high') {
+  if (l > 0) {
     const edge = clamp((avgAttr(opp, ctx, FWD_SLOTS, 'pace') - avgAttr(side, ctx, DEF_SLOTS, 'pace')) / 25, -1, 1);
-    r.concQual *= 1 + 0.14 * edge; r.concVol *= 0.95; r.vol *= 1.04; r.fatigue *= 1.05;
-  } else if (me.line === 'deep') { r.concQual *= 0.92; r.concVol *= 1.07; r.vol *= 0.94; r.fatigue *= 0.97; }
+    r.concQual *= 1 + 0.14 * edge * l; r.concVol *= 1 - 0.05 * l; r.vol *= 1 + 0.04 * l; r.fatigue *= 1 + 0.05 * l;
+  } else if (l < 0) { const d = -l; r.concQual *= 1 - 0.08 * d; r.concVol *= 1 + 0.07 * d; r.vol *= 1 - 0.06 * d; r.fatigue *= 1 - 0.03 * d; }
   // Width stretches the opponents (more so against weak full-backs) and leaves gaps; narrow is the opposite.
-  if (me.width === 'wide') {
+  if (w > 0) {
     const fb = clamp((60 - avgAttr(opp, ctx, FB_SLOTS, 'defending')) / 25, -1, 1);
-    r.vol *= 1.03 + 0.04 * fb; r.concVol *= 1.03;
-  } else if (me.width === 'narrow') { r.vol *= 0.96; r.qual *= 1.03; r.concVol *= 0.95; }
+    r.vol *= 1 + (0.03 + 0.04 * fb) * w; r.concVol *= 1 + 0.03 * w;
+  } else if (w < 0) { const d = -w; r.vol *= 1 - 0.04 * d; r.qual *= 1 + 0.03 * d; r.concVol *= 1 - 0.05 * d; }
   // Tempo: fast means more, hurried attacks, an open game and tired legs; slow the reverse.
-  if (me.tempo === 'fast') { r.vol *= 1.08; r.qual *= 0.96; r.concVol *= 1.03; r.fatigue *= 1.08; }
-  else if (me.tempo === 'slow') { r.vol *= 0.92; r.qual *= 1.04; r.concVol *= 0.95; r.fatigue *= 0.94; }
+  if (t > 0) { r.vol *= 1 + 0.08 * t; r.qual *= 1 - 0.04 * t; r.concVol *= 1 + 0.03 * t; r.fatigue *= 1 + 0.08 * t; }
+  else if (t < 0) { const d = -t; r.vol *= 1 - 0.08 * d; r.qual *= 1 + 0.04 * d; r.concVol *= 1 - 0.05 * d; r.fatigue *= 1 - 0.06 * d; }
   return r;
 }
 
@@ -517,5 +526,5 @@ function squadStrength(club) {
 
 module.exports = {
   createMatch, playFirstHalf, applyHalftime, playSecondHalf, finalizeMatch, playMatch, squadStrength,
-  drainFactor, MAX_SUBS, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods,
+  drainFactor, MAX_SUBS, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods, instrValue,
 };

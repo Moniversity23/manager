@@ -59,6 +59,7 @@ html[data-size="large"]{font-size:16px}
 .mv-replay{position:absolute;left:10px;bottom:10px;padding:4px 10px 4px 22px;background:#d61f2c;color:#fff;font-family:var(--fn);font-weight:900;letter-spacing:.14em;font-size:14px;border-radius:4px;opacity:0;transition:opacity .2s;z-index:3;pointer-events:none}
 .mv-replay::before{content:'';position:absolute;left:8px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#fff;animation:blink 1s steps(2) infinite}
 .mv-replay.on{opacity:1}
+.mv-log{height:300px;overflow-y:auto;background:var(--card,#0e1726);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;margin:6px 0}.mv-log-row{padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;line-height:1.4}.mv-log-row b{color:var(--ac);font-family:var(--fm);font-size:11px;margin-right:6px}.mv-log-row.pa{color:#ffe28a;font-style:italic}
 .mv-cap{position:absolute;left:50%;transform:translateX(-50%);max-width:86%;padding:4px 10px;border-radius:6px;background:rgba(6,10,18,.72);color:#fff;font-size:12px;line-height:1.35;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;z-index:3}
 .mv-cap.on{opacity:1}.mv-cap.pa{color:#ffe28a;font-style:italic}.mv3d .mv-cap.top{top:42px;bottom:auto;z-index:5}.mv3d:has(.mv-intro.on) .mv-cap{top:42px;bottom:auto;z-index:5}
 .mv3d .mv-cap{bottom:96px}.mv-wrap .mv-cap{bottom:8px}
@@ -173,6 +174,8 @@ table{border-collapse:collapse;width:100%}
 .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .tag{padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
 .tg{background:rgba(0,230,118,.12);color:var(--gr)}.tr{background:rgba(255,82,82,.12);color:var(--rd)}.to{background:rgba(255,171,64,.12);color:var(--or)}.tb2{background:rgba(77,166,255,.12);color:var(--bl)}.ta{background:rgba(0,229,204,.12);color:var(--ac)}.tgold{background:rgba(255,215,0,.12);color:var(--gold)}
+.stat-tbl td,.stat-tbl th{text-align:center!important;white-space:nowrap}.stat-tbl tr.pl{display:table-row}
+.award-stage{position:relative;height:250px;border-radius:12px;overflow:hidden;margin-bottom:12px;background:radial-gradient(circle at 50% 30%,#22344c,#0b1220 70%)}.award-stage canvas{display:block;width:100%!important;height:100%!important}.award-stage.flat{height:auto;padding:14px 12px 54px}.award-cap{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;background:linear-gradient(transparent,rgba(0,0,0,.8));display:flex;align-items:center;gap:8px;flex-wrap:wrap}.award-cap span{font-family:var(--fm);font-size:10px;letter-spacing:.12em;color:#f5cf5d;text-transform:uppercase}.award-cap b{font-size:16px}.award-next{position:absolute;right:10px;top:10px;z-index:2}
 .st thead th{background:rgba(255,255,255,.03);padding:7px 8px;text-align:left;font-family:var(--fm);font-size:9px;letter-spacing:.06em;color:var(--dim);border-bottom:1px solid var(--bd);white-space:nowrap}
 .st th.tc,.st td.tc{text-align:center}
 .st tbody tr{border-bottom:1px solid rgba(255,255,255,.04)}.st tbody tr:hover{background:rgba(255,255,255,.03)}
@@ -364,7 +367,7 @@ const NAV = [
   ['transfers','💰','Transfers'],['scouting','🔭','Scouting'],['academy','🎓','Academy'],
   ['finances','📊','Finances'],['staff','👔','Staff'],['career','💼','Career & Board'],
   ['club2','🏢','Second Club'],['performance','📈','Stats'],['awards','🏅','Awards & Records'],['challenges','🏁','Challenges'],['leagues','🌍','Leagues'],
-  ['history','📚','History'],['saves','💾','Saves'],['settings','⚙️','Settings']
+  ['history','📚','History'],['studio','🎨','Player Studio'],['saves','💾','Saves'],['settings','⚙️','Settings']
 ];
 // Preferences live in this browser only (theme, text size, match view mode and speed).
 const PREFS = (() => { try { return JSON.parse(localStorage.getItem('gaffer_prefs') || '{}'); } catch { return {}; } })();
@@ -476,7 +479,7 @@ function showMain(){
   if (STATE.liveMatch) showHalftime(STATE.liveMatch);
 }
 const NAV_GROUPS = [['Club', ['dash', 'inbox', 'news']], ['Team', ['squad', 'lineup', 'tactics', 'dressing', 'academy', 'staff']], ['Matches', ['fixtures', 'cup', 'continental', 'international']],
-  ['Transfers', ['transfers', 'scouting']], ['Business', ['finances', 'career', 'club2']], ['World', ['awards', 'challenges', 'performance', 'leagues', 'history']], ['Game', ['saves', 'settings']]];
+  ['Transfers', ['transfers', 'scouting']], ['Business', ['finances', 'career', 'club2']], ['World', ['awards', 'challenges', 'performance', 'leagues', 'history']], ['Game', ['studio', 'saves', 'settings']]];
 function buildNav(){
   const by = Object.fromEntries(NAV.map(n => [n[0], n]));
   document.getElementById('sbNav').innerHTML = NAV_GROUPS.map(([g, secs]) => `<div class="nv-h">${g}</div>` + secs.map(k => by[k]).filter(Boolean).map(([s,i,l]) => `<button class="nv" data-sec="${s}" onclick="navTo('${s}')"><span class="nv-icon">${i}</span><span>${l}</span>${s==='inbox'?'<span class="cnt hidden" id="inboxCnt"></span>':''}</button>`).join('')).join('');
@@ -486,6 +489,7 @@ function buildNav(){
 const NAV_TRAIL = [];
 let HIST_KEEP = false;
 function navTo(sec){
+  if (sec === 'studio') { location.href = './studio/'; return; }
   if (sec === 'history' && currentSection !== 'history' && !HIST_KEEP) HIST = { tab: 'career' };
   HIST_KEEP = false;
   if (sec !== currentSection) { NAV_TRAIL.push(currentSection); if (NAV_TRAIL.length > 40) NAV_TRAIL.shift(); try { history.pushState({ gaffer: 1 }, ''); } catch {} }
@@ -567,13 +571,34 @@ function afterWeek(out, viewed){
     .forEach(e => notify(e.text, e.type === 'injury' ? 'd' : e.type === 'bid' || e.type === 'trophy' || e.type === 'achievement' ? 'g' : 'w'));
 }
 
+// ── Award ceremonies (man of the match, player of the season, Golden Ball) ──
+let AWARD = null, AWARD_TOKEN = 0;
+function stopAward(){ AWARD_TOKEN++; if (AWARD) { try { AWARD.dispose(); } catch {} AWARD = null; } }
+async function startAward(hostId, w, trophy){
+  stopAward();
+  const token = AWARD_TOKEN, host = document.getElementById(hostId);
+  if (!host || !w || !w.look) return;
+  if ((PREFS.viewMode || '3d') === 'instant' || PREFS.models === 'classic' || typeof WebGLRenderingContext === 'undefined') { host.classList.add('flat'); return; }
+  try {
+    const mod = await import('./match3d.js');
+    const view = await mod.createAwardView(host, { look: w.look, kit: w.kit || {}, gk: !!w.gk, badge: w.badge || null, trophy, quality: PREFS.gfx || 'auto' });
+    if (token !== AWARD_TOKEN || !document.body.contains(host)) { view.dispose(); return; }
+    AWARD = view;
+  } catch (e) { console.warn('award view unavailable', e); host.classList.add('flat'); }
+}
+function awardStage(id, label, w, detail, next){
+  return `<div class="award-stage" id="${id}">${next ? `<button class="btn bsm bg award-next" onclick="${next}">Next award ›</button>` : ''}<div class="award-cap"><span>${label}</span><b>${esc(w.name)}</b><span style="color:var(--tx);letter-spacing:0;text-transform:none;font-family:inherit;font-size:12px">${detail}</span></div></div>`;
+}
+
 function showFullTime(m, next){
   openMo('genMo');
   document.getElementById('genMoContent').classList.remove('mvx');
   const hl = HL && HL.clips.length && HL.key === hlKey({ home: typeof m.home === 'string' ? m.home : (m.home || {}).name, away: typeof m.away === 'string' ? m.away : (m.away || {}).name, compName: m.compName }) ? HL.clips.length : 0;
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}${hl ? `<button class="btn bg fw" id="ftHl" style="margin-bottom:8px">▶ Watch the highlights (${hl} ${hl === 1 ? 'moment' : 'moments'})</button>` : ''}<button class="btn bp fw" id="ftNext">Continue</button>`;
+  const motm = m.motm && m.motm.look ? m.motm : null;
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${motm ? awardStage('awardStage', '⭐ Man of the match', motm, `${esc(motm.side === 'home' ? (typeof m.home === 'string' ? m.home : m.home.name) : (typeof m.away === 'string' ? m.away : m.away.name))} · rating ${Number(motm.rating).toFixed(1)}`) : ''}${matchReportHTML(m)}${hl ? `<button class="btn bg fw" id="ftHl" style="margin-bottom:8px">▶ Watch the highlights (${hl} ${hl === 1 ? 'moment' : 'moments'})</button>` : ''}<button class="btn bp fw" id="ftNext">Continue</button>`;
   document.getElementById('ftNext').onclick = () => { closeMo('genMo'); next(); };
-  const hb = document.getElementById('ftHl'); if (hb) hb.onclick = () => playHighlights(() => showFullTime(m, next));
+  const hb = document.getElementById('ftHl'); if (hb) hb.onclick = () => { stopAward(); playHighlights(() => showFullTime(m, next)); };
+  if (motm) startAward('awardStage', motm, 'cup');
 }
 
 // ── Broadcast layer for the 3D match: score bug, radar, pre-match fly-over, goal replays ──
@@ -730,12 +755,15 @@ const SHAPE = {
   low_block:  { line: -0.09, width: 0.9, compact: 0.72, overlap: 0.03, press: 1 },
 };
 // Instructions adjust the shape: line height, width with the ball, compactness without it.
-const INSTR_SHAPE = { line: { deep: { line: -0.04 }, high: { line: 0.045 } }, width: { narrow: { width: 0.9, compact: 0.92 }, wide: { width: 1.09, compact: 1.04 } } };
+// Instructions adjust the shape (sliders 0–100, 50 = normal): line height, width with the ball,
+// compactness without it. Older saves may still hold the words deep/high etc.
+const INSTR_SHAPE_WORD = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
 const shapeOf = (v, side) => {
   const base = SHAPE[(v.m.tactics || {})[side]] || SHAPE.possession, ins = (v.m.instructions || {})[side];
   if (!ins) return base;
-  const l = INSTR_SHAPE.line[ins.line] || {}, w = INSTR_SHAPE.width[ins.width] || {};
-  return { ...base, line: base.line + (l.line || 0), width: base.width * (w.width || 1), compact: base.compact * (w.compact || 1) };
+  const k = x => { const n = typeof x === 'string' ? INSTR_SHAPE_WORD[x] : Number(x); return Number.isFinite(n) ? (n - 50) / 30 : 0; };
+  const l = k(ins.line), w = k(ins.width);
+  return { ...base, line: base.line + l * (l > 0 ? 0.045 : 0.04), width: base.width * (1 + w * (w > 0 ? 0.09 : 0.1)), compact: base.compact * (1 + w * (w > 0 ? 0.04 : 0.08)) };
 };
 let VIEW = null;
 function basePositions(lineup, mirror){
@@ -744,7 +772,7 @@ function basePositions(lineup, mirror){
     const [x, ys] = SLOT_POS[s.slot] || [0.5, [0.5]];
     const i = used[s.slot] = (used[s.slot] || 0) + 1;
     const y = ys[(i - 1) % ys.length];
-    return { id: s.playerId, name: s.name, slot: s.slot, bx: mirror ? 1 - x : x, by: y, x: mirror ? 1 - x : x, y, off: false };
+    return { id: s.playerId, name: s.name, slot: s.slot, rt: s.rt ?? null, bx: mirror ? 1 - x : x, by: y, x: mirror ? 1 - x : x, y, off: false };
   });
 }
 function normalizeMatch(x){
@@ -764,7 +792,7 @@ function playHalf(match, fromMin, toMin, done){
   document.getElementById('genMoContent').innerHTML = `
     <div class="small dim" style="text-align:center">${esc(m.compName || '')}</div>
     <div class="mv-bar"><div class="mv-score" id="mvScore"></div><div class="mv-clock" id="mvClock"></div></div>
-    ${mode === 'commentary' ? '' : use3d ? `<div class="mv3d" id="mv3d" onclick="skipCinema()"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam"><button id="mvCamBtn" onclick="event.stopPropagation();cycleCam()">🎥 TV</button><button onclick="event.stopPropagation();toggleFull()" title="Full screen" aria-label="Full screen">⛶</button></div><div class="mv-bug" id="mvBug"></div><canvas class="mv-radar" id="mvRadar" width="168" height="108"></canvas><div class="mv-replay" id="mvReplay">REPLAY</div><div class="mv-cap" id="mvCap"></div><div class="mv-intro" id="mvIntro"></div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas><div class="mv-cap" id="mvCap"></div></div>'}
+    ${mode === 'commentary' ? '<div class="mv-log" id="mvLog"><div class="small dim" style="padding:6px 2px">Live commentary</div></div>' : use3d ? `<div class="mv3d" id="mv3d" onclick="skipCinema()"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam"><button id="mvCamBtn" onclick="event.stopPropagation();cycleCam()">🎥 TV</button><button onclick="event.stopPropagation();toggleFull()" title="Full screen" aria-label="Full screen">⛶</button></div><div class="mv-bug" id="mvBug"></div><canvas class="mv-radar" id="mvRadar" width="168" height="108"></canvas><div class="mv-replay" id="mvReplay">REPLAY</div><div class="mv-cap" id="mvCap"></div><div class="mv-intro" id="mvIntro"></div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas><div class="mv-cap" id="mvCap"></div></div>'}
     <div class="row mt8">${[1, 2, 4, 8].map(s => `<button class="btn bsm ${((PREFS.speed || 2) === s) ? 'bact' : 'bg'}" onclick="setSpeed(${s})">${s}×</button>`).join('')}
       <button class="btn bsm bg" id="mvPause" onclick="togglePause()">⏸ Pause</button><button class="btn bsm bs" onclick="skipHalf()">Skip ⏭</button>
       <select onchange="PREFS.viewMode=this.value;savePrefs()" style="width:auto;padding:4px 6px;font-size:11px">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
@@ -782,7 +810,7 @@ function playHalf(match, fromMin, toMin, done){
   if (use3d) start3D(VIEW); else requestAnimationFrame(viewTick);
 }
 const VIEW_MODES = [['3d', '3D stadium'], ['full', 'Full 2D'], ['key', 'Key moments'], ['commentary', 'Commentary'], ['instant', 'Instant result']];
-const view3dOptions = m => ({ homeHue: m.lineups.homeHue ?? 210, awayHue: m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', m.home, m.away, 'THE GAFFER'], night: matchNight(m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: m.lineups.capacity, attendance: m.lineups.attendance, name: m.home }, weather: matchWeather(m) });
+const view3dOptions = m => ({ homeHue: m.lineups.homeHue ?? 210, awayHue: m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', m.home, m.away, 'THE GAFFER'], night: matchNight(m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: m.lineups.capacity, attendance: m.lineups.attendance, name: m.home }, weather: matchWeather(m), kits: m.lineups.kits || null, badges: m.lineups.badges || null });
 
 // ── Highlights ──────────────────────────────────────────────────────
 // Every goal, big save and shot off the woodwork shown in 3D is kept as a clip (the recorded
@@ -901,7 +929,7 @@ function markEvent(e, silent){
     pa('sub', { club: clubOf(v, e.side), outNum, out: outName, inNum, in: inName });
   }
   if (e.type === 'red') { const d = side.find(x => x.id === e.playerId); if (d) d.off = true; }
-  if (e.type === 'sub') { const d = side.find(x => x.id === e.offId); if (d) { d.id = e.playerId; d.name = (e.text || '').replace(/^🔁\s*/, '').split(' on for')[0]; } }
+  if (e.type === 'sub') { const d = side.find(x => x.id === e.offId); if (d) { d.id = e.playerId; d.name = (e.text || '').replace(/^🔁\s*/, '').split(' on for')[0]; d.rt = (((v.m.lineups || {}).looks || {})[e.playerId] || {}).ovr ?? null; } }
   if (live) simOnEvent(v, e);
 }
 function feedRender(){
@@ -956,13 +984,14 @@ function viewTick(now){
 // and captions the lines. Both receive structured events from here, so nothing is guessed.
 function audioOn(){ return PREFS.sound !== false && window.GafferSound; }
 function audioEv(type, data){ try { if (audioOn()) window.GafferSound.event(type, data || {}); } catch {} }
-function say(kind, data, o){ try { if (window.GafferCommentary && PREFS.sound !== false) window.GafferCommentary.say(kind, data || {}, o); } catch {} }
-function pa(kind, data){ try { if (window.GafferCommentary && PREFS.sound !== false) window.GafferCommentary.announce(kind, data || {}); } catch {} }
+// Commentary always runs as text (captions, and the live log in Commentary mode); the sound switch only silences the voice.
+function say(kind, data, o){ try { if (window.GafferCommentary) window.GafferCommentary.say(kind, data || {}, o); } catch {} }
+function pa(kind, data){ try { if (window.GafferCommentary) window.GafferCommentary.announce(kind, data || {}); } catch {} }
 const MIX_DEFAULT = { crowd: 0.85, ref: 0.85, ball: 0.8, voices: 0.6, commentary: 0.9, announcer: 0.8, music: 0.5 };
 function applyAudioPrefs(){
   const m = { ...MIX_DEFAULT, ...(PREFS.mix || {}) };
   try { if (window.GafferSound) { window.GafferSound.setMix(m); window.GafferSound.setVolume(PREFS.volume ?? 0.6); } } catch {}
-  try { if (window.GafferCommentary) window.GafferCommentary.configure({ speech: PREFS.speech !== false, captions: PREFS.captions !== false, commentary: m.commentary > 0, announcer: m.announcer > 0, volume: m.commentary * (PREFS.volume ?? 0.6) / 0.6, paVolume: m.announcer * (PREFS.volume ?? 0.6) / 0.6, speed: PREFS.speed || 2 }); } catch {}
+  try { if (window.GafferCommentary) window.GafferCommentary.configure({ speech: PREFS.speech !== false && PREFS.sound !== false, captions: PREFS.captions !== false || (PREFS.viewMode || '3d') === 'commentary', commentary: m.commentary > 0, announcer: m.announcer > 0, volume: m.commentary * (PREFS.volume ?? 0.6) / 0.6, paVolume: m.announcer * (PREFS.volume ?? 0.6) / 0.6, speed: PREFS.speed || 2 }); } catch {}
 }
 function audioStop(){ try { if (window.GafferCommentary) window.GafferCommentary.stop(); } catch {} try { if (window.GafferSound) window.GafferSound.stopAll(); } catch {} }
 const surname = n => String(n || '').split(' ').slice(-1)[0];
@@ -975,7 +1004,7 @@ function shirtNumbers(v){
 }
 function matchAudioStart(v, fromMin){
   applyAudioPrefs(); shirtNumbers(v);
-  try { if (window.GafferCommentary) { window.GafferCommentary.stop(); window.GafferCommentary.onCaption((t, kind) => { const el = document.getElementById('mvCap'); if (!el) return; el.textContent = t || ''; el.className = 'mv-cap' + (t ? ' on' : '') + (kind === 'pa' ? ' pa' : '') + (VIEW && VIEW.intro != null ? ' top' : ''); }); window.GafferCommentary.onSpeaking((on, isPa) => { try { if (window.GafferSound) window.GafferSound.duck(on ? (isPa ? 0.4 : 0.25) : 0); } catch {} }); } } catch {}
+  try { if (window.GafferCommentary) { window.GafferCommentary.stop(); window.GafferCommentary.onCaption((t, kind) => { const log = document.getElementById('mvLog'); if (log && t) { const row = document.createElement('div'); row.className = 'mv-log-row' + (kind === 'pa' ? ' pa' : ''); row.innerHTML = `<b>${Math.floor((VIEW && VIEW.minute) || 0)}'</b> ${esc(t)}`; log.insertBefore(row, log.children[1] || null); while (log.children.length > 60) log.lastChild.remove(); } const el = document.getElementById('mvCap'); if (!el) return; el.textContent = t || ''; el.className = 'mv-cap' + (t ? ' on' : '') + (kind === 'pa' ? ' pa' : '') + (VIEW && VIEW.intro != null ? ' top' : ''); }); window.GafferCommentary.onSpeaking((on, isPa) => { try { if (window.GafferSound) window.GafferSound.duck(on ? (isPa ? 0.4 : 0.25) : 0); } catch {} }); } } catch {}
   crowd(true);
   const d = { home: v.m.home, away: v.m.away, comp: v.m.compName || 'league', att: v.m.lineups.attendance ? v.m.lineups.attendance.toLocaleString() : 'a good crowd' };
   if (fromMin === 0) {
@@ -1414,7 +1443,7 @@ function showHalftime(h){
       <div><label class="lbl">Tactic</label><select id="htTactic">${h.tactics.map(t => `<option value="${t}" ${t===h.tactic?'selected':''}>${t.replace('_',' ')}</option>`).join('')}</select></div>
       <div><label class="lbl">Formation</label><select id="htFormation">${h.formations.map(f => `<option ${f===h.formation?'selected':''}>${f}</option>`).join('')}</select></div>
     </div>
-    <div class="g3 mt8">${INSTR_UI.map(([key, label, opts]) => `<div><label class="lbl">${label}</label><select id="ht_${key}">${opts.map(([v, l]) => `<option value="${v}" ${((h.instructions || {})[key] || 'normal') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`).join('')}</div>
+    <div class="mt8">${INSTR_UI.map(([key, label, lo, hi]) => instrSlider(key, label, lo, hi, instrVal((h.instructions || {})[key]), 'ht_', '')).join('')}</div>
     <label class="lbl mt12">Team talk</label>
     <div class="row" id="htTalk" style="margin-bottom:6px">${[['encourage', 'Encourage', 'Best when level or behind'], ['demand', 'Demand more', 'Fires them up when losing; can backfire when winning'], ['calm', 'Stay calm', 'Protects a lead'], ['praise', 'Praise', 'Good when winning, flat when losing']].map(([k, l, tip]) => `<button class="btn bsm bg" data-talk="${k}" title="${tip}" onclick="pickTalk(this)">${l}</button>`).join('')}</div>
     <div class="small dim" id="htTalkHint">Pick a team talk (optional). ${h.home.goals === h.away.goals ? 'It is level.' : (h.myKey === 'home' ? h.home.goals > h.away.goals : h.away.goals > h.home.goals) ? 'You are winning.' : 'You are losing.'}</div>
@@ -1434,7 +1463,7 @@ async function resumeMatch(withChanges){
   if (withChanges) {
     body.tactic = document.getElementById('htTactic').value;
     body.formation = document.getElementById('htFormation').value;
-    body.instructions = Object.fromEntries(INSTR_UI.map(([key]) => [key, (document.getElementById('ht_' + key) || {}).value || 'normal']));
+    body.instructions = Object.fromEntries(INSTR_UI.map(([key]) => [key, Number((document.getElementById('ht_' + key) || {}).value ?? 50)]));
     body.subs = HT.subs.slice();
   }
   closeMo('genMo');
@@ -1474,8 +1503,14 @@ function showMatchReport(m){
 function showSeasonEnd(s, m){
   if (!s) return;
   openMo('genMo');
+  const cer = [];
+  const pots = s.awards && s.awards.playerOfSeason;
+  if (pots && pots.look) cer.push({ label: `🏅 ${esc(s.awards.league || 'League')} player of the season`, w: pots, detail: `${esc(pots.club)}${pots.goals != null ? ` · ${pots.goals} goals, ${pots.assists} assists` : ''}`, trophy: 'cup' });
+  if (s.goldenBall && s.goldenBall.look) cer.push({ label: '🌟 Golden Ball', w: s.goldenBall, detail: `${esc(s.goldenBall.club)}${s.goldenBall.goals != null ? ` · ${s.goldenBall.goals} goals, ${s.goldenBall.assists} assists` : ''}`, trophy: 'ball' });
+  SEASON_CER = cer; SEASON_CER_I = 0;
   document.getElementById('genMoContent').innerHTML = `
     <div class="mo-title">${s.promotion ? '🎉' : s.position <= 3 ? '🏆' : '📋'} Season ${esc(s.seasonLabel)} complete</div>
+    <div id="cerBox">${cer.length ? awardStage('seasonStage', cer[0].label, cer[0].w, cer[0].detail, cer.length > 1 ? 'nextCeremony()' : '') : ''}</div>
     <div class="g4" style="margin-bottom:12px">${[['Position', ordinal(s.position)], ['Points', s.points], ['GD', (s.gd >= 0 ? '+' : '') + s.gd], ['Balance', money(s.finances)]].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="color:var(--ac)">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
     <div class="card small">
       <div class="sr"><span>Outcome</span><b style="color:var(--ac)">${esc(s.outcome)}</b></div>
@@ -1486,6 +1521,15 @@ function showSeasonEnd(s, m){
     </div>
     <div class="small dim" style="margin-bottom:10px">Every player starts the new season fully fit and injury-free. Check the Inbox for contracts, youth intake and board news.</div>
     <button class="btn bp fw" onclick="closeMo('genMo');navTo('inbox')">Continue to ${STATE.seasonLabel}</button>`;
+  if (cer.length) startAward('seasonStage', cer[0].w, cer[0].trophy);
+}
+let SEASON_CER = [], SEASON_CER_I = 0;
+function nextCeremony(){
+  if (!SEASON_CER.length) return;
+  SEASON_CER_I = (SEASON_CER_I + 1) % SEASON_CER.length;
+  const c = SEASON_CER[SEASON_CER_I], box = document.getElementById('cerBox'); if (!box) return;
+  box.innerHTML = awardStage('seasonStage', c.label, c.w, c.detail, 'nextCeremony()');
+  startAward('seasonStage', c.w, c.trophy);
 }
 
 // ── HOME ────────────────────────────────────────────────────────────
@@ -1567,14 +1611,17 @@ function statusTag(p){
 const POS_ORDER = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CAM', 'LW', 'RW', 'ST', 'CF'];
 const POS_GROUP = { GK: 'Goalkeepers', CB: 'Defenders', LB: 'Defenders', RB: 'Defenders', CDM: 'Midfielders', CM: 'Midfielders', CAM: 'Midfielders', LW: 'Attackers', RW: 'Attackers', ST: 'Attackers', CF: 'Attackers' };
 const GROUP_CLS = { Goalkeepers: 'pg', Defenders: 'pd', Midfielders: 'pm', Attackers: 'pa' };
-const SQ_SORTS = [['pos', 'Position'], ['ovr', 'Rating'], ['pot', 'Potential'], ['value', 'Value'], ['age', 'Age'], ['wage', 'Wage'], ['form', 'Form'], ['goals', 'Goals'], ['fit', 'Condition']];
+const SQ_SORTS = [['pos', 'Position'], ['ovr', 'Rating'], ['pot', 'Potential'], ['value', 'Value'], ['age', 'Age'], ['wage', 'Wage'], ['form', 'Form'], ['goals', 'Goals'], ['avg', 'Avg rating'], ['motm', 'Man of the match'], ['fit', 'Condition']];
+let SQ_VIEW = 'list';
+const avgRating = p => (p.seasonStats && p.seasonStats.rn ? p.seasonStats.rs / p.seasonStats.rn : null);
 let SQ_SORT = 'pos';
 function posPill(pos){ return `<span class="pos ${GROUP_CLS[POS_GROUP[pos]] || 'pm'}">${esc(pos)}</span>`; }
 function progressTag(p){ return p.progress > 0 ? `<span class="up-a" title="Improved this season">▲${p.progress}</span>` : p.progress < 0 ? `<span class="dn-a" title="Declined this season">▼${-p.progress}</span>` : ''; }
 function squadSorted(list){
   const f = { pos: (a, b) => POS_ORDER.indexOf(a.position) - POS_ORDER.indexOf(b.position) || b.ovr - a.ovr, ovr: (a, b) => b.ovr - a.ovr, pot: (a, b) => b.pot - a.pot || b.ovr - a.ovr,
     value: (a, b) => b.marketValue - a.marketValue, age: (a, b) => a.age - b.age || b.ovr - a.ovr, wage: (a, b) => b.weeklyWage - a.weeklyWage, form: (a, b) => (b.form || 0) - (a.form || 0) || b.ovr - a.ovr,
-    goals: (a, b) => b.seasonStats.goals - a.seasonStats.goals || b.seasonStats.assists - a.seasonStats.assists, fit: (a, b) => b.fit - a.fit }[SQ_SORT] || ((a, b) => b.ovr - a.ovr);
+    goals: (a, b) => b.seasonStats.goals - a.seasonStats.goals || b.seasonStats.assists - a.seasonStats.assists, fit: (a, b) => b.fit - a.fit,
+    avg: (a, b) => (avgRating(b) || 0) - (avgRating(a) || 0), motm: (a, b) => (b.seasonStats.motm || 0) - (a.seasonStats.motm || 0) || (avgRating(b) || 0) - (avgRating(a) || 0) }[SQ_SORT] || ((a, b) => b.ovr - a.ovr);
   return list.slice().sort(f);
 }
 function playerRow(p){
@@ -1582,7 +1629,7 @@ function playerRow(p){
     ${posPill(p.position)}${rb(p.ovr)}
     <div class="pl-n pl-np">${playerPortrait(p, 34)}<div style="min-width:0"><b>${esc(p.name)}</b> ${progressTag(p)} ${statusTag(p)}<div class="small dim">${p.age} yrs · ${esc(p.nation)} · ${p.contractYears <= 1 ? '<span style="color:var(--rd)">final year</span>' : p.contractYears + ' yrs left'}<span class="show-m"> · ${money(p.marketValue)}</span></div></div></div>
     <div class="hide-m"><div class="mini" title="Condition ${p.fit}%"><span style="width:${p.fit}%;background:${fitColor(p.fit)}"></span></div><div class="mini" title="Morale ${p.mor}"><span style="width:${p.mor}%;background:${p.mor >= 65 ? 'var(--bl)' : p.mor >= 45 ? 'var(--or)' : 'var(--rd)'}"></span></div></div>
-    <div class="hide-m small">${p.form != null ? rb10(p.form) : '<span class="dim">–</span>'} <span class="dim">·</span> ${p.seasonStats.goals}G ${p.seasonStats.assists}A <span class="dim">(${p.seasonStats.apps})</span></div>
+    <div class="hide-m small">${p.form != null ? rb10(p.form) : '<span class="dim">–</span>'} <span class="dim">·</span> ${p.seasonStats.goals}G ${p.seasonStats.assists}A <span class="dim">(${p.seasonStats.apps})</span>${p.seasonStats.motm ? ` <span title="Man of the match">⭐${p.seasonStats.motm}</span>` : ''}</div>
     <div class="stars" title="Potential">${stars(p.pot)}<div class="show-m small" style="color:${fitColor(p.fit)};letter-spacing:0;text-align:right">${p.fit}%</div></div>
     <div class="hide-m" style="text-align:right"><b style="color:var(--ac)">${money(p.marketValue)}</b><div class="small dim">${money(p.weeklyWage)}/wk</div></div></div>`;
 }
@@ -1590,20 +1637,32 @@ function rSquad(){
   const squad = squadSorted(STATE.squad || []);
   const avg = squad.length ? Math.round(squad.reduce((t, p) => t + p.ovr, 0) / squad.length) : 0;
   let body = '';
-  if (SQ_SORT === 'pos') for (const g of ['Goalkeepers', 'Defenders', 'Midfielders', 'Attackers']) { const rows = squad.filter(p => POS_GROUP[p.position] === g); if (rows.length) body += `<div class="grp-h">${g} <span class="small dim">${rows.length}</span></div>` + rows.map(playerRow).join(''); }
+  if (SQ_VIEW === 'stats') body = squadStatsTable(squad);
+  else if (SQ_SORT === 'pos') for (const g of ['Goalkeepers', 'Defenders', 'Midfielders', 'Attackers']) { const rows = squad.filter(p => POS_GROUP[p.position] === g); if (rows.length) body += `<div class="grp-h">${g} <span class="small dim">${rows.length}</span></div>` + rows.map(playerRow).join(''); }
   else body = squad.map(playerRow).join('');
   return `<div class="sct">Squad <span class="scs">${squad.length} players · average ${avg} · wages ${money(STATE.ledger?.weeklyWages || 0)}/wk</span></div>
-  <div class="chips"><span class="small dim">Sort by</span>${SQ_SORTS.map(([k, l]) => `<button class="chip ${SQ_SORT === k ? 'on' : ''}" onclick="SQ_SORT='${k}';renderSection('squad')">${l}</button>`).join('')}</div>
+  <div class="chips"><span class="small dim">Show</span>${[['list', 'Players'], ['stats', 'Season stats']].map(([k, l]) => `<button class="chip ${SQ_VIEW === k ? 'on' : ''}" onclick="SQ_VIEW='${k}';renderSection('squad')">${l}</button>`).join('')}<span class="small dim" style="margin-left:8px">Sort by</span>${SQ_SORTS.map(([k, l]) => `<button class="chip ${SQ_SORT === k ? 'on' : ''}" onclick="SQ_SORT='${k}';renderSection('squad')">${l}</button>`).join('')}</div>
   <div class="row" style="margin-bottom:10px"><input id="sqSearch" placeholder="Search name or position…" oninput="filterSquad()" style="max-width:260px"></div>
   <div class="card" style="padding:0;overflow:hidden" id="sqList">
-    <div class="pl pl-h hide-m"><span>Pos</span><span>Rating</span><span>Player</span><span>Condition · morale</span><span>Form · season</span><span>Potential</span><span style="text-align:right">Value</span></div>
+    ${SQ_VIEW === 'stats' ? '' : '<div class="pl pl-h hide-m"><span>Pos</span><span>Rating</span><span>Player</span><span>Condition · morale</span><span>Form · season</span><span>Potential</span><span style="text-align:right">Value</span></div>'}
     ${body}</div>
   ${loanWatchCard()}
   <div class="small dim">Tap a player for his profile, talks, contract and transfer options. Rating colours: <span class="rb q1">35</span> <span class="rb q2">45</span> <span class="rb q3">55</span> <span class="rb q4">65</span> <span class="rb q5">75</span> <span class="rb q6">85</span> · ▲ shows improvement this season.</div>`;
 }
+// Every player's season in one table: appearances, minutes, goals, assists, average rating, man of
+// the match awards, passing, tackles, interceptions, dribbles and cards (from your matches).
+function squadStatsTable(list){
+  const td = (v, t) => `<td${t ? ` title="${t}"` : ''}>${v}</td>`;
+  return `<div style="overflow-x:auto"><table class="st stat-tbl"><thead><tr><th>Pos</th><th style="text-align:left">Player</th><th>Apps</th><th>Min</th><th>G</th><th>A</th><th>Avg</th><th>⭐</th><th>Pass %</th><th>Tkl</th><th>Int</th><th>Drb</th><th>🟨</th><th>🟥</th></tr></thead><tbody>${list.map(p => {
+    const ss = p.seasonStats || {}, tl = ss.tl || null, avg = avgRating(p);
+    return `<tr class="pl" data-s="${esc(p.name.toLowerCase())} ${esc(p.position.toLowerCase())}" onclick="showPlayer(${p.id})" style="cursor:pointer">${td(posPill(p.position))}<td style="text-align:left;white-space:nowrap"><b>${esc(p.name)}</b></td>
+      ${td(`${ss.apps || 0}${ss.subApps ? `<span class="dim">+${ss.subApps}</span>` : ''}`)}${td(ss.minutes || 0)}${td(ss.goals || 0)}${td(ss.assists || 0)}${td(avg != null ? rb10(avg) : '<span class="dim">–</span>')}${td(ss.motm || 0, 'Man of the match')}
+      ${td(tl && tl.p ? `${Math.round(tl.c / tl.p * 100)}<span class="dim small"> ${tl.c}/${tl.p}</span>` : '<span class="dim">–</span>')}${td(tl ? tl.t : '–')}${td(tl ? tl.i : '–')}${td(tl ? tl.d : '–')}${td(ss.yellows || 0)}${td(ss.reds || 0)}</tr>`;
+  }).join('')}</tbody></table></div><div class="small dim" style="padding:8px 10px">Ratings, man of the match, passing, tackles, interceptions and dribbles come from your matches this season.</div>`;
+}
 function filterSquad(){
   const q = (document.getElementById('sqSearch').value || '').toLowerCase();
-  document.querySelectorAll('#sqList .pl').forEach(r => { if (!r.classList.contains('pl-h')) r.style.display = (r.dataset.s || '').includes(q) ? '' : 'none'; });
+  document.querySelectorAll('#sqList .pl').forEach(r => { if (!r.classList.contains('pl-h')) r.style.display = (r.dataset.s || '').includes(q) ? '' : 'none'; });   // list rows and stats rows
 }
 function filterRows(tableId, inputId){
   const s = (document.getElementById(inputId).value || '').toLowerCase();
@@ -1623,6 +1682,8 @@ async function showPlayer(id){
     ${Object.keys(a).length ? `<div class="g2" style="margin-bottom:12px;align-items:center"><div style="text-align:center">${radar(a)}</div><div>${Object.entries(a).map(([k, v]) => `<div class="row" style="gap:6px;margin-bottom:5px"><span style="font-family:var(--fm);font-size:9px;color:var(--dim);width:72px">${k.toUpperCase()}</span><span class="mini" style="flex:1;height:8px;margin:0"><span style="width:${v}%;background:${v >= 75 ? '#0fa3a3' : v >= 65 ? '#2e9e4f' : v >= 55 ? '#c79a12' : v >= 45 ? '#b3541e' : '#5a6678'}"></span></span><b style="font-family:var(--fm);font-size:12px;width:30px;text-align:right">${p.fog ? '~' : ''}${v}</b></div>`).join('')}${p.form != null || p.progress ? `<div class="small dim mt8">${p.form != null ? `Form ${rb10(p.form)} ` : ''}${progressTag(p)}</div>` : ''}</div></div>` : '<div class="small dim" style="margin-bottom:12px">Attributes unknown — scout him to see them.</div>'}
     ${extra ? `<div class="small dim" style="margin-bottom:10px">Agent: <b style="color:var(--tx)">${esc(extra.agent.name)}</b> (${esc(extra.agent.style)}) · ${extra.caps} caps${extra.askFee ? ` · asking price ~${money(extra.askFee)}` : ''}${extra.blocked ? ' · <b style="color:var(--rd)">talks blocked</b>' : ''}</div>` : ''}
     <div class="g4" style="margin-bottom:12px">${[['Condition', p.fit + '%'], ['Morale', p.mor], ['Contract', p.contractYears + ' yr'], ['Value', money(p.marketValue)], ['Career apps', p.apps + (p.subApps ? '+' + p.subApps : '')], ['Goals', p.goals], ['Assists', p.assists], ['Wage', money(p.weeklyWage) + '/wk']].map(([l, v]) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`).join('')}</div>
+    ${playerStatsCard(p)}
+    <div id="plHonours"></div>
     <div class="small dim" style="margin-bottom:${p.growth ? 6 : 12}px">Development outlook: <b style="color:var(--tx)">${esc(p.hint)}</b></div>
     ${p.growth ? `<div class="card" style="padding:10px;margin-bottom:12px"><div class="ch" style="margin-bottom:6px">What drives his development <span class="small dim">× speed of growth</span></div>
       <div class="hs-grid">${p.growth.map(([k, m]) => `<span class="chip" style="cursor:default;${m >= 1.04 ? 'border-color:var(--gr);color:var(--gr)' : m <= 0.96 ? 'border-color:var(--rd);color:var(--rd)' : ''}">${esc(k)} <b>${m >= 1 ? '+' : ''}${Math.round((m - 1) * 100)}%</b></span>`).join('')}</div>
@@ -1632,8 +1693,27 @@ async function showPlayer(id){
     ${!mine ? `<button class="btn bp bsm" onclick="openBid(${p.id})">${p.fromClubId ? 'Make offer' : 'Sign free agent'}</button>${p.loanAvailable && p.fromClubId ? `<button class="btn bs bsm" onclick="openLoan(${p.id})">Loan</button>` : ''}${p.fog && !(extra && extra.scouting) ? `<button class="btn bs bsm" onclick="scoutPlayer(${p.id})">🔭 Scout</button>` : ''}` : ''}
     <button class="btn bg bsm" onclick="promptRename('player', ${p.id}, '${esc(p.name).replace(/'/g, "\'")}')">Rename</button>
     <button class="btn bg bsm" onclick="closeMo('genMo')">Close</button></div>`;
+  loadHonours(p.id);
 }
 
+// The profile's statistics: this season (with the match-by-match detail from your matches) and his career.
+function playerStatsCard(p){
+  const ss = p.seasonStats || {}, tl = ss.tl || null, avg = avgRating(p);
+  const cell = (l, v) => `<div class="kpi"><div class="kpi-v" style="font-size:15px">${v}</div><div class="kpi-l">${l}</div></div>`;
+  const season = [['Apps', `${ss.apps || 0}${ss.subApps ? '+' + ss.subApps : ''}`], ['Minutes', ss.minutes || 0], ['Goals', ss.goals || 0], ['Assists', ss.assists || 0], ['Avg rating', avg != null ? avg.toFixed(2) : '–'], ['Man of the match', ss.motm || 0],
+    ['Passes', tl && tl.p ? `${tl.c}/${tl.p} · ${Math.round(tl.c / tl.p * 100)}%` : '–'], ['Tackles', tl ? tl.t : '–'], ['Interceptions', tl ? tl.i : '–'], ['Dribbles', tl ? tl.d : '–'], ['Yellow cards', ss.yellows || 0], ['Red cards', ss.reds || 0]];
+  const career = [['Appearances', `${p.apps || 0}${p.subApps ? '+' + p.subApps : ''}`], ['Goals', p.goals || 0], ['Assists', p.assists || 0], ['Man of the match', p.motm || 0], ['Trophies', p.trophies || 0], ['Individual awards', p.awards || 0], ['Caps', p.caps || 0]];
+  return `<div class="card" style="padding:10px;margin-bottom:12px"><div class="ch" style="margin-bottom:6px">This season</div><div class="g4">${season.map(([l, v]) => cell(l, v)).join('')}</div>
+    <div class="ch" style="margin:10px 0 6px">Career</div><div class="g4">${career.map(([l, v]) => cell(l, v)).join('')}</div></div>`;
+}
+// Honours and awards (from the history archive): titles, Player of the Season, Golden Boot, Golden Ball…
+async function loadHonours(id){
+  const box = document.getElementById('plHonours'); if (!box) return;
+  const h = await api('/api/hist/player/' + id);
+  if (!h || !h.ok || !document.getElementById('plHonours')) return;
+  const list = h.honours || [];
+  box.innerHTML = `<div class="card" style="padding:10px;margin-bottom:12px"><div class="ch" style="margin-bottom:6px">Honours &amp; awards</div>${list.length ? `<div class="hs-grid">${list.map(x => `<span class="chip" style="cursor:default">${/Golden Ball/.test(x.title) ? '🌟' : /Player of the season|Golden|Young/.test(x.title) ? '🏅' : '🏆'} ${esc(x.title)}${x.comp ? ` · ${esc(x.comp)}` : ''} <b>${x.season}/${String(x.season + 1).slice(-2)}</b></span>`).join('')}</div>` : '<div class="small dim">No honours yet.</div>'}</div>`;
+}
 async function openRenew(id){ return openTalks(id); }
 async function sellPlayer(id){
   if (!confirm('Sell to the best of up to three offers now?')) return;
@@ -1746,7 +1826,7 @@ function rLineup(){
     const p = s.playerId ? sqById(s.playerId) : null;
     return `<button class="pslot ${manual.has(s.slotKey) ? 'manual' : ''} ${p ? '' : 'empty'}" onclick="openPicker('xi','${s.slotKey}')">
       <div class="sl">${esc(s.slot)}${manual.has(s.slotKey) ? ' · yours' : ''}</div><div class="nm" title="${esc(s.playerName || '')}">${esc(s.playerName ? (l.length > 3 ? s.playerName.split(' ').slice(1).join(' ') || s.playerName : s.playerName) : 'Empty')}</div>
-      ${p ? `<div class="pmeta">${rb(s.slotRating)}<span style="color:${fitColor(s.fit)}">${s.fit}%</span>${p.form != null ? rb10(p.form) : ''}</div>${p.position !== s.slot ? `<div class="small" style="color:var(--or)">plays ${esc(p.position)}</div>` : ''}` : '<div class="small dim">tap to pick</div>'}
+      ${p ? `<div class="pmeta">${rb(s.slotRating)}<span style="color:${fitColor(s.fit)}">${s.fit}%</span>${p.form != null ? rb10(p.form) : ''}</div>${p.position !== s.slot ? `<div class="small" style="color:var(--or)">${p.ovr} as ${esc(p.position)} · ${s.slotRating} here</div>` : ''}` : '<div class="small dim">tap to pick</div>'}
     </button>`;
   };
   const inSquad = new Set([...filled.map(s => s.playerId), ...bench.map(b => b.playerId)]);
@@ -1886,16 +1966,24 @@ function cancelSub(offId){ HT.subs = HT.subs.filter(s => s.offId !== offId); ren
 
 // ── TACTICS ─────────────────────────────────────────────────────────
 // Team instructions on top of the style (src/engine/matchEngine.js instrMods).
-const INSTR_UI = [
-  ['line', 'Defensive line', [['deep', 'Deep'], ['normal', 'Normal'], ['high', 'High']]],
-  ['width', 'Width', [['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide']]],
-  ['tempo', 'Tempo', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]],
-];
+const INSTR_UI = [['line', 'Defensive line', 'Deep', 'High'], ['width', 'Width', 'Narrow', 'Wide'], ['tempo', 'Tempo', 'Slow', 'Fast']];
+const INSTR_WORD = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
+const instrVal = v => (typeof v === 'string' && INSTR_WORD[v] != null ? INSTR_WORD[v] : Number.isFinite(Number(v)) && v !== null && v !== '' ? Math.max(0, Math.min(100, Number(v))) : 50);
 const INSTR_HELP = {
-  line: { deep: 'Fewer clear chances against you, but more pressure and fewer bodies forward.', normal: 'A balanced line.', high: 'Squeezes the pitch and wins the ball higher — but quick forwards get in behind. Best with fast defenders.' },
-  width: { narrow: 'Crowds the middle: concedes less, creates a little less, better-quality chances.', normal: 'Balanced width.', wide: 'Stretches them through the wings — more chances, especially against weak full-backs, and a little more space for them.' },
-  tempo: { slow: 'Keeps the ball and picks better chances; fewer attacks, fresher legs.', normal: 'Balanced tempo.', fast: 'More, quicker attacks and an open game — tires players faster.' },
+  line: ['Fewer clear chances against you, but more pressure and fewer bodies forward.', 'A balanced line.', 'Squeezes the pitch and wins the ball higher — but quick forwards get in behind. Best with fast defenders.'],
+  width: ['Crowds the middle: concedes less, creates a little less, better-quality chances.', 'Balanced width.', 'Stretches them through the wings — more chances, especially against weak full-backs, and a little more space for them.'],
+  tempo: ['Keeps the ball and picks better chances; fewer attacks, fresher legs.', 'Balanced tempo.', 'More, quicker attacks and an open game — tires players faster.'],
 };
+function instrHelp(key, v){
+  const d = Math.abs(v - 50), how = d >= 40 ? 'Very much so: ' : d >= 25 ? '' : d > 5 ? 'Slightly: ' : '';
+  return d <= 5 ? INSTR_HELP[key][1] : how + INSTR_HELP[key][v < 50 ? 0 : 2];
+}
+// A slider row: 0–100, 50 is normal. preview() updates the text while dragging; the value is saved on release.
+function instrSlider(key, label, lo, hi, v, idPrefix, onchange){
+  return `<label class="lbl">${label} <b id="${idPrefix}v_${key}">${v}</b></label>
+    <div class="row" style="align-items:center;gap:8px;flex-wrap:nowrap"><span class="small dim">${lo}</span><input type="range" id="${idPrefix}${key}" min="0" max="100" step="5" value="${v}" style="flex:1;min-width:0" oninput="document.getElementById('${idPrefix}v_${key}').textContent=this.value;document.getElementById('${idPrefix}h_${key}').textContent=instrHelp('${key}',+this.value)" ${onchange ? `onchange="${onchange}"` : ''}><span class="small dim">${hi}</span></div>
+    <div class="small dim" id="${idPrefix}h_${key}" style="margin-bottom:10px">${instrHelp(key, v)}</div>`;
+}
 function rTactics(){
   const desc = { high_press: 'Win the ball high. More chances, tires players faster.', counter: 'Absorb pressure and break quickly.', possession: 'Control the tempo and keep the ball.', low_block: 'Sit deep and compact. Least tiring.' };
   return `<div class="sct">Tactics & Training</div><div class="g2">
@@ -1903,7 +1991,7 @@ function rTactics(){
       <div class="ch mt12">Formation</div><div class="row">${STATE.formations.map(f => `<button class="btn bsm ${STATE.formation === f ? 'bact' : 'bg'}" onclick="setTac('formation','${f}')">${f}</button>`).join('')}</div>
       <div class="small dim mt8">Changing formation resets slot picks that no longer exist.</div>
       <div class="ch mt12">Instructions</div>
-      ${INSTR_UI.map(([key, label, opts]) => `<label class="lbl">${label}</label><div class="row" style="margin-bottom:4px">${opts.map(([v, l]) => `<button class="btn bsm ${((STATE.instructions || {})[key] || 'normal') === v ? 'bact' : 'bg'}" onclick="setTac('${key}','${v}')">${l}</button>`).join('')}</div><div class="small dim" style="margin-bottom:10px">${INSTR_HELP[key][(STATE.instructions || {})[key] || 'normal']}</div>`).join('')}</div>
+      ${INSTR_UI.map(([key, label, lo, hi]) => instrSlider(key, label, lo, hi, instrVal((STATE.instructions || {})[key]), 'ti_', `setTac('${key}', Number(this.value))`)).join('')}</div>
     <div class="card"><div class="ch">Training (automatic)</div>
       <div class="small dim" style="margin-bottom:10px">Training runs itself every week for the whole squad. Change these only if you want to steer it.</div>
       <label class="lbl">Focus</label><div class="row" style="margin-bottom:12px">${STATE.trainingFocuses.map(f => `<button class="btn bsm ${STATE.trainingFocus === f ? 'bact' : 'bg'}" onclick="setTac('trainingFocus','${f}')">${f}</button>`).join('')}</div>
@@ -2431,7 +2519,7 @@ async function acceptSponsor(i){
 
 // ── shell ───────────────────────────────────────────────────────────
 function openMo(id){ document.getElementById(id).classList.remove('hidden'); }
-function closeMo(id){ document.getElementById(id).classList.add('hidden'); }
+function closeMo(id){ document.getElementById(id).classList.add('hidden'); if (id === 'genMo') stopAward(); }
 document.getElementById('genMo').addEventListener('click', e => { if (e.target.id === 'genMo' && !STATE?.liveMatch) closeMo('genMo'); });
 function notify(msg, type = 'i'){
   const nc = document.getElementById('notif');
@@ -2459,7 +2547,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) naviga
 function sfx(name){ try { if (PREFS.sound !== false && window.GafferSound) window.GafferSound.play(name, PREFS.volume ?? 0.6); } catch {} }
 function crowd(on){ try { if (window.GafferSound) window.GafferSound.crowd(on && PREFS.sound !== false, PREFS.volume ?? 0.6); } catch {} }
 function toggleCommentary(){ PREFS.speech = PREFS.speech === false; savePrefs(); applyAudioPrefs(); if (PREFS.speech === false) { try { window.GafferCommentary.stop(); } catch {} } const b = document.getElementById('mvComm'); if (b) b.textContent = PREFS.speech === false ? '🎙 Off' : '🎙 On'; }
-function toggleSound(){ PREFS.sound = PREFS.sound === false; savePrefs(); if (PREFS.sound === false) { crowd(false); audioStop(); } else sfx('click'); notify(PREFS.sound === false ? 'Sound off' : 'Sound on', 'i'); }
+function toggleSound(){ PREFS.sound = PREFS.sound === false; savePrefs(); applyAudioPrefs(); if (PREFS.sound === false) { crowd(false); try { window.speechSynthesis && speechSynthesis.cancel(); } catch {} } else sfx('click'); notify(PREFS.sound === false ? 'Sound off' : 'Sound on', 'i'); }
 
 // ── install as an app (PWA) ──
 // Chrome, Edge and Android fire beforeinstallprompt: we keep it and show our own Install buttons.

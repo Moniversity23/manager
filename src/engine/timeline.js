@@ -29,9 +29,11 @@ const PASS_GAP = { possession: [4, 7], high_press: [3, 6], counter: [2.5, 5], lo
 const SPELL_MEAN = { possession: 34, high_press: 24, counter: 18, low_block: 22 };
 // Team instructions (matchEngine): tempo changes passing speed and how long a side keeps the ball;
 // width changes who gets it.
-const TEMPO_GAP = { fast: 0.8, slow: 1.22 };
-const TEMPO_TILT = { slow: 0.03, fast: -0.02 };
-const instrOf = (m, side) => m[side].instr || {};                      // seconds a spell lasts on average
+const WORD_VALUE = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
+const slide = v => { if (v == null || v === '') return 0; const n = typeof v === 'string' ? (WORD_VALUE[v] ?? Number(v)) : Number(v); return Number.isFinite(n) ? (Math.max(0, Math.min(100, n)) - 50) / 30 : 0; };   // 80 → 1, 20 → −1
+const instrOf = (m, side) => { const x = m[side].instr || {}; return { line: slide(x.line), width: slide(x.width), tempo: slide(x.tempo) }; };
+const tempoGap = t => (t > 0 ? 1 - 0.2 * t : 1 - 0.22 * t);        // fast passes come sooner
+const tempoTilt = t => (t > 0 ? -0.02 * t : -0.03 * t);           // slow sides keep the ball longer                      // seconds a spell lasts on average
 const TYPES = ['KICKOFF', 'PASS', 'INTERCEPTION', 'TACKLE', 'FOUL', 'FREE_KICK', 'SHOT', 'GOAL', 'SAVE', 'GOAL_KICK', 'YELLOW', 'RED', 'INJURY', 'SUB', 'HALF_TIME', 'FULL_TIME', 'RECOVERY', 'THROW_IN', 'DRIBBLE'];   // new types go on the end (packed by index)
 const other = s => (s === 'home' ? 'away' : 'home');
 
@@ -80,7 +82,7 @@ function possessionShare(m, ctx) {
   };
   const h = mid('home'), a = mid('away');
   let share = 0.5 + (h - a) / 160 + (POSSESSION_TILT[m.home.tactic] || 0) - (POSSESSION_TILT[m.away.tactic] || 0)
-    + (TEMPO_TILT[instrOf(m, 'home').tempo] || 0) - (TEMPO_TILT[instrOf(m, 'away').tempo] || 0);
+    + tempoTilt(instrOf(m, 'home').tempo) - tempoTilt(instrOf(m, 'away').tempo);
   if (!m.neutral) share += 0.02;
   return clamp(share, 0.3, 0.7);
 }
@@ -106,7 +108,7 @@ function extend(m, ctx, from, to) {
   const slotIndex = (side, t, id) => { const list = players(side, t); const slot = list.find(x => x[0] === id)?.[1]; return [slot, list.filter(x => x[1] === slot).findIndex(x => x[0] === id)]; };
   const posOf = (side, t, id, adv) => { const [slot, k] = slotIndex(side, t, id); return spot(side, slot || 'CM', Math.max(0, k), adv, rng); };
   // Width: a wide side plays it to its wingers and full-backs more, a narrow one less.
-  const widthWeight = (side, slot) => (['LW', 'RW', 'LB', 'RB'].includes(slot) ? ({ wide: 1.35, narrow: 0.7 }[instrOf(m, side).width] || 1) : 1);
+  const widthWeight = (side, slot) => { if (!['LW', 'RW', 'LB', 'RB'].includes(slot)) return 1; const w = instrOf(m, side).width; return Math.max(0.4, w > 0 ? 1 + 0.35 * w : 1 + 0.3 * w); };
   const pickReceiver = (side, t, fromId, attack) => {
     const list = players(side, t).filter(([id]) => id !== fromId);
     const fromSlot = lineupAt(m, side, t).get(fromId) || 'CM';
@@ -199,7 +201,7 @@ function extend(m, ctx, from, to) {
     let spellLeft = tl.spellLeft ?? 20;
     while (t < t1) {
       const tac = m[tl.poss].tactic, gap = PASS_GAP[tac] || [3, 6];
-      t += rng.float(gap[0], gap[1]) * (TEMPO_GAP[instrOf(m, tl.poss).tempo] || 1);
+      t += rng.float(gap[0], gap[1]) * Math.max(0.6, tempoGap(instrOf(m, tl.poss).tempo));
       if (t >= t1) break;
       spellLeft -= t - (tl.lastT ?? t0); tl.lastT = t;
       if (tl.holder == null) changePossession(t, tl.poss, centre(tl.poss, t));

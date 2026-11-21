@@ -33,6 +33,8 @@ const CH = require('./engine/challengeEngine');
 const H = require('./engine/historyEngine');
 const TL = require('./engine/timeline');
 const LOOK = require('./look');
+const { mergeForRenderer } = require('./studio/appearanceService');
+const KITS = require('./studio/kits');
 const REGIONAL = require('./engine/regionalEngine');
 const RENAMES = require('./data/renames.json');
 const { migrate, SAVE_VERSION } = require('./migrations');
@@ -505,7 +507,8 @@ class GameWorld {
         if (b.clause) { this.notify('bid', `🔓 ${this.clubById(b.clubId).name} triggered ${b.playerName}'s release clause ($${Math.round(b.fee / 1000)}K). He has gone.`); continue; }
         if (this.manager.delegate && this.manager.delegate.bids && this._autoBid(b)) continue;
         const p = this.players.get(b.playerId);
-        this.notify('bid', `💰 ${this.clubById(b.clubId).name} bid $${Math.round(b.fee / 1000)}K for ${p.name}${b.unsolicited ? ' (not listed)' : ''}.`, { bidId: b.id });
+        if (b.outbid != null) this.notify('bid', `📈 Bidding war: ${this.clubById(b.clubId).name} top ${this.clubById(b.outbid).name}'s offer for ${p.name} with $${Math.round(b.fee / 1000)}K.`, { bidId: b.id });
+        else this.notify('bid', `💰 ${this.clubById(b.clubId).name} bid $${Math.round(b.fee / 1000)}K for ${p.name}${b.unsolicited ? ' (not listed)' : ''}.`, { bidId: b.id });
       }
     } else if (this.pendingBids.length) this.pendingBids = [];
 
@@ -532,6 +535,8 @@ class GameWorld {
         const p = this.players.get(x.playerId);
         if (!p) continue;
         p.seasonStats.rs = (p.seasonStats.rs || 0) + x.rating; p.seasonStats.rn = (p.seasonStats.rn || 0) + 1;
+        if (rep.motm && rep.motm.playerId === p.id) { p.seasonStats.motm = (p.seasonStats.motm || 0) + 1; p.history.motm = (p.history.motm || 0) + 1; }
+        if (x.st) { const t = p.seasonStats.tl || (p.seasonStats.tl = { p: 0, c: 0, t: 0, i: 0, d: 0 }); for (const k of ['p', 'c', 't', 'i', 'd']) t[k] += x.st[k] || 0; }
         if (side === rep.myKey && p.clubId === me.id) p.ratings = [...(p.ratings || []), x.rating].slice(-5);
       }
       H.recordMatch(this, rep);
@@ -717,7 +722,7 @@ class GameWorld {
   _sponsorOffers() {
     const club = this.club();
     if (club.sponsor && club.sponsor.years > 0) { this.sponsorOffers = null; return; }
-    const base = Math.max(40_000, club.finance.sponsorship || 60_000) * (1 + club.prestige / 200);
+    const base = FIN.sponsorValue(club, this.econ || 1);   // the club's market value, not the last deal (no compounding)
     const brands = ['Apex Logistics', 'Northwind Air', 'Bluefin Bank', 'Kora Telecom', 'Sunrise Foods', 'Vela Energy', 'Ironleaf Tools', 'Marlow Motors', 'Okapi Mobile', 'Harbourline Shipping', 'Tidewater Insurance', 'Brightpath Fintech'];
     const names = this.rng.shuffle(brands).slice(0, 3);
     this.sponsorOffers = [[1, 1.15, 0, 0], [2, 1.05, 0.2, 0.1], [3, 0.95, 0.35, 0.2]].map(([years, f, bp, bt], i) => {
@@ -829,7 +834,7 @@ class GameWorld {
         c.fanMood = clamp(c.fanMood + (pos <= 3 ? 8 : topHalf ? 2 : -6), 0, 100);
         c.prestige = clamp(c.prestige + (pos === 1 ? 4 : pos <= 3 ? 2 : topHalf ? 0 : -2), 1, 99);
         c.boardTrust = clamp(c.boardTrust + (topHalf ? 5 : -8) + (c.finance.balance < 0 ? -6 : 0), 0, 100);
-        c.finance.sponsorship = Math.round(c.finance.sponsorship * (1 + (pos <= 3 ? 0.05 : pos > size - 3 ? -0.03 : 0.01)));
+        if (!(c.sponsor && c.sponsor.years > 0)) c.finance.sponsorship = Math.round(c.finance.sponsorship + (FIN.sponsorValue(c) - c.finance.sponsorship) * 0.5);
       });
     }
 
@@ -840,11 +845,11 @@ class GameWorld {
     if (myRow && myRow.l === 0) AW.unlock(this, 'unbeaten');
     if (myIdx === 0) AW.unlock(this, 'title');
     const myAwards = AW.seasonAwards(this, finalTables);
-    if (myAwards) { summary.awards = myAwards; this.notify('awards', `🏅 ${myLeague.name} awards — Player of the season: ${myAwards.playerOfSeason.name} (${myAwards.playerOfSeason.club}); Golden Boot: ${myAwards.goldenBoot.name} (${myAwards.goldenBoot.goals}).`); }
+    if (myAwards) { summary.awards = { ...myAwards, playerOfSeason: myAwards.playerOfSeason && myAwards.playerOfSeason.id != null ? { ...myAwards.playerOfSeason, ...this._ceremonyLook(myAwards.playerOfSeason.id) } : myAwards.playerOfSeason }; this.notify('awards', `🏅 ${myLeague.name} awards — Player of the season: ${myAwards.playerOfSeason.name} (${myAwards.playerOfSeason.club}); Golden Boot: ${myAwards.goldenBoot.name} (${myAwards.goldenBoot.goals}).`); }
 
     const golden = AW.worldAwards(this, finalTables, this.history.continentalWinners.filter(x => x.season === this.season).map(x => x.clubId));
     if (golden) {
-      summary.goldenBall = golden.winner;
+      summary.goldenBall = { ...golden.winner, ...this._ceremonyLook(golden.winner.id) };
       this.notify('awards', `🏆 Golden Ball ${this.season}: ${golden.winner.name} (${golden.winner.club}) — ${golden.winner.goals} goals, ${golden.winner.assists} assists. Golden Boot: ${golden.goldenBoot.name} (${golden.goldenBoot.goals}).`);
       NEWS.story(this, 'awards', `${golden.winner.name} wins the Golden Ball`, `${golden.winner.name} of ${golden.winner.club} is the world's player of the year, ahead of ${golden.top.slice(1, 3).map(x => x.name).join(' and ')}.`, [golden.winner.clubId]);
       if (golden.winner.clubId === me.id) this.notify('trophy', `🌟 Your player ${golden.winner.name} won the Golden Ball!`);
@@ -1063,7 +1068,7 @@ class GameWorld {
       c.lastXI = null;
     }
     if (d.trainingFocus && TRAINING_FOCUS.includes(d.trainingFocus)) c.trainingFocus = d.trainingFocus;
-    for (const k of ['line', 'width', 'tempo']) if (d[k] && ME.INSTRUCTIONS[k].includes(d[k])) c.instructions = { ...ME.normInstr(c.instructions), [k]: d[k] };
+    for (const k of ['line', 'width', 'tempo']) if (d[k] != null && d[k] !== '' && (typeof d[k] === 'number' || ME.INSTRUCTIONS[k].includes(d[k]) || /^\d{1,3}$/.test(String(d[k])))) c.instructions = { ...ME.normInstr(c.instructions), [k]: ME.instrValue(d[k]) };
     if (d.trainingIntensity !== undefined && d.trainingIntensity !== null) c.trainingIntensity = clamp(parseInt(d.trainingIntensity, 10) || 3, 1, 5);
     return { ok: true };
   }
@@ -1895,7 +1900,7 @@ class GameWorld {
       hg: r.hg, ag: r.ag, pens: r.pens, hx: r.hx, ax: r.ax, hs: r.hs, as: r.as, pos: r.pos,
       homeGoals: r.hg, awayGoals: r.ag, ourClub: this.club().name, result, myKey, events,
       halftime: applied ? { subs: applied.subs, tactic: applied.tactic, formation: applied.formation, talk: applied.talk || null } : null,
-      lineups: this._lineups(m), ratings, motm: ratings.motm, formations: { home: m.home.formation, away: m.away.formation },
+      lineups: this._lineups(m), ratings, motm: ratings.motm ? { ...ratings.motm, ...this._ceremonyLook(ratings.motm.playerId) } : null, formations: { home: m.home.formation, away: m.away.formation },
       timeline: m.tl ? TL.pack(m) : null, ts: r.ts || null,
     };
   }
@@ -1940,17 +1945,18 @@ class GameWorld {
 
   // Starting XIs and club colours for the 2D match view.
   _lineups(m) {
-    const side = key => m[key].startXI.map(s => { const p = this.players.get(s.playerId); return { slotKey: s.slotKey, slot: s.slotKey.split('-')[0], playerId: s.playerId, name: p ? p.name : '?', look: p && p.look != null ? LOOK.describe(p.look, p.age) : null }; });
+    const side = key => m[key].startXI.map(s => { const p = this.players.get(s.playerId); return { slotKey: s.slotKey, slot: s.slotKey.split('-')[0], playerId: s.playerId, name: p ? p.name : '?', look: p ? mergeForRenderer(p) : null, rt: p ? Math.round(positionAbility(p, s.slotKey.split('-')[0])) : null, ovr: p ? Math.round(p.currentAbility) : null }; });
     const hue = id => (id * 137) % 360;
     const h = hue(m.home.clubId), a = hue(m.away.clubId);
     // Looks for the substitutes too, so a player coming on appears as himself.
     const looks = {};
-    for (const id of [...(m.home.bench || []), ...(m.away.bench || [])]) { const p = this.players.get(id); if (p && p.look != null) looks[id] = { ...LOOK.describe(p.look, p.age), gk: p.position === 'GK' }; }
+    for (const id of [...(m.home.bench || []), ...(m.away.bench || [])]) { const p = this.players.get(id); if (p) looks[id] = { ...mergeForRenderer(p), gk: p.position === 'GK', ovr: Math.round(p.currentAbility) }; }
     // Expected crowd for the announcer (same formula as the gate receipts, without posting money).
     const hc = this.clubById(m.home.clubId), ac = this.clubById(m.away.clubId);
     const attendance = hc && hc.facilities ? Math.round(Math.max(500, hc.facilities.stadium || 1000) * clamp((0.3 + hc.fanMood / 220 + hc.prestige / 260 + (ac ? ac.prestige : 30) / 700) * (1 - 0.4 * (clamp(hc.ticketPrice || 1, 0.5, 2) - 1)), 0.1, 1)) : null;
     const capacity = hc && hc.facilities ? Math.max(500, hc.facilities.stadium || 1000) : null;
-    return { home: side('home'), away: side('away'), homeHue: h, awayHue: Math.abs(h - a) < 50 ? (a + 150) % 360 : a, looks, attendance, capacity };
+    const awayHue = Math.abs(h - a) < 50 ? (a + 150) % 360 : a;
+    return { home: side('home'), away: side('away'), homeHue: h, awayHue, looks, attendance, capacity, ...KITS.forMatch(hc, ac, h, awayHue) };
   }
 
   halftimeView() {
@@ -2272,7 +2278,35 @@ class GameWorld {
     if (!w.challenges) { CH.startSeason(w); if (!w.weekState) w._setNextChallenge(); }
     if (!w.manager.careerId) w.manager.careerId = `${w.seed}:${w.club().country}:${w.club().id}`;
     for (const c of w.clubs) if (!c.finance.period) FIN.openPeriod(c, w.season, w.currentWeek + 1, w._detailed(c));
+    w._repairSponsorship();
     return w;
+  }
+
+  // What a player looks like on the award podium: his own look and his club's home kit and badges.
+  _ceremonyLook(playerId) {
+    const p = this.players.get(playerId); if (!p) return {};
+    const c = this.clubById(p.clubId);
+    const kit = c ? KITS.kitsOf(c) : null;
+    return { look: mergeForRenderer(p), gk: p.position === 'GK', kit: kit ? { ...kit.home, gk: kit.gk } : null,
+      badge: c ? { sponsor: c.sponsor && c.sponsor.name ? c.sponsor.name : null, crest: { initials: KITS.initials(c.name), c1: kit.home.shirt, c2: kit.home.second } } : null };
+  }
+
+  // Older versions let shirt deals compound every season (some reached billions). A deal worth more
+  // than twice its division's ceiling is brought back to the club's market value; the money already
+  // earned stays in the bank. Idempotent: a sane deal is never touched.
+  _repairSponsorship() {
+    let fixed = 0;
+    for (const c of this.clubs) {
+      const cap = FIN.SPONSOR_CAP[Math.min(4, Math.max(1, c.division)) - 1] * 2;
+      if ((c.finance.sponsorship || 0) <= cap && !(c.sponsor && c.sponsor.perSeason > cap)) continue;
+      const fair = FIN.sponsorValue(c, this.econ || 1);
+      c.finance.sponsorship = fair;
+      c.finance.sponsorAdvance = Math.min(c.finance.sponsorAdvance || 0, Math.round(fair * 0.3));
+      if (c.sponsor) { c.sponsor.perSeason = fair; if (c.sponsor.bonus) c.sponsor.bonus = { promotion: Math.round(fair * 0.2 / 1000) * 1000, trophy: Math.round(fair * 0.1 / 1000) * 1000 }; }
+      fixed++;
+      if (c.id === this.manager.clubId) this.notify('finance', `🤝 Your shirt deal had grown far beyond its real value through an old bug. It now pays the market rate of $${Math.round(fair / 1000)}K a season. Money already earned is yours to keep.`);
+    }
+    return fixed;
   }
 }
 

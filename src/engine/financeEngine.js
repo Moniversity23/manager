@@ -19,6 +19,11 @@ const FACILITY_UPKEEP_PER_LEVEL = 15_000;   // per season, per level of training
 const SEAT_UPKEEP = 3;                      // per seat, per season
 const OVERDRAFT_RATE = 0.10;                // per season, on a negative balance
 const WEEKS = 32;
+// Shirt sponsorship: what a deal is worth is set by the club itself — division, prestige, fans and
+// stadium — never by the previous deal, so it cannot compound from one season to the next (it used
+// to, and reached billions). Capped per division.
+// Same scale as a new club's starting deal (models.js), so no club loses income it already had.
+const SPONSOR_CAP = [2_500_000, 1_200_000, 600_000, 300_000];
 const FACILITY_MAX = 10;
 const FACILITY_TYPES = ['training', 'youth', 'medical'];
 const DETAILED_KEEP = 60;
@@ -28,6 +33,13 @@ const divIdx = d => clamp((d || 1) - 1, 0, 3);
 
 function openPeriod(club, season, week, detailed) {
   club.finance.period = { season, week, opening: Math.round(club.finance.balance), items: {}, detailed: !!detailed, entries: detailed ? [] : undefined };
+}
+
+function sponsorValue(club, econ = 1) {
+  const d = divIdx(club.division), divMult = Math.max(0.15, 1 / (d + 1));
+  const fans = 0.85 + clamp(club.fanMood ?? 50, 0, 100) / 330;                       // 0.85 … 1.15
+  const v = 300_000 * divMult * (1 + clamp(club.prestige || 50, 1, 99) / 60) * fans * econ;
+  return Math.round(clamp(v, 25_000, SPONSOR_CAP[d]) / 1000) * 1000;
 }
 
 // The ONLY way money moves. amount > 0 is income, < 0 is a cost.
@@ -189,5 +201,5 @@ module.exports = {
   openPeriod, post, closePeriod, syncBudgets, weeklyPostings, gateReceipts, prizeMoney,
   weeklyWageBill, upkeepPerSeason, facilityUpgradeCost, upgradeFacility, aiInvest,
   debtReview, spendingFrozen, gateEstimate, FACILITY_MAX, FACILITY_TYPES, TV_PER_SEASON, MANAGER_SALARY_WEEK, DIVISION_WAGE, WEEKS, TICKET_PRICE,
-  BACKROOM_PER_SEASON, PRIZE_PER_PLACE,
+  BACKROOM_PER_SEASON, PRIZE_PER_PLACE, sponsorValue, SPONSOR_CAP,
 };

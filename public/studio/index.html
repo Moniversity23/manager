@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gaffer Player Studio</title>
+<link rel="stylesheet" href="css/studio.css"><link rel="stylesheet" href="css/modern.css"></head>
+<body>
+<header class="topbar">
+  <a class="back" href="../" title="Back to the game">← Game</a>
+  <div class="brand"><span>THE GAFFER</span><strong>PLAYER STUDIO</strong></div>
+  <nav id="tabs"><button data-tab="creator" class="active">Create</button><button data-tab="appearance">Appearance</button><button data-tab="kit">Kits</button><button data-tab="animation">Animation</button><button data-tab="library">Library</button></nav>
+  <div class="actions"><button id="undo" title="Undo">↶</button><button id="redo" title="Redo">↷</button><button id="saveBtn" class="primary">Save</button></div>
+</header>
+<main>
+  <aside class="left panel">
+    <div class="pane" data-pane="creator">
+      <label>Describe a footballer<textarea id="description" rows="6">Create a 17-year-old Nigerian striker, 183 cm tall, athletic build, dark skin, short curly low-fade hairstyle, realistic facial features, brown eyes, broad shoulders, strong legs, clean-shaven, wearing a red and white kit.</textarea></label>
+      <button id="generate" class="primary wide">Generate footballer</button>
+      <p class="hint">Made on this device: no internet connection or paid AI service is needed. The same description always gives the same player.</p>
+      <section><h3>Identity</h3><div class="grid">
+        <label>Name<input id="name" value="New Footballer" maxlength="80"></label>
+        <label>Age<input id="age" type="number" min="15" max="45" value="17"></label>
+        <label>Position<select id="position"><option>GK</option><option>CB</option><option>LB</option><option>RB</option><option>CDM</option><option>CM</option><option>CAM</option><option>LW</option><option>RW</option><option selected>ST</option><option>CF</option></select></label>
+        <label>Nation<input id="nation" value="Nigeria" maxlength="40"></label>
+      </div></section>
+      <section><h3>New variation</h3>
+        <p class="hint">Keep the ticked features and generate the rest again.</p>
+        <div class="locks" id="locks"></div>
+        <button id="regen" class="wide">Generate a variation</button>
+      </section>
+    </div>
+    <div class="pane" data-pane="appearance" hidden>
+      <section><h3>Skin &amp; face</h3><div id="faceControls"></div></section>
+      <section><h3>Hair</h3><div id="hairControls"></div></section>
+      <section><h3>Body</h3><div id="bodyControls"></div></section>
+    </div>
+    <div class="pane" data-pane="kit" hidden>
+      <p class="hint" id="kitIntro">Design your club's kits. They are worn in your matches.</p>
+      <div class="seg" id="kitSlot"><button data-slot="home" class="on">Home</button><button data-slot="away">Away</button><button data-slot="third">Third</button><button data-slot="gk">Keeper</button></div>
+      <div id="kitFields"></div>
+      <section><h3>Shirt details</h3><div class="grid">
+        <label>Number<input id="kitNumber" type="number" min="1" max="99" value="9"></label>
+        <label>Name on back<input id="kitName" maxlength="14"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="kitShowNumber" checked> Show name and number</label>
+      <label class="check"><input type="checkbox" id="kitShowSponsor" checked> Show the shirt sponsor</label>
+      <label class="check"><input type="checkbox" id="kitShowCrest" checked> Show the club crest</label></section>
+      <button id="kitApply" class="primary wide">Save kits for my club</button>
+      <p class="hint" id="kitMsg"></p>
+    </div>
+    <div class="pane" data-pane="animation" hidden>
+      <p class="hint">Every clip runs on the same skeleton the match players use.</p>
+      <div id="clipList" class="clips"></div>
+      <label>Speed <span id="speedOut">1.0×</span><input id="speed" type="range" min="0.2" max="1.6" step="0.1" value="1"></label>
+    </div>
+    <div class="pane" data-pane="library" hidden>
+      <input id="search" placeholder="Search by name, nation or position" maxlength="60">
+      <div id="libraryList"></div>
+      <label class="import">Import a character (.json or .glb)<input id="importFile" type="file" accept=".json,.glb,application/json,model/gltf-binary"></label>
+    </div>
+  </aside>
+  <section class="viewer">
+    <div id="viewport"><div id="loading">Loading footballer…</div></div>
+    <div class="viewer-controls">
+      <button id="rotateL" title="Turn left">⟲</button><button id="rotateR" title="Turn right">⟳</button>
+      <button id="zoomIn" title="Zoom in">＋</button><button id="zoomOut" title="Zoom out">－</button>
+      <button id="focusFace">Face</button><button id="focusBody">Body</button>
+      <select id="background"><option value="#101722">Studio</option><option value="#274d38">Pitch</option><option value="#3a1a1a">Dark red</option><option value="#d8dee6">Light</option></select>
+    </div>
+  </section>
+  <aside class="right panel">
+    <h3>Character</h3>
+    <div id="status"></div>
+    <h3>Use in your career</h3>
+    <label>Player<select id="assignPlayer"><option value="">Loading your squad…</option></select></label>
+    <div class="row2"><button id="assignBtn" class="primary">Give him this look</button><button id="clearBtn">Use his own look</button></div>
+    <p class="hint" id="assignMsg">Only his appearance changes — never his ratings, contract, club or record.</p>
+    <h3>Files</h3>
+    <div class="row2"><button id="exportJson">Export .json</button><button id="exportGlb">Export .glb</button></div>
+    <div class="row2"><button id="duplicate">Duplicate</button><button id="deleteBtn" class="danger">Delete</button></div>
+  </aside>
+</main>
+<div id="toast" role="status"></div>
+<script src="../appearance.js"></script>
+<script type="module" src="js/app.js"></script>
+</body></html>

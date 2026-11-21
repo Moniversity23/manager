@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-20",
+  "updated": "2026-11-21",
   "policy": "Only licences allowing commercial use without payment. Add an entry before the asset is used.",
   "assets": [
     {
@@ -114,6 +114,20 @@
       "original": "npm package three",
       "processed": "public/vendor/jsm/utils/BufferGeometryUtils.js",
       "usage": "Needed by GLTFLoader",
+      "modifications": "Import paths"
+    },
+    {
+      "name": "three.js GLTFExporter",
+      "url": "https://github.com/mrdoob/three.js",
+      "creator": "three.js authors",
+      "licence": "MIT",
+      "commercialUse": true,
+      "attributionRequired": true,
+      "downloaded": "2026-11-21",
+      "sha256": "6df5187f886b74a18c32b5d41deae7c5fc8d9be93c11d15c6f3a644868286446",
+      "original": "npm package three",
+      "processed": "public/vendor/jsm/exporters/GLTFExporter.js",
+      "usage": "Player Studio .glb export",
       "modifications": "Import paths"
     },
     {

@@ -72,7 +72,7 @@ function seasonAwards(world, finalTables) {
     const a = {
       season: world.season, league: `${lg.country} ${lg.name}`, leagueId: lg.id,
       goldenBoot: { name: boot.p.name, club: boot.club.name, goals: boot.p.seasonStats.goals },
-      playerOfSeason: { name: pots.p.name, club: pots.club.name },
+      playerOfSeason: { id: pots.p.id, name: pots.p.name, club: pots.club.name, clubId: pots.club.id, goals: pots.p.seasonStats.goals, assists: pots.p.seasonStats.assists, apps: pots.p.seasonStats.apps },
       youngPlayer: young.p.age <= 21 ? { name: young.p.name, club: young.club.name, age: young.p.age } : null,
     };
     out.push(a);

@@ -31,8 +31,8 @@ const YOUTH_CAPS = { ovr: 55, attr: 75, wonderkidOvr: 60, wonderkidAttr: 82 };
 
 // Fields only some players/clubs have (dressing room, agents, scouting): saved only when set, so
 // 14,000 players do not carry empty keys and a save/load round trip stays identical.
-const PLAYER_OPTIONAL = ['releaseClause', 'promise', 'playLog', 'unhappy', 'unhappyWeeks', 'talkWeek', 'talksBlockedUntil', 'seasonStartAbility', 'ratings', 'career', 'moves', 'honours', 'look'];
-const CLUB_OPTIONAL = ['captainId', 'unbeatenRun', 'sackedSeason', 'managerName'];
+const PLAYER_OPTIONAL = ['releaseClause', 'promise', 'playLog', 'unhappy', 'unhappyWeeks', 'talkWeek', 'talksBlockedUntil', 'seasonStartAbility', 'ratings', 'career', 'moves', 'honours', 'look', 'studioProfile'];
+const CLUB_OPTIONAL = ['captainId', 'unbeatenRun', 'sackedSeason', 'managerName', 'kits'];
 function withOptional(obj, out, keys) {
   for (let i = 0; i < keys.length; i++) {
     const v = obj[keys[i]];
@@ -152,9 +152,10 @@ class Player {
       pers: this.personality, attrs,
       form: this.ratings && this.ratings.length ? Math.round(this.ratings.reduce((a, b) => a + b, 0) / this.ratings.length * 10) / 10 : null,
       progress: this.seasonStartAbility != null ? ovr - this.seasonStartAbility : null,
-      awards: this.history.awards || 0, caps: this.history.caps || 0,
+      awards: this.history.awards || 0, caps: this.history.caps || 0, motm: this.history.motm || 0,
       apps: this.history.appearances, subApps: this.history.subApps || 0,
       goals: this.history.goals, assists: this.history.assists, trophies: this.history.trophies,
+      studioProfile: this.studioProfile || null,
     };
   }
 }
