@@ -87,7 +87,7 @@ const server = http.createServer(async (req, res) => {
 
 async function shutdown(signal) {
   console.log(`\n${signal}: saving before exit…`);
-  try { await autoSave(); await store.flush(); } catch (e) { console.error('[shutdown]', e); }
+  try { await api.flush(); await autoSave(); await store.flush(); } catch (e) { console.error('[shutdown]', e); }
   process.exit(0);
 }
 process.on('SIGINT', () => shutdown('SIGINT'));

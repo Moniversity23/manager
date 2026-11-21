@@ -39,6 +39,7 @@
       longball: ['{player} goes long.', 'A long ball forward from {player}.'],
       tackle: ['Strong tackle from {player}.', 'Won back by {player} with a good challenge.', '{player} times that tackle perfectly.'],
       interception: ['{player} reads it and intercepts.', 'Cut out by {player}.', 'Good anticipation from {player}.'],
+      keepball: ['{club} keeping it nicely: {n} passes in this move.', 'Patient from {club}. That is {n} passes now.', '{club} are passing them around, {n} in a row.'],
     },
   };
   // Stadium announcer (the PA): spoken more slowly with a different voice, after a chime.
@@ -54,8 +55,8 @@
       full: 'Full-time: {home} {hs}, {away} {as}. Thank you for your support, and have a safe journey home.',
     },
   };
-  const PRIORITY = { goal: 10, score: 9, full: 9, half: 8, red: 8, woodwork: 7, save: 7, punch: 7, shot: 6, miss: 6, sub: 5, yellow: 5, injury: 5, kickoff: 5, kickoff2: 5, replay: 4, attack: 4, late: 3, through: 3, cross: 3, dribble: 2, tackle: 2, interception: 2, longball: 1, build: 1 };
-  const COOLDOWN = { build: 14, attack: 7, shot: 1, late: 60, dribble: 12, cross: 8, through: 10, longball: 16, tackle: 12, interception: 12 };
+  const PRIORITY = { goal: 10, score: 9, full: 9, half: 8, red: 8, woodwork: 7, save: 7, punch: 7, shot: 6, miss: 6, sub: 5, yellow: 5, injury: 5, kickoff: 5, kickoff2: 5, replay: 4, attack: 4, late: 3, through: 3, cross: 3, keepball: 2, dribble: 2, tackle: 2, interception: 2, longball: 1, build: 1 };
+  const COOLDOWN = { build: 14, attack: 7, shot: 1, late: 60, dribble: 12, cross: 8, through: 10, longball: 16, tackle: 12, interception: 12, keepball: 25 };
   const IMPORTANT_FAST = new Set(['goal', 'score', 'full', 'half', 'red', 'kickoff', 'kickoff2']);
   let opts = { lang: 'en', speech: true, captions: true, commentary: true, announcer: true, volume: 0.9, paVolume: 0.8, speed: 1 };
   let caption = () => {}, onSpeak = () => {};

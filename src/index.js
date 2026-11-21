@@ -1063,6 +1063,7 @@ class GameWorld {
       c.lastXI = null;
     }
     if (d.trainingFocus && TRAINING_FOCUS.includes(d.trainingFocus)) c.trainingFocus = d.trainingFocus;
+    for (const k of ['line', 'width', 'tempo']) if (d[k] && ME.INSTRUCTIONS[k].includes(d[k])) c.instructions = { ...ME.normInstr(c.instructions), [k]: d[k] };
     if (d.trainingIntensity !== undefined && d.trainingIntensity !== null) c.trainingIntensity = clamp(parseInt(d.trainingIntensity, 10) || 3, 1, 5);
     return { ok: true };
   }
@@ -1968,7 +1969,7 @@ class GameWorld {
         text: e.type === 'goal' ? `⚽ ${name(e.playerId)}` : e.type === 'injury' ? `🏥 ${name(e.playerId)} injured` : e.type === 'shot' ? `🎯 ${name(e.playerId)} — ${e.outcome === 'saved' ? 'saved' : 'off target'}` : e.type === 'yellow' ? `🟨 ${name(e.playerId)} booked` : e.type === 'red' ? `🟥 ${name(e.playerId)} sent off` : `🔁 ${name(e.onId)} on for ${name(e.offId)}` })),
       lineups: this._lineups(m),
       timeline: TL.pack(m), ts: TL.summary(m),
-      tactic: side.tactic, formation: side.formation, subsUsed: side.subsUsed, maxSubs: ME.MAX_SUBS,
+      tactic: side.tactic, formation: side.formation, instructions: side.instr || ME.normInstr(null), subsUsed: side.subsUsed, maxSubs: ME.MAX_SUBS,
       onPitch: side.onPitch.map(s => ({ slot: s.slot, slotKey: s.slotKey, playerId: s.playerId, name: name(s.playerId), position: p(s.playerId).position, fit: Math.round(p(s.playerId).fitness), ovr: p(s.playerId).currentAbility, rating: positionAbility(p(s.playerId), s.slot) })),
       bench: side.bench.filter(id => !side.apps[id]).map(id => ({ playerId: id, name: name(id), position: p(id).position, fit: Math.round(p(id).fitness), ovr: p(id).currentAbility, injured: p(id).isInjured() })),
       tactics: TACTICS, formations: FORMATIONS,
@@ -2123,7 +2124,7 @@ class GameWorld {
       reputation: this.manager.reputation, fans: c.fanMood, board: c.boardTrust,
       finances: Math.round(c.finance.balance), debt: Math.round(Math.max(0, -c.finance.balance)),
       transferBudget: budget.transferBudget, wageBudget: budget.wageBudget, budget,
-      tactic: c.tactic, formation: c.formation, trainingFocus: c.trainingFocus, trainingIntensity: c.trainingIntensity,
+      tactic: c.tactic, formation: c.formation, instructions: ME.normInstr(c.instructions), trainingFocus: c.trainingFocus, trainingIntensity: c.trainingIntensity,
       chemistry: c.chemistry, prestige: c.prestige, trophies: this.manager.trophies, completedSeasons: this.completedSeasons,
       facilities: c.facilities, facilityCosts: this._facilityCosts(c), facilityMax: FIN.FACILITY_MAX,
       table, market, topScorers: topScorers.slice(0, 25),

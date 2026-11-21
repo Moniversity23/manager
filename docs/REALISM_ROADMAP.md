@@ -8,4 +8,4 @@ Current position (2026-11-20):
 
 * Phase 0 (audit and baseline): done.
 * Phase 1 (authoritative match timeline): done.
-* Phases 2–12: done on 2026-11-20 (reports in the roadmap), with the open items listed under "Still to do".
+* Phases 2–12: done on 2026-11-20 (reports in the roadmap), and the remaining items completed on 2026-11-21 (report at the end of the roadmap).

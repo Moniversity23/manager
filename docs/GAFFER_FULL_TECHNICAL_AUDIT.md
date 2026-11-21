@@ -143,9 +143,9 @@ headless Chrome over the DevTools protocol, Node timing scripts). Companion docu
 | 4 | Engine segment order: shots after a red card or injury | Impossible sequences | **Fixed (Phase 2)** in the engine without changing scores |
 | 5 | Off-ball players move in formation shape only | No defensive shape, runs or pressing on screen | **Improved (Phase 3)**: shape by tactic, overlaps, a second presser, dribble runs; keyframes in the timeline still open |
 | 6 | The ball moves in straight lines at fixed speed | Long balls and crosses do not look like football | **Fixed for passes (Phase 4)**: friction, lofted flight and bounce, crosses at head height |
-| 7 | Animation choice is driven by the view's speed and events only | Kick timing, first touch and body orientation are approximate | **Improved (Phase 5)**: kick type from the pass, standing and sliding tackles, headers from crosses |
-| 8 | Tactics are four presets | Little tactical depth | Open: shape varies by tactic (Phase 3); new instructions still to do |
-| 9 | Replays only for goals; one stadium design | Presentation feels repetitive | **Improved**: big-chance replays (Phase 9); grounds by capacity and rain (Phase 7) |
+| 7 | Animation choice is driven by the view's speed and events only | Kick timing, first touch and body orientation are approximate | **Improved (Phase 5)**: kick type from the pass, standing and sliding tackles, headers, plus procedural shielding, chest control and turning |
+| 8 | Tactics are four presets | Little tactical depth | **Fixed**: line, width and tempo instructions in the engine, timeline, view and UI |
+| 9 | Replays only for goals; one stadium design | Presentation feels repetitive | **Improved**: big-chance replays and a full-time highlight reel; grounds by capacity, crowd reactions, rain, wind and snow |
 | 10 | Large saves (12.6 MB JSON) | Slow saves on phones; storage limits | Assessed (Phase 11): a compact format saves little after gzip; deferred |
 
 ## 5. Risks

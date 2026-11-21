@@ -178,10 +178,34 @@ function buildStands(scene, homeHue, awayHue, low, ground) {
   // Fill to the expected attendance (the same seats stay empty for the whole match).
   { let sd = design.seed; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; }; for (let i = seats.length - 1; i >= 0; i--) if (r() > design.fill) seats.splice(i, 1); }
   // Crowd: two instanced meshes (alternate fans) so they can bounce out of step.
+  // Every fan has a team (home, away or neutral), a rhythm and an energy level; the shader below
+  // moves each one: home fans jump with their arms up when their team scores, the other side's
+  // fans slump, everyone rises as a chance builds, and now and then a wave goes round the ground.
   const fan = new THREE.BoxGeometry(0.6, 0.95, 0.45);
+  const crowdU = { uTime: { value: 0 }, uMood: { value: new THREE.Vector2(0, 0) }, uTension: { value: 0 }, uWave: { value: -1 } };
   const fanMat = new THREE.MeshLambertMaterial();
+  fanMat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, crowdU);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aFan;\nuniform float uTime;\nuniform vec2 uMood;\nuniform float uTension;\nuniform float uWave;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float mood = aFan.y < 0.25 ? uMood.x : aFan.y > 0.75 ? uMood.y : 0.25 * (uMood.x + uMood.y);
+        float joy = max(mood, 0.0) * aFan.z, gloom = max(-mood, 0.0);
+        float hop = max(0.0, sin(uTime * (3.0 + 4.5 * joy) + aFan.x * 6.2832));
+        float waveAmt = 0.0;
+        #ifdef USE_INSTANCING
+        if (uWave >= 0.0) {
+          float ang = atan(instanceMatrix[3].z, instanceMatrix[3].x);
+          float front = mod(uWave * 1.4, 6.2832) - 3.1416;
+          float d = abs(mod(ang - front + 3.1416, 6.2832) - 3.1416);
+          waveAmt = smoothstep(0.55, 0.0, d);
+        }
+        #endif
+        transformed.y *= 1.0 + 0.35 * joy + 0.3 * waveAmt;
+        transformed.y += hop * (0.02 + 0.09 * uTension * aFan.z + 0.45 * joy) + 0.28 * waveAmt - 0.13 * gloom;`);
+  };
   const half = [Math.max(1, Math.ceil(seats.length / 2)), Math.max(1, Math.floor(seats.length / 2))];
-  const crowds = [new THREE.InstancedMesh(fan, fanMat, half[0]), new THREE.InstancedMesh(fan, fanMat, half[1])];
+  const crowds = [new THREE.InstancedMesh(fan, fanMat, half[0]), new THREE.InstancedMesh(fan.clone(), fanMat, half[1])];
+  const fanAttr = [new Float32Array(half[0] * 3), new Float32Array(half[1] * 3)];
   const m = new THREE.Matrix4(), col = new THREE.Color(), v = new THREE.Vector3();
   const palette = [new THREE.Color().setHSL(homeHue / 360, 0.75, 0.5), new THREE.Color().setHSL(awayHue / 360, 0.75, 0.48), new THREE.Color(0xe6e6e6), new THREE.Color(0x3a4050), new THREE.Color(0x8a6a4c)];
   let seed = 7;
@@ -195,10 +219,12 @@ function buildStands(scene, homeHue, awayHue, low, ground) {
     const r = rnd();
     col.copy(palette[r < 0.45 ? 0 : r < 0.6 ? 1 : r < 0.8 ? 2 : r < 0.93 ? 3 : 4]).multiplyScalar(0.75 + rnd() * 0.4);
     crowds[i % 2].setColorAt(i >> 1, col);
+    const fa = fanAttr[i % 2], j = (i >> 1) * 3;
+    fa[j] = rnd(); fa[j + 1] = r < 0.45 ? 0 : r < 0.6 ? 1 : 0.5; fa[j + 2] = 0.55 + rnd() * 0.45;   // rhythm, team, energy
     if (i % 7 === 0) flashSpots.push(v.x, v.y + 0.7, v.z);
   });
-  for (const c of crowds) { c.instanceMatrix.needsUpdate = true; c.frustumCulled = false; scene.add(c); }
-  return { crowds, flashSpots };
+  crowds.forEach((c, k) => { c.geometry.setAttribute('aFan', new THREE.InstancedBufferAttribute(fanAttr[k], 3)); c.instanceMatrix.needsUpdate = true; c.frustumCulled = false; scene.add(c); });
+  return { crowds, flashSpots, crowdU };
 }
 
 function glowTexture() {
@@ -565,12 +591,19 @@ function attachToBone(fig, bone, obj, worldOffset, worldScale = 1) {
   obj.scale.set(worldScale / sb.x, worldScale / sb.y, worldScale / sb.z);
 }
 
-function numberTexture(n, light) {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+// The back of the shirt: his surname across the shoulders and his number below it.
+function numberTexture(n, light, name) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
   const g = c.getContext('2d');
-  g.font = 'bold 44px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
-  g.lineWidth = 6; g.strokeStyle = light ? 'rgba(0,0,0,.8)' : 'rgba(255,255,255,.9)'; g.fillStyle = light ? '#fff' : '#111';
-  g.strokeText(String(n), 32, 34); g.fillText(String(n), 32, 34);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.strokeStyle = light ? 'rgba(0,0,0,.8)' : 'rgba(255,255,255,.9)'; g.fillStyle = light ? '#fff' : '#111';
+  if (name) {
+    const nm = String(name).toUpperCase().slice(0, 12);
+    g.font = `bold ${nm.length > 8 ? 17 : 21}px Arial, sans-serif`; g.lineWidth = 4;
+    g.strokeText(nm, 64, 22, 124); g.fillText(nm, 64, 22, 124);
+  }
+  g.font = 'bold 76px Arial, sans-serif'; g.lineWidth = 9;
+  g.strokeText(String(n), 64, name ? 80 : 68); g.fillText(String(n), 64, name ? 80 : 68);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -594,13 +627,14 @@ function makeFootballer(F, geo, m) {
   });
   const bone = name => model.getObjectByName(name);
   const headBone = bone('head'), spine = bone('spine_03'), handR = bone('hand_r');
+  const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
   // His own head: face, ears, nose, hair and beard from his permanent look.
   const head = buildHead(geo, m, lk);
   const headScale = S * (lk ? lk.heightCm : 181) / 181;
   if (headBone) attachToBone(g, headBone, head, new THREE.Vector3(0.012 * headScale, 0.085 * headScale, 0), headScale);
   // Shirt number on his back
   if (spine && m.number != null) {
-    const plate = new THREE.Mesh(geo.number, new THREE.MeshBasicMaterial({ map: numberTexture(m.number, m.lightNumber !== false), transparent: true, depthWrite: false }));
+    const plate = new THREE.Mesh(geo.number, new THREE.MeshBasicMaterial({ map: numberTexture(m.number, m.lightNumber !== false, m.shirtName), transparent: true, depthWrite: false }));
     plate.rotation.y = -Math.PI / 2;
     attachToBone(g, spine, plate, new THREE.Vector3(-0.15 * headScale * bw, 0.02, 0), headScale);
   }
@@ -613,7 +647,7 @@ function makeFootballer(F, geo, m) {
     a.enabled = false; act[k] = a;
   }
   for (const k of LOCO) if (act[k]) { act[k].enabled = true; act[k].setEffectiveWeight(k === 'idle' ? 1 : 0); act[k].time = Math.random() * act[k].getClip().duration; act[k].play(); }
-  g.userData = { mixer, act, model, holder, head, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F,
+  g.userData = { mixer, act, model, holder, head, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F, bones: bones.s2 && bones.s3 ? bones : null,
     armR: { hand: handR || head }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(k => [k, k === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004 };
   return g;
 }
@@ -649,6 +683,43 @@ function oneShot(u, key, { at = 0, speed = 1, hold = 0, fade = 0.12 } = {}) {
   a.enabled = true; a.reset(); a.time = Math.max(0, at); a.timeScale = speed; a.setEffectiveWeight(1); a.fadeIn(fade); a.play();
   u.one = { key, a, until: (a.getClip().duration - a.time) / Math.max(0.1, speed) + hold, age: 0, done: false };
   const L = globalThis.__animLog; if (L) L[key] = (L[key] || 0) + 1;   // test hook: which actions played
+}
+
+// Procedural layer on top of the motion-captured clips, for actions no free clip covers:
+// shielding the ball (lean in, arm out, a look over the shoulder), chest control (lean back,
+// arms out) and twisting the upper body into a turn with the ball. Bones are turned about world
+// axes (the figure's forward, side and up), so it does not depend on each bone's local axes.
+const _qa = new THREE.Quaternion(), _qp = new THREE.Quaternion();
+const _fwd = new THREE.Vector3(), _side = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+function turnBone(b, axis, angle) {
+  if (!b || !b.parent || Math.abs(angle) < 1e-4) return;
+  b.parent.updateWorldMatrix(true, false);
+  b.parent.getWorldQuaternion(_qp);
+  _qa.setFromAxisAngle(axis, angle);
+  b.quaternion.premultiply(_qp).premultiply(_qa).premultiply(_qp.invert());
+}
+function layerPose(u, a, dt) {
+  const B = u.bones, k = Math.min(1, dt * 8);
+  u.wShield = (u.wShield || 0) + ((a.shield ? 1 : 0) - (u.wShield || 0)) * k;
+  if (a.shield) u.shieldSide = a.shield;
+  u.wChest = (u.wChest || 0) + ((a.chest != null ? Math.sin(Math.PI * Math.min(1, a.chest / 0.5)) : 0) - (u.wChest || 0)) * Math.min(1, dt * 16);
+  u.wTwist = (u.wTwist || 0) + ((a.dribble ? Math.max(-0.35, Math.min(0.35, (a.turn || 0) * 0.05)) : 0) - (u.wTwist || 0)) * k;
+  if (u.wShield < 0.01 && u.wChest < 0.01 && Math.abs(u.wTwist) < 0.01) return;
+  const f = u.face;
+  _fwd.set(Math.cos(f), 0, -Math.sin(f)); _side.set(Math.sin(f), 0, Math.cos(f));
+  if (u.wShield > 0.01) {
+    const s = u.shieldSide || 1, w = u.wShield;                       // s = +1: the defender is on his left
+    turnBone(B.s2, _side, -0.16 * w);                                 // a little lower, over the ball
+    turnBone(B.s3, _fwd, -s * 0.13 * w);                              // lean into the defender
+    turnBone(s > 0 ? B.ual : B.uar, _fwd, s * 0.8 * w);               // the arm on his side holds him off
+    turnBone(B.neck, _up, s * 0.55 * w);                              // and a look over that shoulder
+  }
+  if (u.wChest > 0.01) {
+    const w = u.wChest;
+    turnBone(B.s2, _side, 0.3 * w);                                   // lean back to cushion it
+    turnBone(B.ual, _fwd, 0.55 * w); turnBone(B.uar, _fwd, -0.55 * w); // arms out for balance
+  }
+  if (Math.abs(u.wTwist) > 0.01) turnBone(B.s3, _up, u.wTwist);
 }
 
 // Called every frame instead of pose() for a mocap figure. `a` is the same action description.
@@ -703,6 +774,8 @@ function animateFootballer(u, a, dt, t, simRate) {
     if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
   }
   u.mixer.update(dt);
+  if (u.bones) layerPose(u, a, dt);
+  { const L = globalThis.__animLog; if (L) { if (a.shield) L.shield = (L.shield || 0) + 1; if (a.chest != null) L.chest = (L.chest || 0) + 1; } }   // test hook
   // Test hook: how far the kicking foot is from its contact frame when the ball leaves.
   if (globalThis.__animLog && a.strike != null && u.one && /^kick/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
   // Lean into turns at speed, and keeper dives fly sideways off the ground.
@@ -735,10 +808,10 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   container.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const rain = weather === 'rain';
-  const fogCol = night ? 0x16243b : rain ? 0x9aa7b4 : 0xbfe0fb;
+  const rain = weather === 'rain', snow = weather === 'snow', windy = weather === 'wind';
+  const fogCol = night ? (snow ? 0x2a3546 : 0x16243b) : rain ? 0x9aa7b4 : snow ? 0xd9e0e8 : 0xbfe0fb;
   scene.background = new THREE.Color(fogCol);
-  scene.fog = new THREE.Fog(fogCol, rain ? 140 : 220, rain ? 420 : 560);
+  scene.fog = new THREE.Fog(fogCol, rain || snow ? 140 : 220, rain || snow ? 420 : 560);
   const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.5, 900);
   camera.position.set(0, 17, 40);
   const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 16, 12), new THREE.MeshBasicMaterial({ map: skyTexture(night), side: THREE.BackSide, fog: false, depthWrite: false }));
@@ -758,14 +831,15 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(PX + 400, PZ + 400), new THREE.MeshLambertMaterial({ color: 0x6f7c88 }));
   ground.rotation.x = -Math.PI / 2; ground.position.y = -0.03; scene.add(ground);
   const nets = { '-1': buildGoal(scene, -1), '1': buildGoal(scene, 1) };
-  const { crowds, flashSpots } = buildStands(scene, homeHue, awayHue, low, venue);
+  const { crowds, flashSpots, crowdU } = buildStands(scene, homeHue, awayHue, low, venue);
+  let waveT = -1, lastWave = 0;
   // Rain: streaks falling through the floodlights, recycled around the pitch.
   let rainDrops = null;
-  if (rain) {
-    const n = low ? 700 : 1800, pos = new Float32Array(n * 3);
+  if (rain || snow) {
+    const n = (low ? 700 : 1800) * (snow ? 0.8 : 1) | 0, pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 150; pos[i * 3 + 1] = Math.random() * 40; pos[i * 3 + 2] = (Math.random() - 0.5) * 110; }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    rainDrops = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xd8e2ee, size: 0.45, transparent: true, opacity: 0.5, depthWrite: false }));
+    rainDrops = new THREE.Points(g, new THREE.PointsMaterial({ color: snow ? 0xffffff : 0xd8e2ee, size: snow ? 0.32 : 0.45, transparent: true, opacity: snow ? 0.85 : 0.5, depthWrite: false }));
     rainDrops.frustumCulled = false; scene.add(rainDrops);
   }
   buildFloodlights(scene, night);
@@ -896,7 +970,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       ? { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, number, gkKit[side][0]) }), sleeve: lam(gkKit[side][1]), shorts: lam(0x20242c), sock: lam(gkKit[side][1]), glove: gloves }
       : { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(tm.hue, tm.pattern, number) }), shirt3d: tm.shirt3d, sleeve: tm.sleeve, shorts: tm.shorts, sock: tm.sock };
     const n = Math.abs(Number(d.id) || i * 7 + 3);
-    const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk };
+    const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk, shirtName: String(d.name || '').split(' ').slice(-1)[0] };
     const p = F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
     p.userData.gk = gk; p.userData.pid = d.id; p.userData.number = number;
     p.userData.face = side === 'home' ? 0 : Math.PI;
@@ -966,6 +1040,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           }
           else if (sim.block && sim.block.side === side && sim.block.idx === i && sim.t - sim.block.t0 < 0.7) a.block = sim.t - sim.block.t0;
           else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); }
+          else if (sim.touch && sim.touch.chest && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.5) a.chest = sim.t - sim.touch.t0;
           else if (sim.touch && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.35) a.touch = sim.t - sim.touch.t0;
           else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) { if (sim.tackle.kind === 'standing') a.poke = tackleAge; else a.slide = tackleAge; }
           else if (sim.strike && sim.strike.side === side && sim.strike.idx === i && strikeAge < 0.55) { a.strike = strikeAge; a.power = sim.strike.power || 0.7; }
@@ -983,6 +1058,19 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           p.rotation.y = u.face;
           if (u.shadows) u.shadows.rotation.y = -u.face;
           a.turn = turned / dt; a.rel = speed > 0.5 ? wrap(moveAng - u.face) : 0; a.look = wrap(ballAng - u.face); a.near = ballDist < 7 && by < 1.2; a.dribble = dribble;
+          // Shielding: the man on the ball with an opponent tight beside or behind him.
+          if (dribble && u.bones) {
+            let best = 2.4, lzB = 0;
+            for (const od of v.dots[side === 'home' ? 'away' : 'home']) {
+              if (od.off) continue;
+              const dx = (od.x - 0.5) * L - px, dz = (od.y - 0.5) * W - pz, dd = Math.hypot(dx, dz);
+              if (dd >= best) continue;
+              const lx = dx * Math.cos(u.face) - dz * Math.sin(u.face);
+              if (lx > 1.0) continue;                                  // in front of him: not shielding, taking him on
+              best = dd; lzB = dx * Math.sin(u.face) + dz * Math.cos(u.face);
+            }
+            if (best < 2.4) a.shield = lzB < 0 ? 1 : -1;
+          }
           if (!a.header) u.hd = 0;
           if (sim.card && sim.t - sim.card.t0 < 2.5 && sim.card.side === side && i !== sim.card.idx && !cel) { const bk = (v.dots[side] || [])[sim.card.idx]; if (bk && Math.hypot(bk.x - d.x, (bk.y - d.y) * 0.65) < 0.08) a.appeal = true; }
           if (u.mocap) animateFootballer(u, a, dt, t, simRate); else pose(u, a, dt, t, i);
@@ -1078,12 +1166,26 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       for (const k of ['-1', '1']) nets[k].scale.x = 1;
       if (sim.net) { const age = sim.t - sim.net.t0; const n = nets[sim.net.side === 'home' ? '1' : '-1']; if (age < 1.2) n.scale.x = 1 + Math.sin(Math.min(1, age / 0.5) * Math.PI) * 0.55; }
       // Crowd: gentle sway, a bigger bounce as a chance builds, jumping on a goal
-      const amp = cel ? 0.42 : threat ? 0.12 : 0.03, beat = cel ? 7 : 3;
-      crowds[0].position.y = Math.abs(Math.sin(t * beat)) * amp;
-      crowds[1].position.y = Math.abs(Math.sin(t * beat + 1.3)) * amp;
-      if (rainDrops) { const a = rainDrops.geometry.attributes.position, arr = a.array, fall = Math.min(0.1, dt) * 26; for (let i = 1; i < arr.length; i += 3) { arr[i] -= fall; if (arr[i] < 0) arr[i] += 40; } a.needsUpdate = true; }
+      {
+        // The crowd: moods follow the goals, tension follows the chance, and a wave in quiet spells.
+        const ease = Math.min(1, dt * 3), mood = crowdU.uMood.value;
+        const target = cel ? (cel.side === 'home' ? [1, -1] : [-1, 1]) : [0, 0];
+        mood.x += (target[0] - mood.x) * ease; mood.y += (target[1] - mood.y) * ease;
+        crowdU.uTension.value += ((threat ? 1 : 0) - crowdU.uTension.value) * Math.min(1, dt * 2);
+        crowdU.uTime.value = t;
+        if (waveT < 0 && !threat && !cel && t - lastWave > 120 && Math.random() < dt * 0.03) { waveT = 0; lastWave = t; }
+        if (waveT >= 0) { waveT += dt; if (waveT > 9 || threat || cel) waveT = -1; }
+        crowdU.uWave.value = waveT;
+        crowds[0].position.y = 0; crowds[1].position.y = 0;
+      }
+      if (rainDrops) {
+        // Rain falls straight and fast; snow drifts down slowly, swaying.
+        const a = rainDrops.geometry.attributes.position, arr = a.array, st = Math.min(0.1, dt), fall = st * (snow ? 3.2 : 26);
+        for (let i = 1; i < arr.length; i += 3) { arr[i] -= fall; if (snow) arr[i - 1] += Math.sin(t * 0.8 + i) * st * 0.9; if (arr[i] < 0) arr[i] += 40; }
+        a.needsUpdate = true;
+      }
       boardMat.map.offset.x = t * 0.012;
-      flags.forEach((f, i) => { f.rotation.y = Math.sin(t * 3 + i) * 0.5; });
+      flags.forEach((f, i) => { f.rotation.y = windy ? 0.9 + Math.sin(t * 9 + i) * 0.35 : Math.sin(t * 3 + i) * 0.5; });   // wind: flags stream out and snap
 
       // Marker and name tag for the player on the ball
       const hd = sim.poss && (sim.phase === 'play' || sim.phase === 'held') && !sim.pass ? v.dots[sim.poss][sim.holder] : cel ? v.dots[cel.side][cel.scorer] : null;
@@ -1109,7 +1211,9 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
         camera.position.set(Math.sin(ang) * r, h, Math.cos(ang) * r); look.set(0, lerp(4, 0.5, k), 0);
       } else if (v.replay) {                        // replay: low, beside the goal it went into
         const gs = v.replay.side, cx = gs * (L / 2 - 9), cz = bz > 0 ? bz - 15 : bz + 15;
-        camTarget.set(cx, 3.2, cz); tmp.set(bx, Math.max(0.6, by * 0.7), bz); look.lerp(tmp, ease(9));
+        if (v.replay.angle === 'behind') camTarget.set(gs * (L / 2 + 7), 4.2, bz * 0.35);   // second angle: from behind the goal
+        else camTarget.set(cx, 3.2, cz);
+        tmp.set(bx, Math.max(0.6, by * 0.7), bz); look.lerp(tmp, ease(9));
         camera.position.lerp(camTarget, ease(v.replay.cut ? 60 : 4)); v.replay.cut = false;
       } else if (cel) {                                   // close-up on the scorer
         const sc = v.dots[cel.side][cel.scorer]; const sx = (sc.x - 0.5) * L, sz = (sc.y - 0.5) * W;

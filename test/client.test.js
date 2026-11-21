@@ -27,6 +27,21 @@ describe('client scripts', () => {
     blocks.forEach((b, i) => expect(parse(b), `inline script ${i + 1}`).toBeNull());
   });
 
+  it('nothing is used before it is declared in the same scope (a run-time error the parser cannot see)', () => {
+    const { Linter } = require('eslint');
+    const linter = new Linter({ configType: 'flat' });
+    const rules = { 'no-use-before-define': ['error', { functions: false, classes: false, variables: false }], 'no-dupe-keys': 'error', 'no-const-assign': 'error' };
+    const html = fs.readFileSync(path.join(pub, 'index.html'), 'utf8');
+    const sources = [
+      ...[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x, i) => [`index.html script ${i + 1}`, x[1], 'script']),
+      ...['match3d.js', 'ball.js', 'sound.js', 'commentary.js'].map(f => [f, fs.readFileSync(path.join(pub, f), 'utf8'), f === 'match3d.js' ? 'module' : 'script']),
+    ];
+    for (const [name, code, sourceType] of sources) {
+      const msgs = linter.verify(code, [{ languageOptions: { ecmaVersion: 2023, sourceType }, rules }]);
+      expect(msgs.map(m => `${name}:${m.line} ${m.message}`)).toEqual([]);
+    }
+  });
+
   it('the service worker caches every script the page loads', () => {
     const sw = fs.readFileSync(path.join(pub, 'sw.js'), 'utf8');
     const html = fs.readFileSync(path.join(pub, 'index.html'), 'utf8');

@@ -45,6 +45,7 @@ function settleContracts(world) {
     const active = club.squad.filter(p => !p.retired);
     const ranked = active.slice().sort((a, b) => b.currentAbility - a.currentAbility);
     const core = new Set(ranked.slice(0, 20).map(p => p.id));
+    const avg = active.length ? active.reduce((s, p) => s + p.currentAbility, 0) / active.length : 50;
     for (const p of [...club.squad, ...club.youth]) {
       if (p.retired || p.loan) continue;
       p.contractYears = (p.contractYears || 0) - 1;
@@ -57,6 +58,13 @@ function settleContracts(world) {
       }
       // Academy contracts are renewed by delegation; AI clubs keep their core and young players.
       const keep = isYouth ? p.age < 21 : (core.has(p.id) && p.age < 33) || club.squad.filter(x => !x.retired).length <= 20;
+      // An ambitious player who has outgrown a modest club may turn down a new deal and leave on a
+      // free — bigger clubs then pick him up in the market (the manager's own players are handled
+      // through renewals instead).
+      if (keep && !isYouth && p.age <= 29 && p.currentAbility >= avg + 8 && (club.prestige || 50) < 60 && rng.chance(0.4)) {
+        releasePlayer(world, club, p);
+        continue;
+      }
       if (keep) {
         p.contractYears = rng.int(1, 3);
         if (!isYouth) p.weeklyWage = Math.max(Math.round(p.weeklyWage * 0.9), Math.round(wageFor(p.currentAbility) * divF(club) * rng.float(0.9, 1.15)));

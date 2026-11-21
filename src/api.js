@@ -44,6 +44,20 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
     } catch (e) { logError('autoSave', e); return null; }
   }
 
+  // The autosave after a week or a half runs in the background, so the reply is not held up by
+  // serialising and compressing the whole world. Saves run one at a time; a queued save that has
+  // not started yet is reused, and it captures the newest state when it runs. Everything that
+  // reads saves or reports the state's hash waits for the queue first (flushSaves), and the server
+  // flushes it on shutdown. A crash can lose at most the week being saved.
+  let queued = null, running = Promise.resolve();
+  function queueAutoSave() {
+    if (queued) return queued;
+    const p = running.then(() => { queued = null; return autoSave(); });
+    queued = p; running = p.catch(() => null);
+    return p;
+  }
+  async function flushSaves() { await running; }
+
   // Lineup and tactic edits are saved 5 s after the last change.
   function autoSaveDebounced() {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -51,6 +65,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   }
 
   async function restoreFrom(slotId) {
+    await flushSaves();
     const saved = await store.load(slotId);
     if (!saved || !saved.gameState) return { ok: false, error: saved?.errors?.length ? `Save is corrupt: ${saved.errors.join('; ')}` : 'no_save_found' };
     const v = saved.gameState._v || 6;
@@ -97,7 +112,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
 
   route('GET', '/api/health', async () => ({ ok: true, public: publicMode, db: store.backend(), hasCareer: !!world, saveVersion: SAVE_VERSION, time: now().toISOString() }));
   route('GET', '/api/state', async () => (world ? snap() : { ok: false, hasCareer: false, error: 'No career in progress' }));
-  route('GET', '/api/state-hash', async () => ({ ok: true, hash: stateHash(world.toSave()), season: world.season, week: world.currentWeek }), { world: true });
+  route('GET', '/api/state-hash', async () => { await flushSaves(); return { ok: true, hash: stateHash(world.toSave()), season: world.season, week: world.currentWeek }; }, { world: true });
 
   route('GET', '/api/setup', async () => {
     const setup = GameWorld.setupClubs();
@@ -107,7 +122,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
     return { ok: true, defaultCountry: 'Nigeria', countries, clubsByCountry, leagueByCountry, tactics: TACTICS, formations: FORMATIONS };
   });
 
-  route('GET', '/api/saves', async () => ({ ok: true, slots: await store.listMeta() }));
+  route('GET', '/api/saves', async () => { await flushSaves(); return { ok: true, slots: await store.listMeta() }; });
 
   route('POST', /^\/api\/saves\/([\w]+)$/, async (m) => {
     const slotId = m[1];
@@ -158,7 +173,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   // Plays on until the week ends or one of the manager's matches reaches half-time (interactive).
   async function playOn(decisions, interactive) {
     const r = world.advanceWeek(decisions, interactive);
-    await autoSave();
+    queueAutoSave();
     if (r.halftime) {
       const done = world.weekState ? world.weekState.reports : [];
       return { ok: true, halftime: r.halftime, finished: done[done.length - 1] || null, current: snap() };
@@ -176,7 +191,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
 
   route('POST', '/api/match/resume', async (m, body) => {
     if (!world.liveMatch) return { ok: false, status: 409, error: 'No match is paused at halftime' };
-    return playOn({ tactic: body.tactic, formation: body.formation, subs: Array.isArray(body.subs) ? body.subs : [], talk: body.talk }, body.interactive !== false);
+    return playOn({ tactic: body.tactic, formation: body.formation, instructions: body.instructions && typeof body.instructions === 'object' ? body.instructions : null, subs: Array.isArray(body.subs) ? body.subs : [], talk: body.talk }, body.interactive !== false);
   }, { world: true });
 
   route('POST', '/api/step', async (m, body) => {
@@ -288,7 +303,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   });
 
   // navigator.sendBeacon target on page close.
-  route('POST', '/api/autosave', async () => { if (world) await autoSave(); return { ok: true }; });
+  route('POST', '/api/autosave', async () => { await flushSaves(); if (world) await autoSave(); return { ok: true }; });
 
   async function handle(method, pathname, query, body) {
     // Public deployments serve the app only: every visitor plays in their own browser (offline engine).
@@ -311,7 +326,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
     return { status: 404, payload: { ok: false, error: 'not_found' } };
   }
 
-  return { handle, autoSave, buildMeta, tryRestoreAutoSave, restoreFrom, getWorld: () => world, flush: () => store.flush() };
+  return { handle, autoSave, buildMeta, tryRestoreAutoSave, restoreFrom, getWorld: () => world, flush: async () => { await flushSaves(); await store.flush(); } };
 }
 
 module.exports = { createApi, MANUAL_SLOTS, ALL_SLOTS };

@@ -41,6 +41,40 @@ describe('ball flight', () => {
     expect(end.z * 6).toBeLessThan(3);
   });
 
+  it('curl bends the ball and brings it back onto its target; wind pushes it and does not', () => {
+    const pl = B.plan('cross', 0.25, { curl: 4 }), s = sample(pl, 100);
+    expect(s[0].side).toBe(0);
+    expect(s[100].side).toBeCloseTo(0, 6);                       // arrives where it was aimed
+    expect(Math.max(...s.map(x => x.side))).toBeCloseTo(4, 1);   // 4 m of bend at the middle
+    const windy = B.plan('long', 0.4, { wind: 2 });
+    expect(B.at(windy, windy.dur).side).toBeCloseTo(2, 6);       // blown 2 m off line
+    expect(B.at(B.plan('short', 0.2), 0.5).side).toBe(0);        // no curl asked, none given
+    // Sideways metres convert to pitch units at right angles to the ball's line.
+    const [ux, uy] = B.sidewaysUnits([0.5, 0.5], [0.7, 0.5], 3);
+    expect(ux).toBeCloseTo(0, 9); expect(uy * 68).toBeCloseTo(3, 6);
+  });
+
+  it('shots end at their target height; long shots rise and dip, close ones are driven', () => {
+    const long = B.shot(0.28, { z1: 0.1 }), close = B.shot(0.1, { z1: 0.1 });
+    expect(B.shotAt(long, 1).z).toBeCloseTo(0.1, 6);
+    expect(B.shotAt(close, 1).z).toBeCloseTo(0.1, 6);
+    const peak = pl => Math.max(...Array.from({ length: 51 }, (_, i) => B.shotAt(pl, i / 50).z));
+    expect(peak(long)).toBeGreaterThan(peak(close) + 0.1);       // the long one rises more…
+    expect(peak(long) * 6).toBeLessThan(3);                      // …but stays under the bar's height plus a bit
+    const curled = B.shot(0.2, { z1: 0.1, curl: 2.5 });
+    expect(B.shotAt(curled, 0.5).side).toBeCloseTo(2.5, 6);
+    expect(B.shotAt(curled, 1).side).toBeCloseTo(0, 6);
+  });
+
+  it('a blocked shot deflects wide of the post, the same way every time for the same shot', () => {
+    for (const y of [0.3, 0.45, 0.55, 0.7]) {
+      const d = B.deflection(1, 1, y, 17);
+      expect(Math.abs(d.to[1] - 0.5)).toBeGreaterThan(0.055);   // outside the post (goal is ±0.054)
+      expect(d.z).toBeGreaterThan(0.2);
+      expect(B.deflection(1, 1, y, 17)).toEqual(d);
+    }
+  });
+
   it('is deterministic and chooses a kind when the timeline does not say', () => {
     expect(B.at(B.plan('long', 0.33), 0.7)).toEqual(B.at(B.plan('long', 0.33), 0.7));
     expect(B.kindFor(0.1, false, false)).toBe('short');

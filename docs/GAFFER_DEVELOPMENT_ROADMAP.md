@@ -259,12 +259,120 @@ Common to all of them:
   (headless cannot enter it), and a save-compatibility matrix across every old version (the
   migration tests cover v6 → v11).
 
-## Still to do (next work)
-1. Replays rebuilt from the timeline, and a full-time highlight reel.
-2. Shape keyframes and new tactical instructions (line height, width, tempo) that feed the engine.
-3. Spin, curl and deflections in ball flight; shot trajectories through `ball.js`.
-4. Chest control, shielding and turning animations (needs suitable CC0 clips: check Mesh2Motion
-   updates and the Quaternius library).
-5. Individual crowd reactions; wind and snow.
-6. Moving the server's save off the request path safely (a write-ahead queue that is flushed on
-   shutdown), and smaller saves through a versioned compact player encoding.
+## Remaining items: completion report (2026-11-21)
+
+All six items left open by Phases 2–12 are now done, along with the smaller items listed in those
+reports. No new third-party assets were added, so the asset register is unchanged. Saves are
+compatible both ways: old saves load unchanged; new fields (`club.instructions`, `side.instr`)
+default to "normal" and are ignored by older code.
+
+### 1. Highlights and replays (Phases 9 and 12)
+* **Changed:** `public/index.html` (`hlRecord`, `playHighlights`, `showFullTime`,
+  `view3dOptions`) and `public/match3d.js` (second replay angle).
+* **How clips are kept.** Every goal, big save and woodwork moment shown in 3D is kept as a clip:
+  the recorded frames of what was on screen, the players and the score.
+* **The reel.** At full time the report offers "▶ Watch the highlights". Each moment is replayed in
+  slow motion, and goals are shown a second time from behind the goal. Captions give the minute
+  and the player; you can skip clips and return to the report.
+* **Verified** in headless Chrome (offline mode): two clips recorded from a live match, three reel
+  items (the goal twice, then the save), and the return to the report.
+* **Limitation.** Clips come from the screen buffer, not a re-simulation from the timeline. The
+  view's movement is not deterministic, so "any moment" cannot be rebuilt exactly; the reel holds
+  the moments that were replayed live. In 2D mode no clips are kept, because replays are 3D only.
+
+### 2. Tactical instructions (Phases 3 and 10)
+* **Changed:** `src/engine/matchEngine.js` (`INSTRUCTIONS`, `normInstr`, `instrMods`),
+  `src/engine/timeline.js`, `src/index.js`, `src/api.js` and `public/index.html` (tactics screen,
+  half-time, view shape). Added `test/instructions.test.js` (5 tests).
+* **Settings.** Defensive line (deep, normal, high), width (narrow, normal, wide) and tempo (slow,
+  normal, fast), on the tactics screen and at half-time.
+* **Engine effects.** They scale a side's shot volume and quality, what it concedes, and fatigue,
+  with no extra random draws. "Normal" gives exactly the old results (tested).
+  * A high line is punished by quick forwards and works against slow ones (pace against pace,
+    tested).
+  * Wide play gains more against weak full-backs.
+  * Fast tempo gives more shots and more fatigue; slow tempo gives more possession (measured from
+    the timeline).
+* **Timeline and view.** Tempo sets passing speed and possession; width sets who receives the ball
+  (tested). The team shape on screen follows the line and width.
+* **AI clubs** keep "normal" instructions, so the balance of the rest of the world is unchanged.
+
+### 3. Ball flight (Phase 4)
+* **Changed:** `public/ball.js` (`curl`, `wind`, `shot`, `shotAt`, `deflection`,
+  `sidewaysUnits`), `public/index.html`, and `test/ball.test.js` (8 tests).
+* **Curl.** Crosses swing in or out (2–4.5 m of bend) and long balls bend slightly. The ball still
+  arrives where it was aimed.
+* **Wind.** On windy days, lofted balls drift.
+* **Shots.**
+  * Now built in `ball.js`: from about 17 m out they rise and dip, and any shot can curl.
+  * They still arrive exactly on the event's second at the target.
+  * A blocked shot deflects off the blocker and loops wide.
+
+### 4. Animations without new clips (Phase 5)
+* **Changed:** `public/match3d.js` (`layerPose`, `turnBone`).
+* **Approach.** A procedural layer applied after the motion-captured clips turns bones about the
+  figure's world axes:
+  * **Shielding:** the man on the ball with an opponent tight beside or behind him leans in, holds
+    him off with the arm on that side and looks over his shoulder.
+  * **Chest control:** 40% of long balls now arrive at chest height, and the receiver leans back
+    with his arms out.
+  * **Turning with the ball:** the upper body twists into the turn.
+* **Verified in 3D:** shielding fired 2–4 times in 10 minutes. Chest control was forced once and
+  animated without errors. Kick timing is unchanged (contact errors of 0–0.12 s).
+
+### 5. Crowd and weather (Phase 7)
+* **Changed:** `public/match3d.js` (crowd shader, snow, wind) and `public/index.html`
+  (`matchWeather`, `windOf`).
+* **Fans.** Each fan has a team, a rhythm and an energy level, animated in the shader:
+  * home fans jump with their arms up for their goals while the other side's fans slump;
+  * everyone rises as a chance builds;
+  * a Mexican wave goes round the ground in quiet spells.
+* **Weather.**
+  * Rain: about 15% of fixtures.
+  * Wind: 10%. Flags stream out and lofted balls drift.
+  * Snow: only mid-season in England, Germany, the USA and Japan. Flakes drift down and the light
+    is paler.
+  * All of it is fixed per fixture, and Settings can turn it off.
+* **Verified:** a snow match screenshot.
+
+### 6. Saving and contracts (Phases 10 and 11)
+* **Background autosave** (`src/api.js`): the save after a week or a half runs in the background,
+  so the reply no longer waits for it.
+  * Saves never overlap, and a queued save that has not started captures the newest state.
+  * Loads, the state hash, the saves list and shutdown wait for the queue (`flush`).
+  * At most the week being saved can be lost in a crash.
+  * Tested with a deliberately slow store (`test/savequeue.test.js`); the hard-restart server
+    test still passes.
+* **Compact save format:** still not done, as assessed in Phase 11 (gzip already removes most of
+  the gain).
+* **AI contracts** (`src/engine/contractEngine.js`): at a modest club (prestige under 60), a young
+  player who has clearly outgrown the squad turns down a new deal 40% of the time and leaves on a
+  free. The best-fit recruitment of bigger clubs then picks him up (`test/contracts.test.js`).
+
+### Smaller items
+* Surnames above the numbers on the backs of the 3D shirts.
+* Commentary for long passing moves ("14 passes in this move").
+* **Client test:** an ESLint check (`no-use-before-define` within a scope, duplicate keys, constant
+  reassignment) now runs over every browser script.
+  * It found a real bug during this work: the big-chance replay used the shooter's name before it
+    was declared, which would have thrown on the first big save.
+
+### Tests and checks for this round
+* `npm test`: build and lint clean, **91 of 92 tests pass**. The soak's timing limit fails only under
+  parallel load (487 ms/week) and passes alone (344 ms/week); its correctness checks pass.
+* **Browser, offline mode:**
+  * the highlight reel;
+  * snow and the close camera (names on shirts);
+  * the animation log: shield, chest, kicks with contact timing.
+* **Browser, server mode:** the full career flow (no console errors, no undefined text), and the
+  tactics screen setting and showing instructions.
+* **Local server under headless Chrome:** steps of 7–60 s, against about 1 s with no browser
+  (measured again: 0.8–1.2 s). This is pre-existing contention on this machine; the live site runs
+  in worker mode.
+
+### Still open
+* Replays of arbitrary moments rebuilt from the timeline. This needs a deterministic view
+  simulation.
+* A compact save format.
+* Wind affecting shots.
+* More languages for commentary.

@@ -22,6 +22,42 @@ const TACTIC_MATRIX = {
 };
 const TACTIC_INTENSITY = { high_press: 1.15, counter: 0.95, possession: 1.0, low_block: 0.9 };
 
+// Team instructions on top of the tactic: line height, width and tempo. Each one trades something
+// for something else, and 'normal' changes nothing (so results without instructions are exactly
+// what they were). They scale a side's shot volume and quality, what it concedes, and how fast its
+// players tire — no extra random draws.
+const INSTRUCTIONS = { line: ['deep', 'normal', 'high'], width: ['narrow', 'normal', 'wide'], tempo: ['slow', 'normal', 'fast'] };
+function normInstr(x) {
+  const o = {};
+  for (const [k, vals] of Object.entries(INSTRUCTIONS)) o[k] = x && vals.includes(x[k]) ? x[k] : 'normal';
+  return o;
+}
+const FWD_SLOTS = ['ST', 'CF', 'LW', 'RW'], DEF_SLOTS = ['CB', 'LB', 'RB'], FB_SLOTS = ['LB', 'RB'];
+function avgAttr(side, ctx, slots, attr) {
+  let s = 0, n = 0;
+  for (const x of side.onPitch) if (slots.includes(x.slot)) { const p = ctx.getPlayer(x.playerId); if (p) { s += p.attributes[attr]; n++; } }
+  return n ? s / n : 60;
+}
+function instrMods(m, key, ctx) {
+  const side = m[key], opp = m[key === 'home' ? 'away' : 'home'];
+  const me = side.instr || normInstr(null);
+  const r = { vol: 1, qual: 1, concVol: 1, concQual: 1, fatigue: 1 };
+  // A high line squeezes the pitch and wins the ball higher, but quick forwards get in behind it.
+  if (me.line === 'high') {
+    const edge = clamp((avgAttr(opp, ctx, FWD_SLOTS, 'pace') - avgAttr(side, ctx, DEF_SLOTS, 'pace')) / 25, -1, 1);
+    r.concQual *= 1 + 0.14 * edge; r.concVol *= 0.95; r.vol *= 1.04; r.fatigue *= 1.05;
+  } else if (me.line === 'deep') { r.concQual *= 0.92; r.concVol *= 1.07; r.vol *= 0.94; r.fatigue *= 0.97; }
+  // Width stretches the opponents (more so against weak full-backs) and leaves gaps; narrow is the opposite.
+  if (me.width === 'wide') {
+    const fb = clamp((60 - avgAttr(opp, ctx, FB_SLOTS, 'defending')) / 25, -1, 1);
+    r.vol *= 1.03 + 0.04 * fb; r.concVol *= 1.03;
+  } else if (me.width === 'narrow') { r.vol *= 0.96; r.qual *= 1.03; r.concVol *= 0.95; }
+  // Tempo: fast means more, hurried attacks, an open game and tired legs; slow the reverse.
+  if (me.tempo === 'fast') { r.vol *= 1.08; r.qual *= 0.96; r.concVol *= 1.03; r.fatigue *= 1.08; }
+  else if (me.tempo === 'slow') { r.vol *= 0.92; r.qual *= 1.04; r.concVol *= 0.95; r.fatigue *= 0.94; }
+  return r;
+}
+
 const MAX_SUBS = 5;
 const MAX_WINDOWS = 3;          // in-play windows; halftime is free
 const DRAIN_PER_MIN = 0.2;      // condition points per minute for an average player
@@ -51,7 +87,7 @@ function buildSide(club, isHome) {
   const apps = {};
   for (const s of onPitch) apps[s.playerId] = { start: true, minIn: 0, minOut: null };
   return {
-    clubId: club.id, isHome, tactic: club.tactic, formation: club.formation,
+    clubId: club.id, isHome, tactic: club.tactic, formation: club.formation, instr: normInstr(club.instructions),
     startXI: onPitch.map(s => ({ slotKey: s.slotKey, playerId: s.playerId })),
     onPitch, bench, apps, subsUsed: 0, windowsUsed: 0, manualSubs: 0,
     goals: 0, xg: 0, shots: 0, form: 1, selectionChanges: changes,
@@ -198,13 +234,14 @@ function playSegment(m, from, to, ctx) {
   const rng = ctx.rng;
   const len = to - from;
   const strengths = { home: sideStrength(m, 'home', ctx), away: sideStrength(m, 'away', ctx) };
+  const mods = { home: instrMods(m, 'home', ctx), away: instrMods(m, 'away', ctx) };
   for (const key of ['home', 'away']) {
     const side = m[key];
     const oppKey = key === 'home' ? 'away' : 'home';
     const opp = m[oppKey];
     const ratio = strengths[key] / strengths[oppKey];
     const xgSeg = BASE_XG * Math.pow(ratio, 1.45) * (len / 90);
-    const nShots = rng.poisson(xgSeg / SHOT_XG);
+    const nShots = rng.poisson(xgSeg / SHOT_XG * mods[key].vol * mods[oppKey].concVol);
     const gkSlot = opp.onPitch.find(s => s.slot === 'GK');
     const gk = gkSlot ? ctx.getPlayer(gkSlot.playerId) : null;
     const keeperAdj = gk ? clamp(1 - (positionAbility(gk, 'GK') - 55) / 400, 0.88, 1.15) : 1.35;
@@ -212,7 +249,7 @@ function playSegment(m, from, to, ctx) {
       const shooter = pickWeighted(rng, side.onPitch, ctx, SHOOT_W, p => 0.5 + p.attributes.finishing / 100);
       if (!shooter) break;
       const sp = ctx.getPlayer(shooter.playerId);
-      const q = SHOT_XG * rng.float(0.3, 1.7);
+      const q = SHOT_XG * rng.float(0.3, 1.7) * mods[key].qual * mods[oppKey].concQual;
       side.shots++;
       side.xg += q;
       const finisherAdj = 0.85 + sp.attributes.finishing / 400;
@@ -236,7 +273,7 @@ function playSegment(m, from, to, ctx) {
   // Fatigue and injuries for everyone on the pitch during this segment.
   for (const key of ['home', 'away']) {
     const side = m[key];
-    const intensity = TACTIC_INTENSITY[side.tactic] || 1;
+    const intensity = (TACTIC_INTENSITY[side.tactic] || 1) * instrMods(m, key, ctx).fatigue;
     for (const s of [...side.onPitch]) {
       const p = ctx.getPlayer(s.playerId);
       p.fitness = clamp(p.fitness - DRAIN_PER_MIN * intensity * drainFactor(p) * len, 0, 100);
@@ -280,6 +317,7 @@ function applyHalftime(m, key, decisions = {}, ctx) {
   const club = sideClub(m, key, ctx);
   const applied = { subs: 0, tactic: null, formation: null, errors: [] };
   if (decisions.tactic && TACTIC_MATRIX[decisions.tactic]) { side.tactic = decisions.tactic; club.tactic = decisions.tactic; applied.tactic = decisions.tactic; }
+  if (decisions.instructions && typeof decisions.instructions === 'object') { side.instr = normInstr({ ...side.instr, ...decisions.instructions }); club.instructions = { ...side.instr }; applied.instructions = side.instr; }
   for (const s of (decisions.subs || []).slice(0, MAX_SUBS)) {
     const offId = parseInt(s.offId, 10), onId = parseInt(s.onId, 10);
     if (makeSub(m, key, offId, onId, 45, 'manager', ctx)) { side.manualSubs++; applied.subs++; }
@@ -479,5 +517,5 @@ function squadStrength(club) {
 
 module.exports = {
   createMatch, playFirstHalf, applyHalftime, playSecondHalf, finalizeMatch, playMatch, squadStrength,
-  drainFactor, MAX_SUBS, TACTIC_MATRIX, DRAIN_PER_MIN,
+  drainFactor, MAX_SUBS, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods,
 };

@@ -26,7 +26,12 @@ const SLOT_POS = { GK: [0.05, [0.5]], CB: [0.2, [0.38, 0.62, 0.5]], LB: [0.25, [
 const LINE = { GK: 0, CB: 1, LB: 1, RB: 1, CDM: 2, CM: 2, CAM: 3, LW: 3, RW: 3, ST: 4, CF: 4 };
 const POSSESSION_TILT = { possession: 0.07, high_press: 0.03, counter: -0.05, low_block: -0.06 };
 const PASS_GAP = { possession: [4, 7], high_press: [3, 6], counter: [2.5, 5], low_block: [3.5, 6.5] };   // seconds between passes
-const SPELL_MEAN = { possession: 34, high_press: 24, counter: 18, low_block: 22 };                      // seconds a spell lasts on average
+const SPELL_MEAN = { possession: 34, high_press: 24, counter: 18, low_block: 22 };
+// Team instructions (matchEngine): tempo changes passing speed and how long a side keeps the ball;
+// width changes who gets it.
+const TEMPO_GAP = { fast: 0.8, slow: 1.22 };
+const TEMPO_TILT = { slow: 0.03, fast: -0.02 };
+const instrOf = (m, side) => m[side].instr || {};                      // seconds a spell lasts on average
 const TYPES = ['KICKOFF', 'PASS', 'INTERCEPTION', 'TACKLE', 'FOUL', 'FREE_KICK', 'SHOT', 'GOAL', 'SAVE', 'GOAL_KICK', 'YELLOW', 'RED', 'INJURY', 'SUB', 'HALF_TIME', 'FULL_TIME', 'RECOVERY', 'THROW_IN', 'DRIBBLE'];   // new types go on the end (packed by index)
 const other = s => (s === 'home' ? 'away' : 'home');
 
@@ -74,7 +79,8 @@ function possessionShare(m, ctx) {
     return n ? s / n : 50;
   };
   const h = mid('home'), a = mid('away');
-  let share = 0.5 + (h - a) / 160 + (POSSESSION_TILT[m.home.tactic] || 0) - (POSSESSION_TILT[m.away.tactic] || 0);
+  let share = 0.5 + (h - a) / 160 + (POSSESSION_TILT[m.home.tactic] || 0) - (POSSESSION_TILT[m.away.tactic] || 0)
+    + (TEMPO_TILT[instrOf(m, 'home').tempo] || 0) - (TEMPO_TILT[instrOf(m, 'away').tempo] || 0);
   if (!m.neutral) share += 0.02;
   return clamp(share, 0.3, 0.7);
 }
@@ -99,10 +105,12 @@ function extend(m, ctx, from, to) {
   const players = (side, t) => [...lineupAt(m, side, t).entries()];                // [[id, slot]…]
   const slotIndex = (side, t, id) => { const list = players(side, t); const slot = list.find(x => x[0] === id)?.[1]; return [slot, list.filter(x => x[1] === slot).findIndex(x => x[0] === id)]; };
   const posOf = (side, t, id, adv) => { const [slot, k] = slotIndex(side, t, id); return spot(side, slot || 'CM', Math.max(0, k), adv, rng); };
+  // Width: a wide side plays it to its wingers and full-backs more, a narrow one less.
+  const widthWeight = (side, slot) => (['LW', 'RW', 'LB', 'RB'].includes(slot) ? ({ wide: 1.35, narrow: 0.7 }[instrOf(m, side).width] || 1) : 1);
   const pickReceiver = (side, t, fromId, attack) => {
     const list = players(side, t).filter(([id]) => id !== fromId);
     const fromSlot = lineupAt(m, side, t).get(fromId) || 'CM';
-    return rng.weighted(list, ([, slot]) => { const d = LINE[slot] - LINE[fromSlot]; const w = d === 1 ? 4 : d === 0 ? 3 : d === 2 ? 1.6 : d === -1 ? 1.4 : 0.4; return (slot === 'GK' ? 0.15 : 1) * (attack ? (d > 0 ? w * 1.6 : w * 0.6) : w); })?.[0] ?? null;
+    return rng.weighted(list, ([, slot]) => { const d = LINE[slot] - LINE[fromSlot]; const w = d === 1 ? 4 : d === 0 ? 3 : d === 2 ? 1.6 : d === -1 ? 1.4 : 0.4; return (slot === 'GK' ? 0.15 : 1) * (attack ? (d > 0 ? w * 1.6 : w * 0.6) : w) * widthWeight(side, slot); })?.[0] ?? null;
   };
   const defenderNear = (side, t, adv) => {                                         // an opponent who could win the ball where play is
     const list = players(side, t).filter(([, s]) => s !== 'GK');
@@ -191,7 +199,7 @@ function extend(m, ctx, from, to) {
     let spellLeft = tl.spellLeft ?? 20;
     while (t < t1) {
       const tac = m[tl.poss].tactic, gap = PASS_GAP[tac] || [3, 6];
-      t += rng.float(gap[0], gap[1]);
+      t += rng.float(gap[0], gap[1]) * (TEMPO_GAP[instrOf(m, tl.poss).tempo] || 1);
       if (t >= t1) break;
       spellLeft -= t - (tl.lastT ?? t0); tl.lastT = t;
       if (tl.holder == null) changePossession(t, tl.poss, centre(tl.poss, t));
@@ -429,7 +437,8 @@ function pack(m, fromMin = 0) {
   if (!m.tl) return null;
   const r = v => (v == null ? null : Math.round(v * 100) / 100);          // to the nearest metre or so
   return { v: 1, types: TYPES, outs: OUTS, events: m.tl.events.filter(e => e.t >= fromMin * 60).map(e => [e.t, TYPES.indexOf(e.type), e.side === 'home' ? 0 : 1, e.pid, e.tid ?? null, r(e.from && e.from[0]), r(e.from && e.from[1]), r(e.to && e.to[0]), r(e.to && e.to[1]), OUTS.indexOf(e.out || ''), e.kind || null, e.by ?? null]),
-    spells: m.tl.spells.map(([s, a, b]) => [s === 'home' ? 0 : 1, a, b]), summary: summary(m), tactics: { home: m.home.tactic, away: m.away.tactic } };
+    spells: m.tl.spells.map(([s, a, b]) => [s === 'home' ? 0 : 1, a, b]), summary: summary(m), tactics: { home: m.home.tactic, away: m.away.tactic },
+    instructions: { home: m.home.instr || null, away: m.away.instr || null } };
 }
 
 module.exports = { extend, possession, possessionShare, summary, validate, pack, lineupAt, SLOT_POS, TYPES };

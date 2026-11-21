@@ -157,6 +157,7 @@ table{border-collapse:collapse;width:100%}
 .g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 .g2>*,.g4>*{min-width:0}
 .g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--r);font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap}
 .bp{background:linear-gradient(135deg,#007a45,#00a854);color:#fff;border-color:#00c870}
 .bs{background:var(--s3);border-color:var(--bd2)}.bs:hover{border-color:var(--ac)}
@@ -569,8 +570,10 @@ function afterWeek(out, viewed){
 function showFullTime(m, next){
   openMo('genMo');
   document.getElementById('genMoContent').classList.remove('mvx');
-  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}<button class="btn bp fw" id="ftNext">Continue</button>`;
+  const hl = HL && HL.clips.length && HL.key === hlKey({ home: typeof m.home === 'string' ? m.home : (m.home || {}).name, away: typeof m.away === 'string' ? m.away : (m.away || {}).name, compName: m.compName }) ? HL.clips.length : 0;
+  document.getElementById('genMoContent').innerHTML = `<div class="mo-title">📋 Full time</div>${matchReportHTML(m)}${hl ? `<button class="btn bg fw" id="ftHl" style="margin-bottom:8px">▶ Watch the highlights (${hl} ${hl === 1 ? 'moment' : 'moments'})</button>` : ''}<button class="btn bp fw" id="ftNext">Continue</button>`;
   document.getElementById('ftNext').onclick = () => { closeMo('genMo'); next(); };
+  const hb = document.getElementById('ftHl'); if (hb) hb.onclick = () => playHighlights(() => showFullTime(m, next));
 }
 
 // ── Broadcast layer for the 3D match: score bug, radar, pre-match fly-over, goal replays ──
@@ -583,11 +586,21 @@ function abbr(name, other){
   if (a === b && w[1]) a = (w[0][0] + w[1].slice(0, 2)).toUpperCase();
   return a;
 }
-// Rain at about one match in five, fixed per fixture (Settings can turn weather off).
+// Weather, fixed per fixture: rain (about one match in seven), wind (one in ten), and snow now and
+// then in the middle of the season in the countries with real winters. Settings can turn it off.
+const SNOW_COUNTRIES = new Set(['England', 'Germany', 'USA', 'Japan']);
 function matchWeather(m){
   if (PREFS.weather === 'off') return 'clear';
   let h = 11; for (const c of `${m.home}|${m.away}|${m.compName || ''}|wx`) h = (h * 37 + c.charCodeAt(0)) >>> 0;
-  return h % 5 === 0 ? 'rain' : 'clear';
+  const r = h % 20, phase = STATE && STATE.totalWeeks ? STATE.week / STATE.totalWeeks : 0;
+  const winter = !!(STATE && SNOW_COUNTRIES.has(STATE.country)) && phase > 0.3 && phase < 0.65;
+  if (r < 3) return winter && r === 0 ? 'snow' : 'rain';
+  return r < 5 ? 'wind' : 'clear';
+}
+// Wind pushes balls in the air sideways (metres per second of flight), the same way all match.
+function windOf(v){
+  if (v.windM == null) { let h = 5; for (const c of `${v.m.home}${v.m.away}`) h = (h * 31 + c.charCodeAt(0)) >>> 0; v.windM = matchWeather(v.m) === 'wind' ? (h % 2 ? 1 : -1) * (1.4 + (h % 7) * 0.15) : 0; }
+  return v.windM;
 }
 function matchNight(m){
   if (PREFS.light === 'day') return false;
@@ -675,9 +688,10 @@ function recFrame(v){
     R.push({ t: s.t, b: [v.ball.x, v.ball.y, v.ball.z || 0], d: { home: pack('home'), away: pack('away') }, phase: s.phase, strike: s.strike, tackle: s.tackle, dive: s.dive, net: s.net, poss: s.poss, holder: s.holder, pass: !!s.pass, atk: s.attack ? s.attack.side : null });
     while (R.length && R[0].t < s.t - 8) R.shift();
   }
-  if (s.phase === 'celebrate' && v.lastPhase !== 'celebrate' && s.celebrate) v.goalAt = { t: s.t, side: s.celebrate.side };
+  if (s.phase === 'celebrate' && v.lastPhase !== 'celebrate' && s.celebrate) v.goalAt = { t: s.t, side: s.celebrate.side, who: (v.dots[s.celebrate.side][s.celebrate.scorer] || {}).name || '', minute: Math.floor(v.minute) };
   if (v.lastPhase === 'celebrate' && s.phase !== 'celebrate' && v.goalAt && (PREFS.speed || 2) <= 4 && PREFS.replays !== false && R.length > 10) {
     const from = Math.max(R[0].t, v.goalAt.t - 3.4);
+    hlRecord(v, from, v.goalAt.t + 0.6, { kind: 'goal', side: v.goalAt.side, who: v.goalAt.who, minute: v.goalAt.minute });
     say('replay', {});
     v.replay = { t: from, to: v.goalAt.t + 0.6, rate: 0.6, side: v.goalAt.side === 'home' ? 1 : -1, cut: true };
     const b = document.getElementById('mvReplay'); if (b) b.classList.add('on');
@@ -686,6 +700,7 @@ function recFrame(v){
   // Replay of a big save or a shot off the woodwork, once the shot is over.
   if (v.bigChance && s.phase !== 'shot' && s.phase !== 'celebrate' && s.t > v.bigChance.t + 0.8 && (PREFS.speed || 2) <= 4 && PREFS.replays !== false && R.length > 10) {
     const from = Math.max(R[0].t, v.bigChance.t - 3);
+    hlRecord(v, from, Math.min(s.t, v.bigChance.t + 1.4), { kind: v.bigChance.kind, side: v.bigChance.side, who: v.bigChance.who, minute: v.bigChance.minute });
     say('replay', {});
     v.replay = { t: from, to: Math.min(s.t, v.bigChance.t + 1.4), rate: 0.6, side: v.bigChance.side === 'home' ? 1 : -1, cut: true };
     const b = document.getElementById('mvReplay'); if (b) b.classList.add('on');
@@ -714,7 +729,14 @@ const SHAPE = {
   counter:    { line: -0.05, width: 0.96, compact: 0.84, overlap: 0.05, press: 1 },
   low_block:  { line: -0.09, width: 0.9, compact: 0.72, overlap: 0.03, press: 1 },
 };
-const shapeOf = (v, side) => SHAPE[(v.m.tactics || {})[side]] || SHAPE.possession;
+// Instructions adjust the shape: line height, width with the ball, compactness without it.
+const INSTR_SHAPE = { line: { deep: { line: -0.04 }, high: { line: 0.045 } }, width: { narrow: { width: 0.9, compact: 0.92 }, wide: { width: 1.09, compact: 1.04 } } };
+const shapeOf = (v, side) => {
+  const base = SHAPE[(v.m.tactics || {})[side]] || SHAPE.possession, ins = (v.m.instructions || {})[side];
+  if (!ins) return base;
+  const l = INSTR_SHAPE.line[ins.line] || {}, w = INSTR_SHAPE.width[ins.width] || {};
+  return { ...base, line: base.line + (l.line || 0), width: base.width * (w.width || 1), compact: base.compact * (w.compact || 1) };
+};
 let VIEW = null;
 function basePositions(lineup, mirror){
   const used = {};
@@ -728,13 +750,14 @@ function basePositions(lineup, mirror){
 function normalizeMatch(x){
   const name = v => (typeof v === 'string' ? v : v && v.name);
   return { home: name(x.home), away: name(x.away), compName: x.compName, events: (x.events || []).slice().sort((a, b) => a.min - b.min), lineups: x.lineups || { home: [], away: [] }, pos: x.pos, myKey: x.myKey || null,
-    tl: unpackTimeline(x.timeline), spells: x.timeline ? x.timeline.spells : null, ts: x.ts || null, tactics: x.timeline ? x.timeline.tactics || null : null };
+    tl: unpackTimeline(x.timeline), spells: x.timeline ? x.timeline.spells : null, ts: x.ts || null, tactics: x.timeline ? x.timeline.tactics || null : null, instructions: x.timeline ? x.timeline.instructions || null : null };
 }
 function playHalf(match, fromMin, toMin, done){
   const mode = PREFS.viewMode || '3d';
   document.getElementById('genMoContent').classList.remove('mvx');
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   const m = normalizeMatch(match);
+  if (fromMin === 0 || (HL && HL.key !== hlKey(m))) HL = null;
   if (mode === 'instant' || !m.lineups.home.length) return done();
   openMo('genMo');
   const use3d = mode === '3d' && typeof Worker !== 'undefined';
@@ -759,13 +782,68 @@ function playHalf(match, fromMin, toMin, done){
   if (use3d) start3D(VIEW); else requestAnimationFrame(viewTick);
 }
 const VIEW_MODES = [['3d', '3D stadium'], ['full', 'Full 2D'], ['key', 'Key moments'], ['commentary', 'Commentary'], ['instant', 'Instant result']];
+const view3dOptions = m => ({ homeHue: m.lineups.homeHue ?? 210, awayHue: m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', m.home, m.away, 'THE GAFFER'], night: matchNight(m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: m.lineups.capacity, attendance: m.lineups.attendance, name: m.home }, weather: matchWeather(m) });
+
+// ── Highlights ──────────────────────────────────────────────────────
+// Every goal, big save and shot off the woodwork shown in 3D is kept as a clip (the recorded
+// frames of what was on screen). At full time the report offers the reel: each moment again in
+// slow motion, goals a second time from behind the goal.
+let HL = null;
+const hlKey = m => `${m.home}|${m.away}|${m.compName || ''}`;
+function hlRecord(v, from, to, info){
+  if (!v.three || !v.rec) return;
+  if (!HL || HL.key !== hlKey(v.m)) HL = { key: hlKey(v.m), m: v.m, clips: [], ready: false };
+  const frames = v.rec.filter(f => f.t >= from - 0.01 && f.t <= to + 0.01);
+  if (frames.length < 10) return;
+  const dots = {}; for (const side of ['home', 'away']) dots[side] = v.dots[side].map(d => ({ id: d.id, name: d.name, slot: d.slot, x: d.x, y: d.y, bx: d.bx, by: d.by, off: d.off }));
+  HL.clips.push({ frames, dots, score: { ...v.score }, ...info });
+  if (HL.clips.length > 16) HL.clips.shift();
+}
+function playHighlights(back){
+  if (!HL || !HL.clips.length) return back();
+  const m = HL.m, clips = HL.clips.flatMap(c => c.kind === 'goal' ? [c, { ...c, angle: 'behind' }] : [c]);
+  openMo('genMo');
+  const box = document.getElementById('genMoContent');
+  box.classList.add('mvx');
+  box.innerHTML = `<div class="small dim" style="text-align:center">Highlights · ${esc(m.home)} v ${esc(m.away)}</div>
+    <div class="mv3d" id="mv3d" onclick="HV && (HV.skip = true)"><div class="mv-replay on" id="mvReplay">REPLAY</div>
+      <div id="hlCap" style="position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(8,12,20,.78);color:#fff;padding:5px 12px;border-radius:6px;font-weight:700;font-size:14px;z-index:3;white-space:nowrap"></div></div>
+    <div class="row mt8"><span class="small dim" id="hlCount"></span><button class="btn bsm bg" onclick="HV && (HV.skip = true)">Next ⏭</button><button class="btn bsm bp" id="hlBack">Back to the report</button></div>`;
+  const hv = HV = { m, k: 0, clips, three: null, skip: false, closed: false, last: performance.now() };
+  const close = () => { if (hv.closed) return; hv.closed = true; if (HV === hv) HV = null; try { hv.three && hv.three.dispose && hv.three.dispose(); } catch {} back(); };
+  document.getElementById('hlBack').onclick = close;
+  import('./match3d.js').then(mod => mod.createView(document.getElementById('mv3d'), { ...view3dOptions(m), cam: () => 'tv' })).then(three => {
+    if (hv.closed) return;
+    hv.three = three; hlStart(hv, 0);
+    const tick = now => {
+      if (hv.closed || HV !== hv) return;
+      const dt = Math.min(0.1, (now - hv.last) / 1000); hv.last = now;
+      const c = hv.clips[hv.k];
+      hv.t += dt * hv.rate;
+      if (hv.skip || hv.t >= c.frames[c.frames.length - 1].t) { hv.skip = false; if (hv.k + 1 >= hv.clips.length) return close(); hlStart(hv, hv.k + 1); }
+      const cc = hv.clips[hv.k];
+      hv.three.render(replayFrame({ m, rec: cc.frames, dots: cc.dots, replay: hv.replay, score: cc.score }, hv.t), now);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }).catch(() => close());
+}
+let HV = null;
+function hlStart(hv, k){
+  const c = hv.clips[k];
+  hv.k = k; hv.t = c.frames[0].t; hv.rate = c.angle ? 0.5 : 0.7;
+  hv.replay = { t: hv.t, to: c.frames[c.frames.length - 1].t, rate: hv.rate, side: c.side === 'home' ? 1 : -1, cut: true, angle: c.angle || null };
+  const cap = document.getElementById('hlCap'), cnt = document.getElementById('hlCount');
+  if (cap) cap.textContent = `${c.minute}' ${c.kind === 'goal' ? '⚽ ' + (c.who || 'Goal') : c.kind === 'save' ? '🧤 Big save — ' + (c.who || '') : '🥅 Off the woodwork — ' + (c.who || '')}${c.angle ? ' · from behind the goal' : ''}`;
+  if (cnt) cnt.textContent = `${k + 1} / ${hv.clips.length}`;
+}
 // The 3D view lives in match3d.js (three.js, loaded on demand). If WebGL or the module is missing,
 // the match falls back to the 2D pitch automatically.
 async function start3D(v){
   try {
     const mod = await import('./match3d.js');
     if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), { homeHue: v.m.lineups.homeHue ?? 210, awayHue: v.m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', v.m.home, v.m.away, 'THE GAFFER'], night: matchNight(v.m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: v.m.lineups.capacity, attendance: v.m.lineups.attendance, name: v.m.home }, weather: matchWeather(v.m) });
+    v.three = await mod.createView(document.getElementById('mv3d'), view3dOptions(v.m));
     document.getElementById('genMoContent').classList.add('mvx');
     hudInit(v);
     if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
@@ -802,9 +880,9 @@ function markEvent(e, silent){
   }
   else if (live && e.type === 'shot') {
     const saved = e.outcome === 'saved' || /saved/.test(e.text || ''), sh = v.sim && v.sim.shot, other = e.side === 'home' ? 'away' : 'home';
-    // Big chances get a replay too: a save from a good chance, or a shot off the woodwork.
-    if ((saved && (e.xg || 0) >= 0.2) || (sh && sh.wood)) v.bigChance = { t: v.sim ? v.sim.t : 0, side: e.side };
     const shooter = (side.find(x => x.id === e.playerId) || {}).name || '', keeper = ((v.dots[other] || [])[v.sim ? v.sim.gk[other] : 0] || {}).name || 'the keeper';
+    // Big chances get a replay too: a save from a good chance, or a shot off the woodwork.
+    if ((saved && (e.xg || 0) >= 0.2) || (sh && sh.wood)) v.bigChance = { t: v.sim ? v.sim.t : 0, side: e.side, kind: sh && sh.wood ? 'woodwork' : 'save', who: shooter, minute: e.min };
     if (!sh) audioEv('SHOOT', { side: e.side, x: goalSideX(e.side), power: 0.9 });   // a strike for every attempt
     if (saved) { const kind = v.sim && v.sim.dive ? v.sim.dive.kind : 'dive'; audioEv('SAVE', { side: e.side, x: goalSideX(e.side), kind }); say(kind === 'punch' ? 'punch' : 'save', { keeper: surname(keeper), player: surname(shooter) }); }
     else if (sh && sh.wood) { audioEv('WOODWORK', { side: e.side, x: goalSideX(e.side) }); say('woodwork', { player: surname(shooter) }); }
@@ -858,7 +936,7 @@ function viewTick(now){
   while (v.idx < v.m.events.length && v.m.events[v.idx].min <= v.minute && v.m.events[v.idx].min <= v.to) { markEvent(v.m.events[v.idx], false); v.idx++; changed = true; }
   if (changed) { feedRender(); statsRender(); }
   const clock = document.getElementById('mvClock'); if (clock) clock.textContent = `${Math.floor(v.minute)}'`;
-  if (v.m.tl && Math.floor(v.minute) !== v.statsMin) { v.statsMin = Math.floor(v.minute); statsRender(); }
+  if (v.m.tl && Math.floor(v.minute) !== v.statsMin) { v.statsMin = Math.floor(v.minute); statsRender(); tlMoveCommentary(v); }
   stepPositions(now, v.paused ? 0 : dt);
   if (v.three) { recFrame(v); v.three.render(v, now); hudRender(v); } else drawPitch(now);
   if (v.minute >= v.to && !(v.hold > 0)) {
@@ -1016,6 +1094,16 @@ function tlTurnovers(v){
   if (!e || e.type === 'TACKLE') audioEv('TACKLE', { side, x: v.ball.x, slide: !!(e && e.kind === 'sliding') });
   if (e && (e.type === 'TACKLE' || e.type === 'INTERCEPTION') && Math.random() < 0.3) say(e.type === 'TACKLE' ? 'tackle' : 'interception', { player: surname((v.dots[side][idx] || {}).name), club: clubOf(v, side) });
 }
+// A long passing move gets a line of commentary ("14 passes in this move"), once per spell.
+function tlMoveCommentary(v){
+  const sp = v.m.spells; if (!sp || !sp.length) return;
+  const clock = v.minute * 60;
+  let k = 0; while (k < sp.length - 1 && sp[k][2] <= clock) k++;
+  const [sd, t0] = sp[k]; if (v.saidSpell === t0) return;
+  const side = sd ? 'away' : 'home';
+  let n = 0; for (const e of v.m.tl) { if (e.t < t0) continue; if (e.t > clock) break; if (e.type === 'PASS' && e.side === side && e.out === 'complete') n++; }
+  if (n >= 12) { v.saidSpell = t0; say('keepball', { club: clubOf(v, side), n }); }
+}
 // Live possession and passing from the timeline, up to the current clock.
 function tlLiveStats(v){
   if (!v.m.tl || !v.m.spells) return null;
@@ -1090,7 +1178,11 @@ function simPass(v, secsTo){
   // Ball flight (public/ball.js): the timeline's pass type, or one chosen from the distance and positions.
   const wide = Math.abs(v.ball.y - 0.5) > 0.27, box = dir * (tp[0] - 0.5) > 0.33 && Math.abs(tp[1] - 0.5) < 0.2;
   const kind = (tlKind === 'cross' || tlKind === 'long' || tlKind === 'through' || tlKind === 'short') ? tlKind : window.GafferBall ? GafferBall.kindFor(dist, wide, box) : 'short';
-  const plan = window.GafferBall ? GafferBall.plan(kind, dist) : null;
+  // Curl: crosses swing in or out, long balls and through balls bend a little, short passes don't.
+  const curlM = kind === 'cross' ? rnd(2, 4.5) : kind === 'long' ? rnd(0, 2) : kind === 'through' ? rnd(0, 1) : 0;
+  const chest = kind === 'long' && to !== s.gk[s.poss] && steal == null && Math.random() < 0.4;   // some long balls are taken on the chest
+  const plan = window.GafferBall ? GafferBall.plan(kind, dist, { curl: (Math.random() < 0.5 ? -1 : 1) * curlM, arrive: chest ? 'chest' : null }) : null;
+  if (plan && plan.lofted) plan.wind = windOf(v) * plan.dur * 0.6;
   s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind };
   s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: kind === 'long' || kind === 'cross' ? 0.9 : kind === 'through' ? 0.75 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
   s.carry = null;
@@ -1113,12 +1205,23 @@ function simShoot(v, secs){
   if (type === 'off' && Math.random() < 0.16) { wood = Math.random() < 0.55 ? 'post' : 'bar'; to = [gx + dir * 0.002, wood === 'post' ? 0.5 + (Math.random() < 0.5 ? -1 : 1) * 0.0345 : 0.5 + rnd(-0.03, 0.03)]; z1 = wood === 'bar' ? 0.37 : rnd(0.05, 0.3); }
   s.phase = 'shot';
   s.shot = { from: [v.ball.x, v.ball.y], to, z1, t0: s.t + 0.12, dur: Math.max(0.25, secs - 0.12), type, side: a.side, wood };
+  if (window.GafferBall) {
+    const sd = Math.hypot(to[0] - v.ball.x, (to[1] - v.ball.y) * 0.65);
+    s.shot.plan = GafferBall.shot(sd, { z1, curl: (Math.random() < 0.5 ? -1 : 1) * rnd(0, sd > 0.16 ? 3 : 1.2) });
+  }
   s.strike = { side: a.side, idx: a.shooter, t0: s.t, power: 1, dir: [to[0] - d.x, to[1] - d.y] };
   const def = otherSide(a.side);
   s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t,
     kind: type === 'saved' ? (z1 > 0.22 ? 'punch' : Math.abs(to[1] - 0.5) < 0.022 ? 'catch' : 'dive') : 'dive' };
   s.block = null;
   if (type === 'off' && Math.random() < 0.35) { const [bi] = simNearest(v.dots[def], d.x + dir * 0.03, d.y, s.gk[def]); if (bi >= 0) s.block = { side: def, idx: bi, t0: s.t + 0.05, x: d.x + dir * 0.025, y: d.y + (to[1] - d.y) * 0.15 }; }
+  // A blocked shot comes off the defender and loops away wide (it was a miss anyway).
+  if (s.block && window.GafferBall) {
+    const fx = s.shot.from[0], at = Math.max(0.05, Math.min(0.6, (s.block.x - fx) / ((to[0] - fx) || 1e-6)));
+    const df = GafferBall.deflection(gx, dir, s.shot.from[1], Math.round(s.t * 1000));
+    s.shot.defl = { at, from: [s.block.x, s.block.y], to: df.to, z: df.z, hit: false };
+    s.shot.wood = null;
+  }
   { const ev = { side: a.side, x: d.x, power: 0.75 + Math.random() * 0.25 }; setTimeout(() => { if (VIEW === v && !v.paused) audioEv('SHOOT', ev); }, 120 / simSpeed()); }
   say('shot', { player: surname(d.name), club: clubOf(v, a.side) });
 }
@@ -1186,7 +1289,8 @@ function stepPositions(now, dt){
       const fl = s.pass.plan ? GafferBall.at(s.pass.plan, Math.max(0, s.t - s.pass.t0)) : null;
       const p = fl ? fl.p : s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
       ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = fl ? fl.z : Math.sin(p * Math.PI) * s.pass.lob;
-      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
+      if (fl && fl.side) { const o = GafferBall.sidewaysUnits(s.pass.from, s.pass.to, fl.side); ball.x += o[0]; ball.y += o[1]; }
+      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t, chest: !!(ps.plan && ps.plan.chest && ps.steal == null) }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
     } else {
       const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
@@ -1197,8 +1301,18 @@ function stepPositions(now, dt){
         else if (oi >= 0 && od < 0.035) audioEv('PRESS', { side: s.poss, x: h.x }); }
     }
   } else if (s.phase === 'shot' && s.shot) {
-    const p = Math.max(0, Math.min(1, (s.t - s.shot.t0) / s.shot.dur));
-    ball.x = s.shot.from[0] + (s.shot.to[0] - s.shot.from[0]) * p; ball.y = s.shot.from[1] + (s.shot.to[1] - s.shot.from[1]) * p; ball.z = s.shot.z1 * p + Math.sin(p * Math.PI) * 0.1;
+    const p = Math.max(0, Math.min(1, (s.t - s.shot.t0) / s.shot.dur)), sh = s.shot, df = sh.defl;
+    if (df && p > df.at) {
+      // Off the blocker: a new, looping path wide of the post.
+      const q = (p - df.at) / (1 - df.at);
+      if (!df.hit) { df.hit = true; df.z0 = ball.z; audioEv('TOUCH', { side: otherSide(sh.side), x: ball.x }); }
+      ball.x = df.from[0] + (df.to[0] - df.from[0]) * q; ball.y = df.from[1] + (df.to[1] - df.from[1]) * q;
+      ball.z = (df.z0 || 0.05) + (df.z - (df.z0 || 0.05)) * q + Math.sin(q * Math.PI) * 0.25;
+    } else if (sh.plan) {
+      const f = GafferBall.shotAt(sh.plan, p);
+      ball.x = sh.from[0] + (sh.to[0] - sh.from[0]) * f.p; ball.y = sh.from[1] + (sh.to[1] - sh.from[1]) * f.p; ball.z = f.z;
+      if (f.side) { const o = GafferBall.sidewaysUnits(sh.from, sh.to, f.side); ball.x += o[0]; ball.y += o[1]; }
+    } else { ball.x = sh.from[0] + (sh.to[0] - sh.from[0]) * p; ball.y = sh.from[1] + (sh.to[1] - sh.from[1]) * p; ball.z = sh.z1 * p + Math.sin(p * Math.PI) * 0.1; }
   } else if (s.phase === 'held') {
     if (!s.goalKick) { ball.x += (h.x + dir * 0.006 - ball.x) * 0.4; ball.y += (h.y - ball.y) * 0.4; ball.z += (0.2 - ball.z) * 0.3; }
   } else if (s.phase === 'reset') { ball.x += (0.5 - ball.x) * 0.12; ball.y += (0.5 - ball.y) * 0.12; ball.z *= 0.7; }
@@ -1300,6 +1414,7 @@ function showHalftime(h){
       <div><label class="lbl">Tactic</label><select id="htTactic">${h.tactics.map(t => `<option value="${t}" ${t===h.tactic?'selected':''}>${t.replace('_',' ')}</option>`).join('')}</select></div>
       <div><label class="lbl">Formation</label><select id="htFormation">${h.formations.map(f => `<option ${f===h.formation?'selected':''}>${f}</option>`).join('')}</select></div>
     </div>
+    <div class="g3 mt8">${INSTR_UI.map(([key, label, opts]) => `<div><label class="lbl">${label}</label><select id="ht_${key}">${opts.map(([v, l]) => `<option value="${v}" ${((h.instructions || {})[key] || 'normal') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`).join('')}</div>
     <label class="lbl mt12">Team talk</label>
     <div class="row" id="htTalk" style="margin-bottom:6px">${[['encourage', 'Encourage', 'Best when level or behind'], ['demand', 'Demand more', 'Fires them up when losing; can backfire when winning'], ['calm', 'Stay calm', 'Protects a lead'], ['praise', 'Praise', 'Good when winning, flat when losing']].map(([k, l, tip]) => `<button class="btn bsm bg" data-talk="${k}" title="${tip}" onclick="pickTalk(this)">${l}</button>`).join('')}</div>
     <div class="small dim" id="htTalkHint">Pick a team talk (optional). ${h.home.goals === h.away.goals ? 'It is level.' : (h.myKey === 'home' ? h.home.goals > h.away.goals : h.away.goals > h.home.goals) ? 'You are winning.' : 'You are losing.'}</div>
@@ -1319,6 +1434,7 @@ async function resumeMatch(withChanges){
   if (withChanges) {
     body.tactic = document.getElementById('htTactic').value;
     body.formation = document.getElementById('htFormation').value;
+    body.instructions = Object.fromEntries(INSTR_UI.map(([key]) => [key, (document.getElementById('ht_' + key) || {}).value || 'normal']));
     body.subs = HT.subs.slice();
   }
   closeMo('genMo');
@@ -1769,12 +1885,25 @@ function renderHtSubs(){
 function cancelSub(offId){ HT.subs = HT.subs.filter(s => s.offId !== offId); renderHtSubs(); }
 
 // ── TACTICS ─────────────────────────────────────────────────────────
+// Team instructions on top of the style (src/engine/matchEngine.js instrMods).
+const INSTR_UI = [
+  ['line', 'Defensive line', [['deep', 'Deep'], ['normal', 'Normal'], ['high', 'High']]],
+  ['width', 'Width', [['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide']]],
+  ['tempo', 'Tempo', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]],
+];
+const INSTR_HELP = {
+  line: { deep: 'Fewer clear chances against you, but more pressure and fewer bodies forward.', normal: 'A balanced line.', high: 'Squeezes the pitch and wins the ball higher — but quick forwards get in behind. Best with fast defenders.' },
+  width: { narrow: 'Crowds the middle: concedes less, creates a little less, better-quality chances.', normal: 'Balanced width.', wide: 'Stretches them through the wings — more chances, especially against weak full-backs, and a little more space for them.' },
+  tempo: { slow: 'Keeps the ball and picks better chances; fewer attacks, fresher legs.', normal: 'Balanced tempo.', fast: 'More, quicker attacks and an open game — tires players faster.' },
+};
 function rTactics(){
   const desc = { high_press: 'Win the ball high. More chances, tires players faster.', counter: 'Absorb pressure and break quickly.', possession: 'Control the tempo and keep the ball.', low_block: 'Sit deep and compact. Least tiring.' };
   return `<div class="sct">Tactics & Training</div><div class="g2">
     <div class="card"><div class="ch">Style</div>${STATE.tactics.map(t => `<div onclick="setTac('tactic','${t}')" class="lbr" style="cursor:pointer;padding:9px;border:1px solid ${STATE.tactic === t ? 'var(--ac)' : 'var(--bd)'};border-radius:9px;margin-bottom:6px"><div><div style="font-weight:600">${t.replace('_', ' ')}</div><div class="small dim">${desc[t]}</div></div></div>`).join('')}
       <div class="ch mt12">Formation</div><div class="row">${STATE.formations.map(f => `<button class="btn bsm ${STATE.formation === f ? 'bact' : 'bg'}" onclick="setTac('formation','${f}')">${f}</button>`).join('')}</div>
-      <div class="small dim mt8">Changing formation resets slot picks that no longer exist.</div></div>
+      <div class="small dim mt8">Changing formation resets slot picks that no longer exist.</div>
+      <div class="ch mt12">Instructions</div>
+      ${INSTR_UI.map(([key, label, opts]) => `<label class="lbl">${label}</label><div class="row" style="margin-bottom:4px">${opts.map(([v, l]) => `<button class="btn bsm ${((STATE.instructions || {})[key] || 'normal') === v ? 'bact' : 'bg'}" onclick="setTac('${key}','${v}')">${l}</button>`).join('')}</div><div class="small dim" style="margin-bottom:10px">${INSTR_HELP[key][(STATE.instructions || {})[key] || 'normal']}</div>`).join('')}</div>
     <div class="card"><div class="ch">Training (automatic)</div>
       <div class="small dim" style="margin-bottom:10px">Training runs itself every week for the whole squad. Change these only if you want to steer it.</div>
       <label class="lbl">Focus</label><div class="row" style="margin-bottom:12px">${STATE.trainingFocuses.map(f => `<button class="btn bsm ${STATE.trainingFocus === f ? 'bact' : 'bg'}" onclick="setTac('trainingFocus','${f}')">${f}</button>`).join('')}</div>
@@ -2268,7 +2397,7 @@ function rSettings(){
       <label class="lbl">Text size</label><div class="row" style="margin-bottom:10px">${['normal', 'large'].map(t => `<button class="btn bsm ${(PREFS.size || 'normal') === t ? 'bact' : 'bg'}" onclick="PREFS.size='${t}';savePrefs();applyPrefs();renderSection('settings')">${t}</button>`).join('')}</div>
       <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D graphics quality</label><select onchange="PREFS.gfx=this.value;savePrefs()">${[['auto', 'Automatic (decides from your device)'], ['low', 'Low — smoothest on older phones'], ['high', 'High — sharper, with shadows']].map(([k, l]) => `<option value="${k}" ${(PREFS.gfx || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <label class="lbl mt12">3D weather</label><select onchange="PREFS.weather=this.value;savePrefs()">${[['on', 'Changes by fixture — some matches are played in the rain'], ['off', 'Always dry']].map(([k, l]) => `<option value="${k}" ${(PREFS.weather || 'on') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">3D weather</label><select onchange="PREFS.weather=this.value;savePrefs()">${[['on', 'Changes by fixture — rain, wind, and snow in winter'], ['off', 'Always dry and calm']].map(([k, l]) => `<option value="${k}" ${(PREFS.weather || 'on') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D players</label><select onchange="PREFS.models=this.value;savePrefs()">${[['mocap', 'Motion-captured — natural running, kicking and celebrating'], ['classic', 'Classic — lighter figures for very old phones']].map(([k, l]) => `<option value="${k}" ${(PREFS.models || 'mocap') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Match audio mixer</label>
       <div class="card" style="padding:10px">${[['crowd', '🏟 Crowd'], ['ref', '🟨 Referee'], ['ball', '⚽ Ball and boots'], ['commentary', '🎙 Commentary'], ['announcer', '📢 Stadium announcer']].map(([k, l]) => { const val = { ...MIX_DEFAULT, ...(PREFS.mix || {}) }[k]; return `<div class="row" style="gap:8px;margin-bottom:6px"><span class="small" style="width:132px">${l}</span><input type="range" min="0" max="1" step="0.05" value="${val}" style="flex:1" oninput="PREFS.mix={...MIX_DEFAULT,...(PREFS.mix||{}),'${k}':+this.value};savePrefs();applyAudioPrefs();this.nextElementSibling.textContent=this.value>0?Math.round(this.value*100)+'%':'off'"><span class="small dim" style="width:34px;text-align:right">${val > 0 ? Math.round(val * 100) + '%' : 'off'}</span></div>`; }).join('')}
