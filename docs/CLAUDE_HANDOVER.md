@@ -77,7 +77,7 @@ node scripts/anim/extract-ara.js [file.glb]      # only when the Ara source clip
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v21`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v22`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

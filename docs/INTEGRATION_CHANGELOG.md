@@ -161,6 +161,21 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
   replay the release. A keeper whose side lost the ball before he released it no longer mimes a
   throw.
 
+## 10. Movement off the ball, the keeper's angle, and the last header cases (follow-up)
+* **Support runs:** the timeline's next receiver moves into the space his pass goes to before it is
+  played, and the nearest defender tracks him goal-side.
+* **Crosses:** on a cross or a header chance, two more attackers attack the near and far post and
+  defenders pick each of them up goal-side. Frozen mid-cross in 3D: 2 attackers and 4 defenders were
+  in the box.
+* **The keeper narrows the angle:** he comes off his line (at most 6 m) and across with the ball as it
+  enters his third.
+* **Header chances that run out of time before the cross** get one extension (the clock holds as in
+  `chanceShown`): a lay-off if the scorer has the ball, or the cross.
+* **Stricter audit (9 matches, 3 careers):**
+  * every one of the 124 engine shots and goals was visibly struck before being recorded;
+  * 0 problems;
+  * 13 of 16 header chances were shown as headers.
+
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -176,7 +191,7 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
 | Real phone, real GPU | **Not tested** |
 
 ## Remaining issues
-* About one header chance in six is still struck with the foot. This happens when the chance
-  starts while the other side has the ball.
+* About one header chance in five or six is still struck with the foot. This happens when there is
+  no way to get a cross in, such as a turnover right before the shot.
 * Ara 3D Gen bodies are evaluated, not shipped (size).
 * Real-phone frame rate and first-half start on a real GPU were not measured.

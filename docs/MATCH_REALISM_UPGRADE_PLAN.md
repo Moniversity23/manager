@@ -31,7 +31,7 @@ matchEngine (result, events)  ──►  timeline (passes, tackles, fouls, throw
 | 1 | **Events and animation agree with the timeline** | **Done:** one chance at a time (`chanceShown`). A goal or shot waits, with the clock held, until the view has struck it and the ball has arrived. Before this, two chances in the same minute collided: the second cut the goal celebration short and the ball sat in the net with no goal. Keepers dive only at real shots, take the save type (catch, parry or dive) from the timeline, and watch shots that are well wide or over. The dive side is fixed when the shot is struck. Browser audit: 9 matches in 3 careers, 0 problems (see the changelog) |
 | 2 | **Footballer movement and action transitions** | **Done in part:** 23 new football clips (passes with the inside of the foot, driven pass, shot, first touch, chest control, header and jumping header, standing and slide tackle, the keeper's set, catch, punch, dives and low dives, throw-in, a celebration). Each starts so its contact frame meets the ball (measured kick offset −0.02 to +0.02 s). Locomotion was already blended by speed and direction with smoothed acceleration; it was not changed |
 | 3 | **Ball interaction** | **Done in part:** the receiver plays a first touch or chest control as the pass arrives. Throw-ins are taken from above the head and the ball flies from the hands. Shots, passes and crosses keep the constrained flights of `public/ball.js` |
-| 4 | **Players' movement off the ball (AI) on screen** | **Planned:** use the timeline's pass receivers to start support runs earlier; track runners into the box on crosses |
+| 4 | **Players' movement off the ball (AI) on screen** | **Done:** the timeline's next receiver makes a run into the pass's space and his marker tracks him; on crosses, attackers attack the near and far post and are marked goal-side; the keeper narrows the angle |
 | 5 | **Player appearance** | Existing Studio and procedural faces. Ara 3D Gen bodies **evaluated, not shipped** (see `PLAYER_STUDIO_INTEGRATION_AUDIT.md`) |
 | 6 | **Replays and presentation** | Existing replays and highlights now show the new clips. Header shots are now shown as headers after a cross (most of them; see the changelog), and keepers throw or roll the ball out after a catch |
 | 7 | **Performance** | **Done:** one shared WebGL renderer per session with compiled shaders kept, a shader warm-up during the week's simulation, and the first half's view reused for the second half. Second-half start in headless Chrome: about 20 s → 0.7–1.5 s. First frame of the second half: 10 s → 0.04 s |
@@ -53,6 +53,5 @@ Substitutions during play use one of three windows, as in real football; half-ti
 ## Implementation sequence for what remains
 
 1. ~~Header shots~~ and ~~keeper distribution~~: done.
-2. Header chances that start while the other side has the ball: a quicker cross.
-3. Support runs and tracking runners from the timeline's upcoming receivers.
-4. A reduced Ara-based body for close-up cameras only (see the integration audit), loaded on demand.
+2. ~~Header chances that start while the other side has the ball~~ and ~~support runs~~: done.
+3. A reduced Ara-based body for close-up cameras only (see the integration audit), loaded on demand.

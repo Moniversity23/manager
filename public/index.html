@@ -1394,7 +1394,15 @@ function stepPositions(now, dt){
     // With a timeline, the attacking side gets the ball when its real build-up starts (at the latest now).
     if (s.attack && v.m.tl && s.poss !== s.attack.side && !s.pass && secsTo < 2.6) { const c = s.attack.chain; simGive(v, s.attack.side, c ? c[0] : s.attack.shooter, 0.15); }
     const secsLeft = s.attack && v.chanceDue === s.attack.ev ? Math.max(0, v.chanceAt - s.t) : secsTo;   // a hold set just above counts this frame
-    if (s.attack && secsLeft <= 0.55 && !(s.attack.header && s.pass && s.pass.toIdx === s.attack.shooter && s.pass.steal == null)) simShoot(v, secsLeft / 1);
+    // A header chance whose cross has not come yet gets one extension (the clock holds, as in
+    // chanceShown): time for a lay-off if the scorer has the ball, or for the cross.
+    if (s.attack && secsLeft <= 0.55 && s.attack.header && !s.attack.extended && s.poss === s.attack.side && !s.pass && window.GafferBall
+      && (s.holder !== s.attack.shooter || !s.attack.laidOff)) {
+      const sh = v.dots[s.attack.side][s.attack.shooter], cd = GafferBall.plan('cross', Math.hypot(sh.x - ball.x, (sh.y - ball.y) * 0.65)).dur;
+      s.attack.extended = true; v.chanceDue = s.attack.ev; v.chanceSince = performance.now();
+      v.chanceAt = s.t + (s.holder === s.attack.shooter ? 2.4 * k : cd + 0.6); s.nextAt = s.t;
+    }
+    else if (s.attack && secsLeft <= 0.55 && !(s.attack.header && s.pass && s.pass.toIdx === s.attack.shooter && s.pass.steal == null)) simShoot(v, secsLeft / 1);
   }
 
   // Phase changes
@@ -1458,6 +1466,37 @@ function stepPositions(now, dt){
     opp.forEach((d, i) => { if (d.off || i === pressIdx || i === s.gk[otherSide(s.poss)]) return; const dd = Math.hypot(d.x - ball.x, (d.y - ball.y) * 0.65); if (dd < best) { best = dd; press2 = i; } });
   }
   const carry = s.carry && s.t < s.carry.until && s.phase === 'play' && !s.pass ? s.carry : null;
+  // Off the ball (positions only, never outcomes): the timeline's next receiver moves into the space
+  // the pass will go to and the nearest defender tracks him; on a cross or a header chance two more
+  // attackers attack the box (near post and far post) and defenders pick up each of them goal-side.
+  const offBall = { run: null, mark: null, box: null, boxDef: null };
+  if (s.phase === 'play' && !s.pass && v.m.tl && !(s.attack && s.attack.side === s.poss)) {
+    const nx = tlNextPass(v, s.poss);
+    if (nx && nx.e.type === 'PASS' && nx.e.out === 'complete' && nx.e.to && nx.e.to[0] != null) {
+      const ri = dotOf(v, s.poss, nx.e.tid), team0 = v.dots[s.poss];
+      if (ri >= 0 && ri !== s.holder && ri !== s.gk[s.poss]) {
+        const r = team0[ri], dd = sideDir(s.poss), ahead = dd * (nx.e.to[0] - r.x) > -0.02;
+        const gx = ahead ? nx.e.to[0] : r.x + dd * 0.04;
+        offBall.run = { side: s.poss, idx: ri, to: [r.x + (gx - r.x) * 0.7, r.y + (nx.e.to[1] - r.y) * 0.7] };
+        const def = otherSide(s.poss), [mi] = simNearest(v.dots[def], offBall.run.to[0], offBall.run.to[1], s.gk[def]);
+        if (mi >= 0 && mi !== pressIdx && mi !== press2) offBall.mark = { side: def, idx: mi, of: ri };
+      }
+    }
+  }
+  const xa = s.attack && s.poss === s.attack.side && (s.phase === 'play' || s.phase === 'shot') && (s.attack.header || (s.pass && s.pass.kind === 'cross')) ? s.attack : null;
+  if (xa) {
+    const dd = sideDir(xa.side), gx = goalX(xa.side), team0 = v.dots[xa.side], def = otherSide(xa.side), dteam = v.dots[def];
+    const cand = team0.map((d, i) => ({ d, i })).filter(o => !o.d.off && o.i !== s.gk[xa.side] && o.i !== s.holder && o.i !== xa.shooter && dd * (o.d.bx - 0.5) > 0.12)
+      .sort((a, b) => dd * (b.d.x - a.d.x)).slice(0, 2);
+    const spots = [[gx - dd * 0.07, 0.45], [gx - dd * 0.1, 0.57]];
+    offBall.box = new Map(cand.map((o, k) => [o.i, spots[k]]));
+    offBall.boxDef = new Map();
+    for (const sp0 of [...offBall.box.values(), xa.spot]) {
+      let best = -1, bd = 9;
+      dteam.forEach((d, i) => { if (d.off || i === s.gk[def] || offBall.boxDef.has(i)) return; const q = Math.hypot(d.x - sp0[0], (d.y - sp0[1]) * 0.65); if (q < bd) { bd = q; best = i; } });
+      if (best >= 0) offBall.boxDef.set(best, [sp0[0] + dd * 0.014, sp0[1] + (sp0[1] < 0.5 ? 0.012 : -0.012)]);
+    }
+  }
   for (const side of ['home', 'away']) {
     const d0 = sideDir(side), inPoss = s.poss === side, shp = shapeOf(v, side), shift = (ball.x - 0.5) * 0.42 + (inPoss ? d0 * 0.05 : -d0 * 0.03) + d0 * shp.line * (inPoss ? 0.6 : 1);
     const ballInTheirHalf = d0 * (ball.x - 0.5) > 0.02;
@@ -1470,9 +1509,15 @@ function stepPositions(now, dt){
       let tx = d.bx + shift * (gk ? 0.07 : 1), ty = gk ? 0.5 + (ball.y - 0.5) * 0.16 : yb + (ball.y - yb) * (inPoss ? 0.2 : 0.3), sp = 0.05;
       if (inPoss && ballInTheirHalf && (d.slot === 'LB' || d.slot === 'RB') && (s.phase === 'play')) { tx += d0 * shp.overlap; ty += (d.by < 0.5 ? -1 : 1) * 0.03; }
       tx += 0.006 * Math.sin(s.t * 0.9 + i * 1.7); ty += 0.008 * Math.cos(s.t * 0.7 + i * 2.3);
+      // The keeper narrows the angle: off his line and across with the ball as it comes into his third (at most 6 m out).
+      if (gk && (s.phase === 'play' || s.phase === 'shot')) { const own = 1 - goalX(side), near = Math.max(0, 0.32 - Math.abs(ball.x - own)) / 0.32; tx += (ball.x - tx) * 0.09 * near; tx = own + Math.max(-0.06, Math.min(0.06, tx - own)); ty = 0.5 + (ball.y - 0.5) * (0.16 + 0.22 * near); }
       if (s.phase === 'play' || s.phase === 'shot') {
         const atk = s.attack && s.attack.side === side;
         if (atk && !gk && d0 * (d.bx - 0.5) > 0.1) { tx += d0 * 0.09; sp = 0.07; }
+        if (offBall.run && offBall.run.side === side && offBall.run.idx === i) { tx = offBall.run.to[0]; ty = offBall.run.to[1]; sp = 0.075; }
+        if (offBall.mark && offBall.mark.side === side && offBall.mark.idx === i) { const r = v.dots[otherSide(side)][offBall.mark.of]; tx = r.x - d0 * 0.018; ty = r.y + (0.5 - r.y) * 0.08; sp = 0.072; }
+        if (xa && side === xa.side && offBall.box.has(i)) { const q = offBall.box.get(i); tx = q[0]; ty = q[1]; sp = 0.085; }
+        if (xa && side !== xa.side && offBall.boxDef.has(i)) { const q = offBall.boxDef.get(i); tx = q[0]; ty = q[1]; sp = 0.082; }
         if (inPoss && i === s.holder && !s.pass && s.phase === 'play') {
           sp = 0.075;
           if (atk && i === s.attack.shooter) { tx = s.attack.spot[0]; ty = s.attack.spot[1]; sp = 0.09; }
