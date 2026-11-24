@@ -244,9 +244,16 @@ async function applyKits() {
 }
 
 // ── animation lab ──
-const CLIPS = [['idle', 'Idle'], ['walk', 'Walk'], ['jog', 'Run'], ['sprint', 'Sprint'], ['back', 'Back-pedal'], ['strafeL', 'Side-step'], ['kickSide', 'Pass'], ['kickFront', 'Shoot'], ['slide', 'Slide tackle'], ['block', 'Block'],
-  ['header', 'Header'], ['jumpAir', 'Jump'], ['celFist', 'Celebrate: fist'], ['celVictory', 'Celebrate: arms up'], ['celFlip', 'Celebrate: backflip'], ['celDab', 'Celebrate: dab'], ['celPower', 'Celebrate: power'], ['clap', 'Clap'],
-  ['ready', 'Keeper: set'], ['diveL', 'Keeper: dive left'], ['diveR', 'Keeper: dive right'], ['pickUp', 'Keeper: gather'], ['tired', 'Tired'], ['angry', 'Appeal'], ['fall', 'Fall'], ['getUp', 'Get up']];
+// Every clip the match players use. The football set (passes with the inside of the foot, first
+// touch, chest control, tackles, the keeper's catch, punch and dives, throws) comes from Ara 3D Gen,
+// retargeted onto the same skeleton; the rest from Mesh2Motion. A clip the build lacks is not listed.
+const CLIPS = [['idle', 'Idle'], ['walk', 'Walk'], ['jog', 'Run'], ['sprint', 'Sprint'], ['back', 'Back-pedal'], ['strafeL', 'Side-step'],
+  ['passIn', 'Pass: inside of the foot'], ['passL', 'Pass: across the body'], ['passR', 'Pass: opened up'], ['passA', 'Pass: driven'], ['shoot', 'Shoot'], ['receive', 'First touch'], ['chestCtl', 'Chest control'],
+  ['headerA', 'Header'], ['headerJump', 'Jumping header'], ['tackleA', 'Standing tackle'], ['slideA', 'Slide tackle'], ['block', 'Block'], ['throwIn', 'Throw-in'],
+  ['celJump', 'Celebrate: jump and turn'], ['celFist', 'Celebrate: fist'], ['celVictory', 'Celebrate: arms up'], ['celFlip', 'Celebrate: backflip'], ['celDab', 'Celebrate: dab'], ['celPower', 'Celebrate: power'], ['clap', 'Clap'],
+  ['gkReady', 'Keeper: set'], ['gkCatch', 'Keeper: catch'], ['gkPunch', 'Keeper: punch'], ['gkDiveL', 'Keeper: dive left'], ['gkDiveR', 'Keeper: dive right'], ['gkLowL', 'Keeper: low dive left'], ['gkLowR', 'Keeper: low dive right'],
+  ['gkPick', 'Keeper: pick up'], ['gkThrow', 'Keeper: throw'], ['gkRoll', 'Keeper: roll out'],
+  ['kickSide', 'Kick (classic)'], ['kickFront', 'Volley (classic)'], ['tired', 'Tired'], ['angry', 'Appeal'], ['fall', 'Fall'], ['getUp', 'Get up']];
 function buildClips() {
   const have = new Set(view ? view.clips : []);
   $('clipList').innerHTML = CLIPS.filter(([k]) => have.has(k)).map(([k, l]) => `<button data-clip="${k}"${k === 'idle' ? ' class="on"' : ''}>${l}</button>`).join('');

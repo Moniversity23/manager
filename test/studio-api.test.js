@@ -114,7 +114,7 @@ describe('Player Studio — in a career', () => {
     expect((await call('POST', '/api/load/auto', {})).ok).toBe(true);
     expect(JSON.stringify(mergeForRenderer(world().players.get(p.id)))).toBe(look1);
     // Line-ups for a match include his Studio look; the others keep theirs.
-    let out; do { out = world().stepWeek({}); } while (!world().lastMatch);
+    do { world().stepWeek({}); } while (!world().lastMatch);
     const lu = world().lastMatch.lineups;
     const all = [...lu.home, ...lu.away];
     const mine = all.find(x => x.playerId === p.id);
@@ -175,7 +175,7 @@ describe('Player Studio — in a career', () => {
     expect(ok.ok).toBe(true);
     const w2 = GameWorld.fromSave(JSON.parse(JSON.stringify(world().toSave())));
     expect(w2.club().kits.home.shirt).toBe('#123456');
-    let out; do { out = world().stepWeek({}); } while (!world().lastMatch);
+    do { world().stepWeek({}); } while (!world().lastMatch);
     const lm = world().lastMatch, side = lm.myKey;
     expect(lm.lineups.kits[side].shirt).toBe('#123456');
     expect(lm.lineups.badges[side].crest.initials.length).toBeGreaterThan(0);

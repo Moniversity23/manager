@@ -73,9 +73,6 @@ const DRAIN_PER_MIN = 0.2;      // condition points per minute for an average pl
 const BASE_XG = 1.27;           // xG per 90 for a side facing an equal opponent (before home edge)
 const SHOT_XG = 0.11;           // average xG per shot
 const HOME_EDGE = 1.085;
-const SEGMENTS_H1 = [[0, 15], [15, 30], [30, 45]];
-const SEGMENTS_H2 = [[45, 60], [60, 75], [75, 90]];
-const SEGMENTS_ET = [[90, 105], [105, 120]];
 const INJURY_TYPES = ['hamstring strain', 'ankle sprain', 'calf strain', 'knee ligament', 'groin strain', 'thigh bruise', 'concussion'];
 
 const SHOOT_W = { ST: 5, CF: 5, LW: 3, RW: 3, CAM: 3, CM: 1.4, CDM: 0.7, LB: 0.6, RB: 0.6, CB: 0.6, GK: 0.01 };
@@ -313,24 +310,54 @@ function playSegment(m, from, to, ctx) {
   m.minute = to;
 }
 
-function playFirstHalf(m, ctx) {
+// The manager's own match (interactiveSide set, watched or not) is played in five-minute segments,
+// so a change he makes while watching takes effect within five minutes. The rates are the same as
+// in 15-minute segments (shots are Poisson per minute; cards, injuries and fatigue scale with the
+// segment's length), so only the order of the random draws differs. Other matches keep 15, and
+// recording the timeline (recordShots) still never changes a result.
+const LIVE_SEGMENT = 5;
+function segmentsOf(m, from, to) {
+  const len = m.interactiveSide ? LIVE_SEGMENT : 15;
+  const out = [];
+  for (let a = from; a < to; a += len) out.push([a, Math.min(to, a + len)]);
+  return out;
+}
+// Plays [from, to). ctx.snapshot(m, minute), when given, is called before every segment so a live
+// match can be rewound to that minute; the assistant's substitutions at 60 and 75 come after it.
+function playRange(m, from, to, ctx) {
+  for (const [a, b] of segmentsOf(m, from, to)) {
+    if (ctx.snapshot) ctx.snapshot(m, a);
+    if (a === 60 || a === 75) { assistantSubs(m, 'home', a, ctx); assistantSubs(m, 'away', a, ctx); }
+    playSegment(m, a, b, ctx);
+  }
+}
+
+function playFirstHalf(m, ctx, from = 0) {
   m.phase = 'first';
-  for (const [a, b] of SEGMENTS_H1) playSegment(m, a, b, ctx);
+  playRange(m, from, 45, ctx);
   if (m.recordShots) TL.extend(m, ctx, 0, 45);           // the authoritative action timeline (src/engine/timeline.js)
   m.phase = 'halftime';
 }
 
-// Manager decisions at halftime: { tactic, formation, subs: [{ offId, onId }] }.
-function applyHalftime(m, key, decisions = {}, ctx) {
+// Manager decisions at halftime: { tactic, formation, subs: [{ offId, onId }] }. During play
+// (minute < 45 or > 45) the same decisions apply at that minute, and substitutions use one of
+// the three in-play windows.
+function applyHalftime(m, key, decisions = {}, ctx, minute = 45) {
   const side = m[key];
   const club = sideClub(m, key, ctx);
   const applied = { subs: 0, tactic: null, formation: null, errors: [] };
   if (decisions.tactic && TACTIC_MATRIX[decisions.tactic]) { side.tactic = decisions.tactic; club.tactic = decisions.tactic; applied.tactic = decisions.tactic; }
   if (decisions.instructions && typeof decisions.instructions === 'object') { side.instr = normInstr({ ...side.instr, ...decisions.instructions }); club.instructions = { ...side.instr }; applied.instructions = side.instr; }
-  for (const s of (decisions.subs || []).slice(0, MAX_SUBS)) {
-    const offId = parseInt(s.offId, 10), onId = parseInt(s.onId, 10);
-    if (makeSub(m, key, offId, onId, 45, 'manager', ctx)) { side.manualSubs++; applied.subs++; }
-    else applied.errors.push(`Invalid substitution ${offId} → ${onId}`);
+  const inPlay = minute !== 45 && minute !== 90;
+  const subs = (decisions.subs || []).slice(0, MAX_SUBS);
+  if (inPlay && subs.length && side.windowsUsed >= MAX_WINDOWS) applied.errors.push('All three substitution windows have been used');
+  else {
+    for (const s of subs) {
+      const offId = parseInt(s.offId, 10), onId = parseInt(s.onId, 10);
+      if (makeSub(m, key, offId, onId, minute, 'manager', ctx)) { side.manualSubs++; applied.subs++; }
+      else applied.errors.push(`Invalid substitution ${offId} → ${onId}`);
+    }
+    if (inPlay && applied.subs) side.windowsUsed++;
   }
   if (decisions.formation && decisions.formation !== side.formation && buildSlotMap(decisions.formation).length === 11) {
     reslot(side, decisions.formation, ctx);
@@ -361,15 +388,14 @@ function reslot(side, formation, ctx) {
   side.formation = formation;
 }
 
-function playSecondHalf(m, ctx) {
+// The second half from `from` (45, or a later minute when a live match is rewound), then extra
+// time and penalties in a knockout tie.
+function playSecondHalf(m, ctx, from = 45) {
   m.phase = 'second';
-  for (const [a, b] of SEGMENTS_H2) {
-    if (a === 60 || a === 75) { assistantSubs(m, 'home', a, ctx); assistantSubs(m, 'away', a, ctx); }
-    playSegment(m, a, b, ctx);
-  }
-  if (m.knockout && m.home.goals === m.away.goals) {
+  if (from < 90) playRange(m, from, 90, ctx);
+  if (from > 90 || (m.knockout && m.home.goals === m.away.goals)) {
     m.phase = 'extra';
-    for (const [a, b] of SEGMENTS_ET) playSegment(m, a, b, ctx);
+    playRange(m, Math.max(90, from), 120, ctx);
     if (m.home.goals === m.away.goals) m.pens = shootout(m, ctx);
   }
   if (m.recordShots) TL.extend(m, ctx, 45, m.minute);
@@ -526,5 +552,5 @@ function squadStrength(club) {
 
 module.exports = {
   createMatch, playFirstHalf, applyHalftime, playSecondHalf, finalizeMatch, playMatch, squadStrength,
-  drainFactor, MAX_SUBS, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods, instrValue,
+  drainFactor, MAX_SUBS, MAX_WINDOWS, LIVE_SEGMENT, segmentsOf, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods, instrValue,
 };

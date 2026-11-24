@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-21",
+  "updated": "2026-11-24",
   "policy": "Only licences allowing commercial use without payment. Add an entry before the asset is used.",
   "assets": [
     {
@@ -45,6 +45,20 @@
       "processedSha256": "58c7acc60a0c82e747d63e7ec8ea918c1c89eaf5251a0235437c5360460318a5",
       "usage": "Locomotion, kicks, tackles, keeper actions, celebrations, reactions",
       "modifications": "Rotations and pelvis translation kept, static tracks collapsed, values rounded, ball-contact times added"
+    },
+    {
+      "name": "Ara 3D Gen football animation clips (23)",
+      "url": "https://github.com/olatunde85/3d-gen",
+      "creator": "Joshua Olatunde and Ara 3D Gen contributors",
+      "licence": "MIT (code and generated clips); MakeHuman character data CC0-1.0",
+      "commercialUse": true,
+      "attributionRequired": false,
+      "downloaded": "2026-11-24",
+      "sha256": "47ed033c0250bfca88b40ab77c4e1d02e7908133366283cdead38bd55836f871",
+      "original": "FOOTBALL-RALISM-LAB/outputs/footballer-models/Kofi_Mensah.glb (not in git)",
+      "processed": "assets/animations/source/ara3dgen/football-clips.json (sha256 f0f00341779e3346467542da54f882e18e4f2baef5888fc5c09c2125f81f4a7f) -> public/models/footballer-anims.json",
+      "usage": "Football actions of every 3D player: shots, passes, first touch, chest control, headers, tackles, goalkeeping, throw-ins, a celebration",
+      "modifications": "Retargeted onto the Mesh2Motion skeleton by scripts/anim/retarget.js (limb error <= 0.3 degrees); resampled at 30 fps; fingers held; contact times added"
     },
     {
       "name": "KinemIQ Free Game Animations (35 clips)",

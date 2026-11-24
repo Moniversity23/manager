@@ -770,8 +770,8 @@ async function fetchFootballer(base = new URL('./models/', import.meta.url).href
   return FOOTBALLER;
 }
 
-const LOCO = ['idle', 'walk', 'jog', 'sprint', 'back', 'strafeL', 'strafeR', 'ready', 'tired', 'injuredWalk'];
-const CEL = ['celFist', 'celVictory', 'celFlip', 'celDab'];
+const LOCO = ['idle', 'walk', 'jog', 'sprint', 'back', 'strafeL', 'strafeR', 'ready', 'gkReady', 'tired', 'injuredWalk'];
+const CEL = ['celFist', 'celVictory', 'celJump', 'celFlip', 'celDab'];
 // Ground speed (m/s at our figure scale) at which each locomotion clip's feet don't slide.
 const STRIDE = { walk: 1.7, jog: 3.9, sprint: 7.2, back: 1.5, strafeL: 1.6, strafeR: 1.6, injuredWalk: 1.0 };
 
@@ -972,18 +972,31 @@ function animateFootballer(u, a, dt, t, simRate) {
   const F = u.F, sp = u.spd / (u.sy / S), k = simRate || 1;              // speed in model metres
   // ── one-shot actions from match events ──
   let want = null, opts = {};
+  // Keeper and football clips from Ara 3D Gen (retargeted) where the build has them; the
+  // Mesh2Motion stand-ins otherwise. Each is started so its contact frame (hands, foot or head
+  // on the ball) lands when the ball does: `eta` is the time until the ball arrives.
+  const C = F.clips, has = key => !!C[key];
+  const meet = (key, eta, speed) => ({ at: Math.max(0, Math.min(C[key].contact || 0, (C[key].contact || 0) - Math.max(0, eta) * speed)), speed });
   if (a.injured != null) { want = a.injured < 2.4 ? 'fall' : 'getUp'; opts = { hold: 0.6 }; }
-  else if (a.dive) { want = a.dive.sign > 0 ? 'diveL' : 'diveR'; opts = { speed: 1.6 * k }; }
-  else if (a.catchBall != null || a.punch != null) { want = 'block'; opts = { speed: 1.4 * k }; }
-  else if (a.slide != null) { want = 'slide'; opts = { at: 0.15, speed: 1.5 * k }; }
-  else if (a.poke != null && a.poke < 0.3) { want = 'kickSide'; opts = { at: 0.08, speed: 1.4 * k }; }   // standing tackle: a foot in
+  else if (a.dive) {
+    if (has('gkDiveL')) { want = a.dive.sign > 0 ? (a.dive.low ? 'gkLowL' : 'gkDiveL') : (a.dive.low ? 'gkLowR' : 'gkDiveR'); opts = meet(want, a.dive.eta ?? 0.3, 1.25 * k); }
+    else { want = a.dive.sign > 0 ? 'diveL' : 'diveR'; opts = { speed: 1.6 * k }; }
+  }
+  else if (a.catchBall != null) { want = has('gkCatch') ? 'gkCatch' : 'block'; opts = has('gkCatch') ? meet('gkCatch', a.eta ?? 0.3, 1.2 * k) : { speed: 1.4 * k }; }
+  else if (a.punch != null) { want = has('gkPunch') ? 'gkPunch' : 'block'; opts = has('gkPunch') ? meet('gkPunch', a.eta ?? 0.3, 1.2 * k) : { speed: 1.4 * k }; }
+  else if (a.slide != null) { want = has('slideA') ? 'slideA' : 'slide'; opts = has('slideA') ? { at: 0.12, speed: 1.4 * k } : { at: 0.15, speed: 1.5 * k }; }
+  else if (a.poke != null && a.poke < 0.3) { want = has('tackleA') ? 'tackleA' : 'kickSide'; opts = { at: has('tackleA') ? 0.1 : 0.08, speed: 1.4 * k }; }   // standing tackle: a foot in
+  else if (a.throwIn != null && has('throwIn')) { want = 'throwIn'; opts = { at: Math.max(0, Math.min(0.7, a.throwIn)), speed: k }; }
   else if (a.strike != null && a.strike < 0.3) {
     // Time the kick so the foot meets the ball as it leaves (the ball leaves 0.11 s of match time after the strike starts).
-    const key = (a.power || 0.6) >= 0.85 ? 'kickFront' : 'kickSide', c = F.clips[key];
+    // A shot is struck with the laces; a long or driven pass straight through the ball; a short one with the inside of the foot.
+    const p = a.power || 0.6;
+    const key = has('shoot') ? (p >= 0.95 ? 'shoot' : p >= 0.85 ? 'passA' : 'passIn') : p >= 0.85 ? 'kickFront' : 'kickSide', c = C[key];
     // The mixer advances by this frame's dt straight after the kick starts, hence the - dt * k.
     want = key; opts = { at: Math.max(0, (c.contact || 0.3) - (0.11 - a.strike) - dt * k), speed: k };
   }
-  else if (a.header) { want = 'header'; opts = { at: 0.25, speed: 1.3 * k }; }
+  else if (a.header) { const jump = a.headerHigh && has('headerJump'); want = has('headerA') ? (jump ? 'headerJump' : 'headerA') : 'header'; opts = has('headerA') ? { at: jump ? 0.3 : 0.18, speed: 1.3 * k } : { at: 0.25, speed: 1.3 * k }; }
+  else if (a.receive != null && a.receive < 0.7 && has('receive')) { want = a.receiveChest && has('chestCtl') ? 'chestCtl' : 'receive'; opts = { at: Math.max(0, Math.min(0.35, a.receive * k)), speed: k }; }
   else if (a.block != null) { want = 'block'; opts = { speed: 1.2 * k }; }
   else if (a.cel === 'scorer' && u.spd < 1.6) want = CEL[u.cel % CEL.length];
   else if (a.cel === 'mate' && u.spd < 1.6) want = u.cel % 2 ? 'clap' : 'celPower';
@@ -1000,9 +1013,9 @@ function animateFootballer(u, a, dt, t, simRate) {
   // ── locomotion blend by speed and direction ──
   const active = u.one ? 0 : 1;
   const sad = a.cel === 'sad', fwd = Math.cos(a.rel || 0), side = Math.sin(a.rel || 0);
-  const w = { idle: 0, walk: 0, jog: 0, sprint: 0, back: 0, strafeL: 0, strafeR: 0, ready: 0, tired: 0, injuredWalk: 0 };
+  const w = { idle: 0, walk: 0, jog: 0, sprint: 0, back: 0, strafeL: 0, strafeR: 0, ready: 0, gkReady: 0, tired: 0, injuredWalk: 0 };
   if (sad && sp < 1) w.tired = 1;
-  else if (a.ready && sp < 2) w.ready = 1;
+  else if (a.ready && sp < 2) { if (u.gk && u.act.gkReady) w.gkReady = 1; else w.ready = 1; }
   else if (sp < 0.35) w.idle = 1;
   else if (fwd < -0.35 && sp < 4.5) { w.back = 1; }
   else if (Math.abs(side) > 0.7 && sp < 4) { w[side > 0 ? 'strafeL' : 'strafeR'] = 1; }
@@ -1018,21 +1031,68 @@ function animateFootballer(u, a, dt, t, simRate) {
     if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
   }
   u.mixer.update(dt);
-  if (u.bones) layerPose(u, a, dt);
+  if (u.bones) layerPose(u, u.one && u.one.key === 'chestCtl' ? { ...a, chest: null } : a, dt);
   { const L = globalThis.__animLog; if (L) { if (a.shield) L.shield = (L.shield || 0) + 1; if (a.chest != null) L.chest = (L.chest || 0) + 1; } }   // test hook
   // Test hook: how far the kicking foot is from its contact frame when the ball leaves.
-  if (globalThis.__animLog && a.strike != null && u.one && /^kick/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
+  if (globalThis.__animLog && a.strike != null && u.one && /^(kick|shoot|pass)/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
   // Lean into turns at speed, and keeper dives fly sideways off the ground.
   u.bank = (u.bank || 0) + ((Math.max(-0.22, Math.min(0.22, (a.turn || 0) * u.spd * 0.014))) - (u.bank || 0)) * Math.min(1, dt * 6);
   let roll = -u.bank, lift = 0;
-  if (a.dive) { const wv = Math.min(1, a.dive.age / 0.2), far = Math.min(1, Math.abs(a.dive.reach) * 9); roll = a.dive.sign * 1.25 * wv * far; lift = 0.5 * wv * far; }
+  if (a.dive && !F.clips.gkDiveL) { const wv = Math.min(1, a.dive.age / 0.2), far = Math.min(1, Math.abs(a.dive.reach) * 9); roll = a.dive.sign * 1.25 * wv * far; lift = 0.5 * wv * far; }
   if (a.header) lift = Math.max(lift, Math.sin(Math.PI * Math.min(1, a.header)) * 0.35);
   u.holder.rotation.set(roll, 0, 0);
   u.holder.position.y = lift * u.sy;
   u.blob.scale.setScalar(1 - Math.min(0.6, lift));
 }
 
-export async function createView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null } = {}) {
+// One WebGL renderer for every match of the session. Compiling the players' and stadium's shaders
+// is what made the start of a half wait (seconds on some GPUs); the renderer keeps its compiled
+// programs, so only the first match of a session compiles them, and prepare() does that before
+// the first frame (asynchronously where the browser can compile in parallel).
+const RENDERERS = {};
+function matchRenderer(antialias) {
+  const k = antialias ? 'aa' : 'plain';
+  let r = RENDERERS[k];
+  if (!r || r.__lost) {
+    r = RENDERERS[k] = new THREE.WebGLRenderer({ antialias, powerPreference: 'high-performance' });
+    r.domElement.addEventListener('webglcontextlost', () => { r.__lost = true; });
+  }
+  r.shadowMap.needsUpdate = true;
+  return r;
+}
+
+// Compiles the shaders a match needs while the week is being simulated (advance() calls this
+// before the match view exists), using a small stand-in scene: a keeper and an outfield player per
+// side in an empty stadium. Their programs stay with the shared renderer for the real match.
+let WARMED = null;
+export function warmUp({ night = false, quality = 'auto' } = {}) {
+  const key = `${night}|${quality}`;
+  if (WARMED && WARMED.key === key) return WARMED.p;
+  const p = (async () => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-4000px;top:0;width:320px;height:180px;';
+    document.body.appendChild(host);
+    try {
+      const view = await createView(host, { night, quality });
+      const lu = side => [{ playerId: side === 'home' ? -1 : -3, slot: 'GK' }, { playerId: side === 'home' ? -2 : -4, slot: 'CM' }];
+      const dots = side => lu(side).map((x, i) => ({ id: x.playerId, name: 'Warm Up', x: side === 'home' ? 0.1 + i * 0.3 : 0.9 - i * 0.3, y: 0.5, off: false }));
+      const v = { m: { lineups: { home: lu('home'), away: lu('away'), looks: {} } }, dots: { home: dots('home'), away: dots('away') }, ball: { x: 0.5, y: 0.5, z: 0 }, sim: { t: 0, phase: 'play' }, minute: 0, score: { home: 0, away: 0 } };
+      await view.prepare(v, { textures: false });   // only the shaders: the textures belong to each match
+      view.dispose();
+    } catch (e) { console.warn('3D warm-up skipped:', e && e.message); }
+    host.remove();
+  })();
+  WARMED = { key, p };
+  return p;
+}
+
+export async function createView(container, opts = {}) {
+  const t0 = performance.now();
+  const view = await buildView(container, opts);
+  if (globalThis.__m3dDebug) console.log('prepare createView', Math.round(performance.now() - t0), 'ms');
+  return view;
+}
+async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null } = {}) {
   let F = null;
   if (models !== 'classic') {
     try { F = await Promise.race([loadFootballer(), new Promise((_, no) => setTimeout(() => no(new Error('timed out')), 30000))]); }
@@ -1042,7 +1102,7 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
   // Graphics quality: 'low' for older phones, 'high' for strong devices, 'auto' decides from the device.
   const weak = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
   const low = quality === 'low' || (quality === 'auto' && weak);
-  const renderer = new THREE.WebGLRenderer({ antialias: quality !== 'low', powerPreference: 'high-performance' });
+  const renderer = matchRenderer(quality !== 'low');
   renderer.setPixelRatio(Math.min(quality === 'low' ? 1 : low ? 1.75 : 2, window.devicePixelRatio || 1));
   renderer.shadowMap.enabled = !low && !night;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1275,11 +1335,19 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
           else if (cel) a.cel = side !== cel.side ? 'sad' : i === cel.scorer ? 'scorer' : u.gk ? null : 'mate';
           else if (sim.dive && sim.dive.side === side && sim.dive.idx === i && sim.phase === 'shot') {
             const age = sim.t - sim.dive.t0;
+            const eta = sim.shot ? sim.shot.t0 + sim.shot.dur - sim.t : 0.2;
+            a.eta = eta;
             if (sim.dive.kind === 'catch') a.catchBall = age; else if (sim.dive.kind === 'punch') a.punch = age;
-            else a.dive = { age, reach: sim.dive.y - d.y, sign: (Math.sign(sim.dive.y - d.y) || 1) * (Math.cos(u.face) >= 0 ? 1 : -1) };
+            else if (sim.dive.kind !== 'watch') {
+              // The side he dives to is decided when the shot is struck and kept for the whole dive.
+              if (u.diveT0 !== sim.dive.t0) { u.diveT0 = sim.dive.t0; u.diveSign = (Math.sign(sim.dive.y - d.y) || 1) * (Math.cos(u.face) >= 0 ? 1 : -1); }
+              a.dive = { age, eta, low: (sim.dive.z ?? 0.2) < 0.1, reach: sim.dive.y - d.y, sign: u.diveSign };
+            }
           }
           else if (sim.block && sim.block.side === side && sim.block.idx === i && sim.t - sim.block.t0 < 0.7) a.block = sim.t - sim.block.t0;
-          else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); }
+          else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); a.headerHigh = by > 2.3; }
+          else if (sim.throwIn && sim.throwIn.side === side && sim.throwIn.idx === i && sim.t >= sim.throwIn.at - 0.8 && sim.t < sim.throwIn.at + 0.8) a.throwIn = sim.t - (sim.throwIn.at - 0.8);
+          else if (sim.receiving && sim.receiving.side === side && sim.receiving.idx === i && sim.t - sim.receiving.t0 < 0.8) { a.receive = sim.t - sim.receiving.t0; a.receiveChest = !!sim.receiving.chest; }
           else if (sim.touch && sim.touch.chest && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.5) a.chest = sim.t - sim.touch.t0;
           else if (sim.touch && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.35) a.touch = sim.t - sim.touch.t0;
           else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) { if (sim.tackle.kind === 'standing') a.poke = tackleAge; else a.slide = tackleAge; }
@@ -1471,10 +1539,49 @@ export async function createView(container, { homeHue = 210, awayHue = 0, cam = 
       if (sim.net && v.introT == null) { const age = sim.t - sim.net.t0; if (age < 0.55) { const k = (1 - age / 0.55) * 0.3; camera.position.y += Math.sin(age * 46) * k; camera.position.x += Math.cos(age * 39) * k * 0.6; } }
       renderer.render(scene, camera);
     },
+    // Builds the players and compiles every shader before the first frame is shown.
+    async prepare(v, { textures = true } = {}) {
+      ensurePlayers(v);
+      const hidden = [];
+      scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });   // eyes, lips and effects that appear later
+      const t0 = performance.now(), p0 = renderer.info.programs ? renderer.info.programs.length : 0;
+      try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); }
+      catch (e) { console.warn('shader warm-up skipped', e); }
+      const t1 = performance.now();
+      // Textures (pitch, crowd, kits, faces) go to the GPU now too, not on the first frame.
+      if (textures) scene.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ['map', 'normalMap', 'roughnessMap', 'alphaMap', 'emissiveMap']) if (m[k] && m[k].isTexture) renderer.initTexture(m[k]); });
+      for (const o of hidden) o.visible = false;
+      if (globalThis.__m3dDebug) console.log('prepare', 'programs', p0, '→', renderer.info.programs.length, 'compile', Math.round(t1 - t0), 'ms', 'textures', Math.round(performance.now() - t1), 'ms');
+    },
+    // Moves the view into a new page element (the second half reuses the first half's view).
+    attach(host) {
+      if (!host || host === container) return;
+      if (ro) ro.disconnect();
+      container = host;
+      host.prepend(renderer.domElement);
+      if (ro) ro.observe(host);
+      resize();
+    },
+    // A new half: the same figures follow the players to their new places in the line-up, players
+    // who came on at half-time get theirs, and nothing carries over from the last frame.
+    rebind(v) {
+      for (const side of ['home', 'away']) {
+        const old = players[side].slice(), next = [];
+        v.dots[side].forEach((d, i) => { const k = old.findIndex(p => p && p.userData.pid === d.id); if (k >= 0) { next[i] = old[k]; old[k] = null; } });
+        v.dots[side].forEach((d, i) => { if (!next[i]) next[i] = buildFigure(v, side, i, d, 12 + subsOn[side]++); });
+        for (const p of old) if (p) scene.remove(p);
+        for (const p of next) { p.userData.lx = null; p.userData.lz = null; }
+        players[side] = next;
+      }
+      lastNow = 0; lastSimT = null; lastStrike = null; lastCel = null;
+    },
+    info() { return { programs: renderer.info.programs ? renderer.info.programs.length : null, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }; },
     dispose() {
       if (ro) ro.disconnect();
-      scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); } });
-      renderer.dispose();
+      // Geometry and textures are freed; materials are left to the garbage collector so their
+      // compiled shader programs stay with the shared renderer for the next match.
+      scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map) m.map.dispose(); }); } });
+      renderer.renderLists.dispose();
       renderer.domElement.remove();
     },
   };

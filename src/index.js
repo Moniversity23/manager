@@ -413,17 +413,8 @@ class GameWorld {
     const mctx = this.matchCtx();
     const me = this.manager.clubId;
     if (this.liveMatch) {
-      const { match: m, fixture } = this.liveMatch;
-      const key = m.interactiveSide, oppKey = key === 'home' ? 'away' : 'home';
-      const talk = decisions.talk ? DR.halftimeTalk(m[key], m[key].goals, m[oppKey].goals, decisions.talk) : null;
-      const applied = ME.applyHalftime(m, key, decisions, mctx);
-      applied.talk = talk;
-      ME.playSecondHalf(m, mctx);
-      const r = ME.finalizeMatch(m, mctx);
-      this._recordFixture(fixture, r, m);
-      ws.reports.push(this._matchReport(m, r, applied.subs || applied.tactic || applied.formation || talk ? applied : null));
-      this.liveMatch = null;
-      ws.done++;
+      if (this.liveMatch.match.phase === 'halftime') this.liveResume(decisions);
+      this.liveFinish();
     }
     while (ws.done < ws.queue.length) {
       const f = ws.queue[ws.done];
@@ -435,10 +426,8 @@ class GameWorld {
       if (f.mine) {
         const m = ME.createMatch(mctx, opts);
         this._reportSelection(m, opts.interactiveSide);
-        ME.playFirstHalf(m, mctx);
-        m.home.xg = Math.round(m.home.xg * 1e4) / 1e4;
-        m.away.xg = Math.round(m.away.xg * 1e4) / 1e4;
-        this._quantize();
+        ME.playFirstHalf(m, interactive ? this._liveCtx(true) : mctx);
+        this._afterFirstHalf(m);
         if (interactive) { this.liveMatch = { match: m, fixture: f }; return { halftime: this.halftimeView() }; }
         ME.playSecondHalf(m, mctx);
         const r = ME.finalizeMatch(m, mctx);
@@ -451,6 +440,130 @@ class GameWorld {
       ws.done++;
     }
     return { out: this._closeWeek() };
+  }
+
+  _afterFirstHalf(m) {
+    m.home.xg = Math.round(m.home.xg * 1e4) / 1e4;
+    m.away.xg = Math.round(m.away.xg * 1e4) / 1e4;
+    this._quantize();
+  }
+
+  // ── the manager's live match ─────────────────────────────────────
+  // While he watches, his match can be changed from any five-minute mark the view has not reached
+  // yet. Each segment of a live half starts with a snapshot (the match, the world's random state
+  // and the fitness and injuries of everyone in the squads); a change restores the snapshot at the
+  // next mark, applies the decisions there and plays the rest of the half again. What he has
+  // already seen never changes. Snapshots are kept in memory only: a reloaded career continues
+  // from half-time (or full time) without them.
+  _liveCtx(reset = false) {
+    const mctx = this.matchCtx();
+    if (reset || !this._liveSnaps) this._liveSnaps = [];
+    const snaps = this._liveSnaps;
+    mctx.snapshot = (m, minute) => {
+      const ids = new Set();
+      for (const k of ['home', 'away']) {
+        for (const x of m[k].onPitch) ids.add(x.playerId);
+        for (const id of m[k].bench) ids.add(id);
+        for (const id of Object.keys(m[k].apps)) ids.add(Number(id));
+      }
+      const players = [];
+      for (const id of ids) {
+        const p = this.players.get(id);
+        if (p) players.push([id, p.fitness, p.injury ? { ...p.injury } : null, p.seasonStats.inj || 0, p.history.injuries || 0]);
+      }
+      const at = snaps.findIndex(x => x.minute >= minute);
+      if (at >= 0) snaps.length = at;                  // a replay replaces the marks after it
+      snaps.push({ minute, m: JSON.stringify(m), rng: this.rng.getState(), players });
+    };
+    return mctx;
+  }
+
+  // The first mark at or after `minute` in the half being watched, or null when the half has none left.
+  _liveMark(minute) {
+    const lm = this.liveMatch, snaps = this._liveSnaps;
+    if (!lm || !snaps || !snaps.length) return null;
+    const second = lm.match.phase === 'full';
+    if (!second && lm.match.phase !== 'halftime') return null;
+    const lo = second ? 45 : 0, hi = second ? 999 : 45;
+    const want = Math.max(lo, Number(minute) || 0);
+    return snaps.find(x => x.minute >= want && x.minute >= lo && x.minute < hi) || null;
+  }
+
+  _sideView(m, key) {
+    const side = m[key], p = id => this.players.get(id), name = id => p(id)?.name || '?';
+    return {
+      tactic: side.tactic, formation: side.formation, instructions: side.instr || ME.normInstr(null),
+      subsUsed: side.subsUsed, maxSubs: ME.MAX_SUBS, windowsUsed: side.windowsUsed || 0, maxWindows: ME.MAX_WINDOWS,
+      onPitch: side.onPitch.map(s => ({ slot: s.slot, slotKey: s.slotKey, playerId: s.playerId, name: name(s.playerId), position: p(s.playerId).position, fit: Math.round(p(s.playerId).fitness), ovr: p(s.playerId).currentAbility, rating: positionAbility(p(s.playerId), s.slot) })),
+      bench: side.bench.filter(id => !side.apps[id]).map(id => ({ playerId: id, name: name(id), position: p(id).position, fit: Math.round(p(id).fitness), ovr: p(id).currentAbility, injured: p(id).isInjured() })),
+    };
+  }
+
+  // What the manager can change while paused at `minute`: his side as it will be at the next mark.
+  liveState(minute) {
+    const mark = this._liveMark(minute);
+    if (!mark) return { ok: false, error: this.liveMatch && this.liveMatch.match.phase === 'halftime' && Number(minute) >= 40 ? 'Make your changes at half-time.' : 'No more changes can be made in this half.' };
+    const m = JSON.parse(mark.m);
+    const fit = new Map(mark.players.map(x => [x[0], x]));
+    const view = this._sideView(m, m.interactiveSide);
+    for (const r of [...view.onPitch, ...view.bench]) { const f = fit.get(r.playerId); if (f) { r.fit = Math.round(f[1]); if (r.injured != null) r.injured = !!(f[2] && f[2].weeks > 0); } }
+    return { ok: true, minute: mark.minute, ...view, tactics: TACTICS, formations: FORMATIONS };
+  }
+
+  // Applies the manager's decisions at the next mark and plays the rest of the half again.
+  liveChange(minute, decisions = {}) {
+    const lm = this.liveMatch;
+    const mark = this._liveMark(minute);
+    if (!lm || !mark) return { ok: false, error: lm && lm.match.phase === 'halftime' && Number(minute) >= 40 ? 'Make your changes at half-time.' : 'No more changes can be made in this half.' };
+    const second = lm.match.phase === 'full';
+    const m = JSON.parse(mark.m);
+    lm.match = m;
+    this.rng.setState(mark.rng);
+    for (const [id, fit, inj, si, hi] of mark.players) {
+      const p = this.players.get(id); if (!p) continue;
+      p.fitness = fit; p.injury = inj ? { ...inj } : null; p.seasonStats.inj = si; p.history.injuries = hi;
+    }
+    const mctx = this._liveCtx();
+    const applied = ME.applyHalftime(m, m.interactiveSide, decisions, mctx, mark.minute);
+    const shape = m[m.interactiveSide].onPitch.map(x => ({ playerId: x.playerId, slot: x.slot }));
+    if (second) ME.playSecondHalf(m, mctx, mark.minute);
+    else { ME.playFirstHalf(m, mctx, mark.minute); this._afterFirstHalf(m); }
+    lm.changes = [...(lm.changes || []), { minute: mark.minute, subs: applied.subs, tactic: applied.tactic, formation: applied.formation }];
+    return { ok: true, minute: mark.minute, applied, shape, live: this.halftimeView() };
+  }
+
+  // Half-time decisions, then the second half is played and kept open until the view reaches
+  // full time (liveFinish), so changes can still be made while it is watched.
+  liveResume(decisions = {}) {
+    const lm = this.liveMatch; if (!lm) return null;
+    const m = lm.match;
+    if (m.phase === 'halftime') {
+      const key = m.interactiveSide, oppKey = key === 'home' ? 'away' : 'home';
+      const mctx = this._liveCtx(true);
+      const talk = decisions.talk ? DR.halftimeTalk(m[key], m[key].goals, m[oppKey].goals, decisions.talk) : null;
+      const applied = ME.applyHalftime(m, key, decisions, mctx);
+      applied.talk = talk;
+      lm.applied = applied;
+      ME.playSecondHalf(m, mctx);
+    }
+    return this.halftimeView();
+  }
+
+  // Full time: the result is recorded and the week can carry on.
+  liveFinish() {
+    const lm = this.liveMatch, ws = this.weekState;
+    if (!lm || !ws) return null;
+    const mctx = this.matchCtx();
+    if (lm.match.phase === 'halftime') this.liveResume({});
+    const m = lm.match;
+    const r = ME.finalizeMatch(m, mctx);
+    this._recordFixture(lm.fixture, r, m);
+    const a = lm.applied;
+    const report = this._matchReport(m, r, a && (a.subs || a.tactic || a.formation || a.talk) ? a : null);
+    ws.reports.push(report);
+    this.liveMatch = null; this._liveSnaps = null;
+    ws.done++;
+    return report;
   }
 
   // Compatibility helpers: a full week with no input.
@@ -1967,7 +2080,8 @@ class GameWorld {
     const p = id => this.players.get(id);
     const name = id => p(id)?.name || '?';
     return {
-      comp: m.comp, compName: m.compName, week: m.week, myKey: key,
+      comp: m.comp, compName: m.compName, week: m.week, myKey: key, phase: m.phase, minute: m.minute, live: !!this._liveSnaps,
+      windowsUsed: side.windowsUsed || 0, maxWindows: ME.MAX_WINDOWS, pens: m.pens || null, knockout: !!m.knockout,
       home: { name: this.clubById(m.home.clubId).name, goals: m.home.goals, xg: Math.round(m.home.xg * 100) / 100, shots: m.home.shots },
       away: { name: this.clubById(m.away.clubId).name, goals: m.away.goals, xg: Math.round(m.away.xg * 100) / 100, shots: m.away.shots },
       events: m.events.slice().sort((a, b) => a.min - b.min).map(e => ({ min: e.min, side: e.side, type: e.type,

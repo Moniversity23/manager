@@ -1,5 +1,5 @@
 {
- "when": "2026-11-18T02:54:04.386Z",
+ "when": "2026-11-24T13:02:57.845Z",
  "model": {
   "vertices": 7399,
   "triangles": 13757,
@@ -382,5 +382,168 @@
   }
  ],
  "failed": [],
- "animsBytes": 846026
+ "retarget": [
+  {
+   "key": "shoot",
+   "source": "Shoot (football)",
+   "duration": 0.95,
+   "worstDeg": 0.22,
+   "contact": 0.3
+  },
+  {
+   "key": "passA",
+   "source": "Pass (straight)",
+   "duration": 0.7,
+   "worstDeg": 0.22,
+   "contact": 0.22
+  },
+  {
+   "key": "passL",
+   "source": "Side pass left (inside foot)",
+   "duration": 0.75,
+   "worstDeg": 0.27,
+   "contact": 0.24
+  },
+  {
+   "key": "passIn",
+   "source": "Side pass forward (inside foot)",
+   "duration": 0.75,
+   "worstDeg": 0.25,
+   "contact": 0.24
+  },
+  {
+   "key": "passR",
+   "source": "Side pass right (inside foot)",
+   "duration": 0.75,
+   "worstDeg": 0.23,
+   "contact": 0.24
+  },
+  {
+   "key": "receive",
+   "source": "Receive ball (inside foot)",
+   "duration": 0.7,
+   "worstDeg": 0.23,
+   "contact": 0.2
+  },
+  {
+   "key": "chestCtl",
+   "source": "Chest control",
+   "duration": 0.9,
+   "worstDeg": 0.2,
+   "contact": 0.25
+  },
+  {
+   "key": "headerA",
+   "source": "Header",
+   "duration": 0.8,
+   "worstDeg": 0.23,
+   "contact": 0.3
+  },
+  {
+   "key": "headerJump",
+   "source": "Jumping header",
+   "duration": 1.1,
+   "worstDeg": 0.24,
+   "contact": 0.48
+  },
+  {
+   "key": "tackleA",
+   "source": "Standing tackle",
+   "duration": 0.85,
+   "worstDeg": 0.27,
+   "contact": 0.28
+  },
+  {
+   "key": "slideA",
+   "source": "Slide tackle",
+   "duration": 1.25,
+   "worstDeg": 0.26,
+   "contact": 0.45
+  },
+  {
+   "key": "gkReady",
+   "source": "Goalkeeper ready",
+   "duration": 0.9,
+   "worstDeg": 0.18,
+   "contact": null
+  },
+  {
+   "key": "gkCatch",
+   "source": "Goalkeeper catch",
+   "duration": 0.9,
+   "worstDeg": 0.26,
+   "contact": 0.35
+  },
+  {
+   "key": "gkPunch",
+   "source": "Goalkeeper punch",
+   "duration": 0.9,
+   "worstDeg": 0.26,
+   "contact": 0.26
+  },
+  {
+   "key": "gkDiveL",
+   "source": "Goalkeeper dive left",
+   "duration": 1.7,
+   "worstDeg": 0.28,
+   "contact": 0.45
+  },
+  {
+   "key": "gkDiveR",
+   "source": "Goalkeeper dive right",
+   "duration": 1.7,
+   "worstDeg": 0.28,
+   "contact": 0.45
+  },
+  {
+   "key": "gkLowL",
+   "source": "Goalkeeper low dive left",
+   "duration": 1.7,
+   "worstDeg": 0.29,
+   "contact": 0.45
+  },
+  {
+   "key": "gkLowR",
+   "source": "Goalkeeper low dive right",
+   "duration": 1.7,
+   "worstDeg": 0.29,
+   "contact": 0.45
+  },
+  {
+   "key": "gkPick",
+   "source": "Pick up ball",
+   "duration": 1.5,
+   "worstDeg": 0.2,
+   "contact": 0.7
+  },
+  {
+   "key": "gkThrow",
+   "source": "Two-hand throw forward",
+   "duration": 1.3,
+   "worstDeg": 0.26,
+   "contact": 0.62
+  },
+  {
+   "key": "gkRoll",
+   "source": "Low throw (right hand)",
+   "duration": 1.4,
+   "worstDeg": 0.25,
+   "contact": 0.72
+  },
+  {
+   "key": "throwIn",
+   "source": "Throw-in (overhead)",
+   "duration": 1.5,
+   "worstDeg": 0.24,
+   "contact": 0.8
+  },
+  {
+   "key": "celJump",
+   "source": "Siu celebration",
+   "duration": 2.4,
+   "worstDeg": 0.22,
+   "contact": null
+  }
+ ],
+ "animsBytes": 1397122
 }

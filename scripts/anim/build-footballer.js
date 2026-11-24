@@ -13,11 +13,15 @@
 const fs = require('fs');
 const path = require('path');
 const { readGLB, accessor, writeGLB } = require('./glb');
+const RT = require('./retarget');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'assets', 'animations', 'source', 'mesh2motion');
 const OUT = path.join(ROOT, 'public', 'models');
 const REPORT = path.join(ROOT, 'assets', 'animations', 'processed', 'build-report.json');
+// Football clips from Ara 3D Gen (scripts/anim/extract-ara.js), retargeted onto the same skeleton.
+const ARA = path.join(ROOT, 'assets', 'animations', 'source', 'ara3dgen', 'football-clips.json');
+const MAX_RETARGET_DEG = 1;     // a clip whose limbs end up further than this from the source fails the build
 
 // Game clip → source file. loop: plays continuously; kick: has a ball-contact moment to find.
 const CLIPS = {
@@ -193,6 +197,27 @@ async function buildClips(model, report) {
       report.clips.push({ key, source: def.file + '.glb', sourceName: a.name, duration: clip.duration, tracks: tracks.length, animated: kept, staticCollapsed: collapsed, ...(def.kick ? { contact: clip.contact, foot: clip.foot } : {}) });
     } catch (e) { report.failed.push({ key, file: def.file + '.glb', error: e.message }); }
   }
+  // Ara 3D Gen's football clips (passes with the inside of the foot, first touch, chest control,
+  // headers, tackles, the keeper's catch, punch and dives, throws): retargeted from Ara's skeleton,
+  // checked limb by limb against the source, and given the moment they meet the ball.
+  if (fs.existsSync(ARA)) {
+    const src = JSON.parse(fs.readFileSync(ARA, 'utf8'));
+    const tgt = RT.restFromGLB((await readGLB(path.join(SRC, 'model.glb'))).json);
+    report.retarget = [];
+    for (const [key, c] of Object.entries(src.clips)) {
+      try {
+        if (out.clips[key]) throw new Error('name already used by a Mesh2Motion clip');
+        const clip = RT.retargetClip(src.rest, c, tgt, { name: key, fps: src.source.fps || 30 });
+        const check = RT.checkClip(src.rest, c, tgt, clip, { fps: src.source.fps || 30 });
+        if (!(check.worst <= MAX_RETARGET_DEG)) throw new Error(`retarget error ${check.worst}° (limit ${MAX_RETARGET_DEG}°)`);
+        clip.src = 'ara';
+        if (c.contact != null) { clip.contact = c.contact; clip.part = c.part; if (c.part === 'footR') clip.foot = 'r'; }
+        out.clips[key] = clip;
+        report.retarget.push({ key, source: c.name, duration: clip.duration, worstDeg: check.worst, contact: c.contact ?? null });
+      } catch (e) { report.failed.push({ key, file: 'ara3dgen/football-clips.json', error: e.message }); }
+    }
+    out.source += '; football clips from Ara 3D Gen (MIT code, CC0 MakeHuman data), retargeted by scripts/anim/retarget.js';
+  }
   const file = path.join(OUT, 'footballer-anims.json');
   fs.writeFileSync(file, JSON.stringify(out));
   report.animsBytes = fs.statSync(file).size;
@@ -207,5 +232,6 @@ async function buildClips(model, report) {
   console.log(`footballer.glb ${Math.round(report.model.bytes / 1024)} KB · regions ${JSON.stringify(report.model.regions)}`);
   console.log(`footballer-anims.json ${Math.round(report.animsBytes / 1024)} KB · ${report.clips.length} clips${report.failed.length ? ` · FAILED ${report.failed.map(f => f.key + ': ' + f.error).join('; ')}` : ''}`);
   for (const c of report.clips.filter(x => x.contact != null)) console.log(`  ${c.key}: ball contact at ${c.contact}s with the ${c.foot === 'r' ? 'right' : 'left'} foot`);
+  if (report.retarget) console.log(`  Ara 3D Gen: ${report.retarget.length} clips retargeted, worst limb error ${Math.max(0, ...report.retarget.map(r => r.worstDeg))}°`);
   if (report.failed.length) process.exit(1);
 })().catch(e => { console.error(e); process.exit(1); });

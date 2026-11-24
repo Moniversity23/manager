@@ -208,6 +208,11 @@ table{border-collapse:collapse;width:100%}
 .mini{height:5px;border-radius:3px;background:var(--s3);overflow:hidden;margin:3px 0}.mini span{display:block;height:100%}
 .up-a{color:var(--gr);font-size:11px;font-weight:700}.dn-a{color:var(--rd);font-size:11px;font-weight:700}
 .show-m{display:none}
+.hub-tabs{display:flex;gap:4px;overflow-x:auto;margin:-4px 0 14px;padding-bottom:2px;border-bottom:1px solid var(--bd);scrollbar-width:none}.hub-tabs::-webkit-scrollbar{display:none}
+.hub-tab{flex:0 0 auto;padding:8px 12px;font-size:13px;color:var(--dim);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.hub-tab:hover{color:var(--tx)}.hub-tab.on{color:var(--ac);border-bottom-color:var(--ac);font-weight:600}
+.hero-go{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.hero-links{font-size:12px;color:var(--dim)}.hero-links a{color:var(--dim)}.hero-links a:hover{color:var(--ac)}
+@media (min-width:769px){body[data-sec="dash"] #continueBtn{display:none}}
 .nv-h{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:12px 14px 4px}
 .hero{border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid var(--bd2);background:radial-gradient(120% 140% at 0% 0%,rgba(0,229,204,.16),transparent 55%),linear-gradient(135deg,#0d1b2e,#101f38)}
 :root[data-theme="light"] .hero{background:linear-gradient(135deg,#e6f7f5,#eaf1fb)}
@@ -262,6 +267,7 @@ a.hl{color:var(--bl);text-decoration:none}a.hl:hover{text-decoration:underline}
 .pslot .sl{font-family:var(--fm);font-size:9px;color:var(--ac)}.pslot .nm{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:100;display:flex;align-items:center;justify-content:center;padding:10px}
 .mbox{background:linear-gradient(180deg,#0f1d30,#0a1422);border:1px solid var(--bd2);border-radius:16px;padding:20px;width:min(620px,100%);max-height:92vh;overflow-y:auto}
+.mv-prep{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;background:rgba(8,12,20,.72);padding:8px 14px;border-radius:8px;font-weight:600;font-size:13px;display:none;z-index:4;pointer-events:none}.mv-prep.on{display:block}
 .mo-title{font-family:var(--fn);font-size:20px;font-weight:700;margin-bottom:12px}
 .score{font-family:var(--fn);font-size:34px;font-weight:900;text-align:center;letter-spacing:.04em}
 .lbl{font-size:10px;color:var(--dim);display:block;margin-bottom:5px;letter-spacing:.07em;text-transform:uppercase}
@@ -324,6 +330,7 @@ a.hl{color:var(--bl);text-decoration:none}a.hl:hover{text-decoration:underline}
 </div>
 
 <div class="mo hidden" id="genMo"><div class="mbox" id="genMoContent"></div></div>
+<div class="mo hidden" id="liveMo" style="z-index:110"><div class="mbox" id="liveMoContent"></div></div>
 <div class="mo hidden" id="pickMo" style="z-index:120" onclick="if(event.target===this)closePicker()"><div class="mbox" id="pickMoContent"></div></div>
 
 <div id="app" class="hidden">
@@ -478,11 +485,25 @@ function showMain(){
   buildNav(); refresh(); syncInstallButtons();
   if (STATE.liveMatch) showHalftime(STATE.liveMatch);
 }
-const NAV_GROUPS = [['Club', ['dash', 'inbox', 'news']], ['Team', ['squad', 'lineup', 'tactics', 'dressing', 'academy', 'staff']], ['Matches', ['fixtures', 'cup', 'continental', 'international']],
-  ['Transfers', ['transfers', 'scouting']], ['Business', ['finances', 'career', 'club2']], ['World', ['awards', 'challenges', 'performance', 'leagues', 'history']], ['Game', ['studio', 'saves', 'settings']]];
+// The menu is seven hubs; a hub's screens are tabs across the top of the page (hubTabs).
+const HUBS = [
+  ['home', '🏠', 'Home', ['dash', 'inbox', 'news']],
+  ['team', '👥', 'Team', ['squad', 'lineup', 'tactics', 'dressing', 'academy', 'staff']],
+  ['matches', '📅', 'Matches', ['fixtures', 'cup', 'continental', 'international']],
+  ['market', '💰', 'Transfers', ['transfers', 'scouting']],
+  ['club', '🏢', 'Club', ['finances', 'career', 'club2']],
+  ['world', '🌍', 'World', ['leagues', 'performance', 'awards', 'history', 'challenges']],
+  ['game', '⚙️', 'Game', ['studio', 'saves', 'settings']],
+];
+const NAV_LABEL = Object.fromEntries(NAV.map(([k, i, l]) => [k, [i, l]]));
+const hubOf = sec => HUBS.find(h => h[3].includes(sec)) || HUBS[0];
+const HUB_LAST = {};
 function buildNav(){
-  const by = Object.fromEntries(NAV.map(n => [n[0], n]));
-  document.getElementById('sbNav').innerHTML = NAV_GROUPS.map(([g, secs]) => `<div class="nv-h">${g}</div>` + secs.map(k => by[k]).filter(Boolean).map(([s,i,l]) => `<button class="nv" data-sec="${s}" onclick="navTo('${s}')"><span class="nv-icon">${i}</span><span>${l}</span>${s==='inbox'?'<span class="cnt hidden" id="inboxCnt"></span>':''}</button>`).join('')).join('');
+  document.getElementById('sbNav').innerHTML = HUBS.map(([k, i, l, secs]) => `<button class="nv" data-hub="${k}" onclick="navTo(HUB_LAST['${k}'] || '${secs[0]}')"><span class="nv-icon">${i}</span><span>${l}</span>${k === 'home' ? '<span class="cnt hidden" id="inboxCnt">0</span>' : ''}</button>`).join('');
+}
+function hubTabs(sec){
+  const h = hubOf(sec); if (h[3].length < 2) return '';
+  return `<div class="hub-tabs" role="tablist">${h[3].filter(k => NAV_LABEL[k]).map(k => `<button role="tab" class="hub-tab ${k === sec ? 'on' : ''}" onclick="navTo('${k}')">${NAV_LABEL[k][1]}</button>`).join('')}</div>`;
 }
 // Navigation keeps a trail so Back retraces your steps and always ends at Home. The browser's
 // own Back (and the Android back button in the installed app) follows the same trail.
@@ -527,7 +548,7 @@ function updateTopbar(){
   const btn = document.getElementById('continueBtn');
   btn.textContent = busy ? 'Simulating…' : '▶ ' + (STATE.continueLabel || 'Continue');
   btn.disabled = busy;
-  document.querySelectorAll('.nv').forEach(b => b.classList.toggle('act', b.dataset.sec === currentSection));
+  document.querySelectorAll('.nv').forEach(b => b.classList.toggle('act', b.dataset.hub === hubOf(currentSection)[0]));
   const back = document.getElementById('tbBack'); if (back) back.classList.toggle('hidden', currentSection === 'dash');
   const unread = (STATE.decisions || []).filter(d => ['bid', 'contract', 'unhappy', 'sponsor', 'job', 'national', 'sacked'].includes(d.type)).length || (STATE.pendingBids || []).length;
   const cnt = document.getElementById('inboxCnt');
@@ -539,7 +560,9 @@ function renderSection(sec){
     cup:rCup, staff:rStaff, career:rCareer, awards:rAwards, settings:rSettings,
     news:rNews, dressing:rDressing, scouting:rScouting, international:rInternational, challenges:rChallenges };
   const sc = document.getElementById('sc');
-  try { sc.innerHTML = (fns[sec] || rDash)(); } catch (e) { sc.innerHTML = `<div class="card" style="color:var(--rd)">Error: ${esc(e.message)}</div>`; console.error(e); }
+  HUB_LAST[hubOf(sec)[0]] = sec;
+  document.body.dataset.sec = sec;
+  try { sc.innerHTML = hubTabs(sec) + (fns[sec] || rDash)(); } catch (e) { sc.innerHTML = `<div class="card" style="color:var(--rd)">Error: ${esc(e.message)}</div>`; console.error(e); }
   updateTopbar();
 }
 
@@ -549,16 +572,16 @@ function renderSection(sec){
 async function advance(){
   if (busy || !STATE) return;
   if (STATE.manager && STATE.manager.status === 'sacked') { navTo('career'); return notify('You were sacked — choose a new club in Career & Board.', 'w'); }
-  if (STATE.liveMatch) return showHalftime(STATE.liveMatch);
+  if (STATE.liveMatch) return STATE.liveMatch.phase === 'full' ? finishLive() : showHalftime(LIVE = STATE.liveMatch);
   audioStop(); try { window.GafferCommentary && window.GafferCommentary.unlock(); } catch {}
-  if ((PREFS.viewMode || '3d') === '3d' && PREFS.models !== 'classic') import('./match3d.js').then(m => m.loadFootballer()).catch(() => {});   // warm up while the week simulates
+  if ((PREFS.viewMode || '3d') === '3d' && PREFS.models !== 'classic') import('./match3d.js').then(m => m.loadFootballer().then(() => m.warmUp({ quality: PREFS.gfx || 'auto' }))).catch(() => {});   // load the players and compile their shaders while the week simulates
   sfx('click');
   busy = true; updateTopbar();
   const r = await post('/api/step-week', { interactive: true });
   busy = false;
   if (!r.ok) { applyCurrent(r); updateTopbar(); if (r.sacked) navTo('career'); return notify(r.error || 'Could not continue', 'd'); }
   applyCurrent(r); refresh();
-  if (r.halftime) return playHalf(r.halftime, 0, 45, () => showHalftime(r.halftime));
+  if (r.halftime) { LIVE = r.halftime; return playHalf(r.halftime, 0, 45, () => showHalftime(LIVE)); }
   afterWeek(r.out, false);
 }
 
@@ -792,9 +815,9 @@ function playHalf(match, fromMin, toMin, done){
   document.getElementById('genMoContent').innerHTML = `
     <div class="small dim" style="text-align:center">${esc(m.compName || '')}</div>
     <div class="mv-bar"><div class="mv-score" id="mvScore"></div><div class="mv-clock" id="mvClock"></div></div>
-    ${mode === 'commentary' ? '<div class="mv-log" id="mvLog"><div class="small dim" style="padding:6px 2px">Live commentary</div></div>' : use3d ? `<div class="mv3d" id="mv3d" onclick="skipCinema()"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam"><button id="mvCamBtn" onclick="event.stopPropagation();cycleCam()">🎥 TV</button><button onclick="event.stopPropagation();toggleFull()" title="Full screen" aria-label="Full screen">⛶</button></div><div class="mv-bug" id="mvBug"></div><canvas class="mv-radar" id="mvRadar" width="168" height="108"></canvas><div class="mv-replay" id="mvReplay">REPLAY</div><div class="mv-cap" id="mvCap"></div><div class="mv-intro" id="mvIntro"></div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas><div class="mv-cap" id="mvCap"></div></div>'}
+    ${mode === 'commentary' ? '<div class="mv-log" id="mvLog"><div class="small dim" style="padding:6px 2px">Live commentary</div></div>' : use3d ? `<div class="mv3d" id="mv3d" onclick="skipCinema()"><div class="mv-flash" id="mvFlash">GOAL!</div><div class="mv-label" id="mvLabel"></div><div class="mv-cam"><button id="mvCamBtn" onclick="event.stopPropagation();cycleCam()">🎥 TV</button><button onclick="event.stopPropagation();toggleFull()" title="Full screen" aria-label="Full screen">⛶</button></div><div class="mv-bug" id="mvBug"></div><canvas class="mv-radar" id="mvRadar" width="168" height="108"></canvas><div class="mv-replay" id="mvReplay">REPLAY</div><div class="mv-cap" id="mvCap"></div><div class="mv-intro" id="mvIntro"></div><div class="mv-prep" id="mvPrep">Preparing the stadium…</div></div>` : '<div class="mv-wrap"><canvas class="mv-canvas" id="mvCanvas" width="680" height="420"></canvas><div class="mv-cap" id="mvCap"></div></div>'}
     <div class="row mt8">${[1, 2, 4, 8].map(s => `<button class="btn bsm ${((PREFS.speed || 2) === s) ? 'bact' : 'bg'}" onclick="setSpeed(${s})">${s}×</button>`).join('')}
-      <button class="btn bsm bg" id="mvPause" onclick="togglePause()">⏸ Pause</button><button class="btn bsm bs" onclick="skipHalf()">Skip ⏭</button>
+      <button class="btn bsm bg" id="mvPause" onclick="togglePause()" title="Pause to change tactics, shape and players">⏸ Pause</button>
       <select onchange="PREFS.viewMode=this.value;savePrefs()" style="width:auto;padding:4px 6px;font-size:11px">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <button class="btn bsm bg" onclick="toggleSound()" title="Sound">${PREFS.sound === false ? '🔇' : '🔊'}</button><button class="btn bsm bg" id="mvComm" onclick="toggleCommentary()" title="Spoken commentary">${PREFS.speech === false ? '🎙 Off' : '🎙 On'}</button></div>
     <div class="mv-stats" id="mvStats"></div><div class="mv-feed" id="mvFeed"></div>`;
@@ -845,7 +868,7 @@ function playHighlights(back){
     hv.three = three; hlStart(hv, 0);
     const tick = now => {
       if (hv.closed || HV !== hv) return;
-      const dt = Math.min(0.1, (now - hv.last) / 1000); hv.last = now;
+      const dt = Math.max(0, Math.min(0.1, (now - hv.last) / 1000)); hv.last = now;
       const c = hv.clips[hv.k];
       hv.t += dt * hv.rate;
       if (hv.skip || hv.t >= c.frames[c.frames.length - 1].t) { hv.skip = false; if (hv.k + 1 >= hv.clips.length) return close(); hlStart(hv, hv.k + 1); }
@@ -867,14 +890,34 @@ function hlStart(hv, k){
 }
 // The 3D view lives in match3d.js (three.js, loaded on demand). If WebGL or the module is missing,
 // the match falls back to the 2D pitch automatically.
+// The first half's 3D view is kept through half-time and reused for the second half, so the
+// stadium, the players and their compiled shaders are ready at once (rebuilding them was the wait
+// at the start of each half).
+let KEEP3D = null;
+function keep3D(v){ drop3D(); KEEP3D = { key: hlKey(v.m), three: v.three }; }
+function drop3D(){ if (KEEP3D) { try { KEEP3D.three.dispose(); } catch {} KEEP3D = null; } }
 async function start3D(v){
   try {
-    const mod = await import('./match3d.js');
-    if (VIEW !== v) return;
-    v.three = await mod.createView(document.getElementById('mv3d'), view3dOptions(v.m));
+    const host = document.getElementById('mv3d');
+    let reused = false;
+    if (KEEP3D && KEEP3D.key === hlKey(v.m)) {
+      v.three = KEEP3D.three; KEEP3D = null;
+      v.three.attach(host); v.three.rebind(v); reused = true;
+    } else {
+      drop3D();
+      const mod = await import('./match3d.js');
+      if (VIEW !== v) return;
+      const three = await mod.createView(host, view3dOptions(v.m));
+      if (VIEW !== v) { three.dispose(); return; }
+      const prep = document.getElementById('mvPrep'); if (prep) prep.classList.add('on');
+      if (three.prepare) await three.prepare(v);
+      if (prep) prep.classList.remove('on');
+      if (VIEW !== v) { three.dispose(); return; }
+      v.three = three;
+    }
     document.getElementById('genMoContent').classList.add('mvx');
     hudInit(v);
-    if (v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
+    if (!reused && v.minute === 0 && PREFS.intro !== false && (PREFS.speed || 2) <= 4) { v.intro = INTRO_LEN; showIntroCard(v); }
   } catch (e) {
     console.warn('3D unavailable, using 2D', e);
     document.getElementById('genMoContent').classList.remove('mvx');
@@ -884,7 +927,7 @@ async function start3D(v){
   if (VIEW === v) { v.last = performance.now(); requestAnimationFrame(viewTick); }
 }
 function setSpeed(s){ PREFS.speed = s; savePrefs(); applyAudioPrefs(); document.querySelectorAll('.mv-bar ~ .row .btn').forEach(b => { if (/×$/.test(b.textContent)) b.classList.toggle('bact', b.textContent === s + '×'); }); }
-function togglePause(){ if (!VIEW) return; VIEW.paused = !VIEW.paused; try { if (VIEW.paused) { window.GafferSound && window.GafferSound.suspend(); window.GafferCommentary && window.GafferCommentary.pause(); } else { window.GafferSound && window.GafferSound.resume(); window.GafferCommentary && window.GafferCommentary.resume(); } } catch {} const b = document.getElementById('mvPause'); if (b) b.textContent = VIEW.paused ? '▶ Play' : '⏸ Pause'; }
+function togglePause(){ if (!VIEW) return; VIEW.paused = !VIEW.paused; if (VIEW.paused) openLivePanel(); else closeMo('liveMo'); try { if (VIEW.paused) { window.GafferSound && window.GafferSound.suspend(); window.GafferCommentary && window.GafferCommentary.pause(); } else { window.GafferSound && window.GafferSound.resume(); window.GafferCommentary && window.GafferCommentary.resume(); } } catch {} const b = document.getElementById('mvPause'); if (b) b.textContent = VIEW.paused ? '▶ Play' : '⏸ Pause'; }
 function skipHalf(){ if (!VIEW) return; VIEW.skip = true; VIEW.hold = 0; VIEW.minute = VIEW.to; }
 function markEvent(e, silent){
   const v = VIEW;
@@ -951,7 +994,7 @@ function statsRender(){
 }
 function viewTick(now){
   const v = VIEW; if (!v || v.finished) return;
-  const dt = Math.min(0.1, (now - v.last) / 1000); v.last = now;
+  const dt = Math.max(0, Math.min(0.1, (now - v.last) / 1000)); v.last = now;   // a frame stamped before the view started must not run the clock backwards
   if (v.three && (v.intro != null || v.replay) && cinematic(v, now, dt)) return;
   const nextEv = v.m.events[v.idx];
   if (!v.paused) {
@@ -961,8 +1004,16 @@ function viewTick(now){
     if (v.hold > 0) v.hold -= dt; else v.minute = Math.min(v.to, v.minute + rate * dt);
   }
   let changed = false;
-  while (v.idx < v.m.events.length && v.m.events[v.idx].min <= v.minute && v.m.events[v.idx].min <= v.to) { markEvent(v.m.events[v.idx], false); v.idx++; changed = true; }
+  while (v.idx < v.m.events.length && v.m.events[v.idx].min <= v.minute && v.m.events[v.idx].min <= v.to) {
+    const e = v.m.events[v.idx];
+    // One chance at a time: a goal or shot waits (the clock holds) until the view has struck it and
+    // the ball has arrived, so two in the same minute are both played out and a celebration is
+    // never cut short by the next shot.
+    if ((e.type === 'goal' || e.type === 'shot') && !chanceShown(v, e)) { v.hold = Math.max(v.hold || 0, 0.05); break; }
+    markEvent(e, false); v.idx++; changed = true;
+  }
   if (changed) { feedRender(); statsRender(); }
+  if (v.liveShape && v.minute >= v.liveShape.at) { applyLiveShape(v, v.liveShape); v.liveShape = null; }
   const clock = document.getElementById('mvClock'); if (clock) clock.textContent = `${Math.floor(v.minute)}'`;
   if (v.m.tl && Math.floor(v.minute) !== v.statsMin) { v.statsMin = Math.floor(v.minute); statsRender(); tlMoveCommentary(v); }
   stepPositions(now, v.paused ? 0 : dt);
@@ -971,12 +1022,20 @@ function viewTick(now){
     v.finished = true;
     const done = v.done;
     matchAudioEnd(v);
-    setTimeout(() => { if (VIEW === v) { VIEW = null; if (v.three) v.three.dispose(); done(); } }, 700);
+    setTimeout(() => { if (VIEW === v) { VIEW = null; if (v.three) { if (v.to <= 45) keep3D(v); else v.three.dispose(); } done(); } }, 700);
     return;
   }
   // Added time and the closing minutes
   if (!v.skip && !v.lateSaid && v.to >= 90 && v.minute >= 84 && Math.abs(v.score.home - v.score.away) <= 1) { v.lateSaid = true; const losing = v.score.home < v.score.away ? 'home' : 'away'; say('late', { club: clubOf(v, losing) }); }
   if (document.getElementById('mvScore')) requestAnimationFrame(viewTick); else { if (v.three) v.three.dispose(); VIEW = null; crowd(false); audioStop(); }
+}
+
+function chanceShown(v, e){
+  const s = v.sim;
+  if (!s || v.skip || v.mode === 'commentary') return true;
+  if (s.shot && s.attack && s.attack.ev === e) return s.t >= s.shot.t0 + s.shot.dur - 0.02;   // struck: wait for the ball to arrive
+  if (v.chanceDue !== e) { v.chanceDue = e; v.chanceAt = s.t + 2.6 * simSpeed(); v.chanceSince = performance.now(); }   // not built up yet: give it a few seconds
+  return performance.now() - v.chanceSince > 9000;                                       // never hold the match for long
 }
 
 // ── Match audio: one place that turns what happens on the pitch into sound, commentary and PA ──
@@ -1118,6 +1177,7 @@ function tlTurnovers(v){
   if (!e || e.type === 'TACKLE') s.tackle = { side, idx, t0: s.t, kind: e ? e.kind : 'sliding' };
   s.carry = null;
   simGive(v, side, idx, e && e.type === 'THROW_IN' ? rnd(1.2, 1.8) : rnd(0.5, 1.1));   // a throw-in takes a moment to set up
+  s.throwIn = e && e.type === 'THROW_IN' ? { side, idx, t0: s.t, at: s.nextAt } : null;
   v.lastTurn = s.t;
   if (window.__tlDebug) { const D = window.__tlDebug; const kk = e ? 'turnover:' + e.type : 'turnover:spell'; D[kk] = (D[kk] || 0) + 1; }
   if (!e || e.type === 'TACKLE') audioEv('TACKLE', { side, x: v.ball.x, slide: !!(e && e.kind === 'sliding') });
@@ -1212,7 +1272,10 @@ function simPass(v, secsTo){
   const chest = kind === 'long' && to !== s.gk[s.poss] && steal == null && Math.random() < 0.4;   // some long balls are taken on the chest
   const plan = window.GafferBall ? GafferBall.plan(kind, dist, { curl: (Math.random() < 0.5 ? -1 : 1) * curlM, arrive: chest ? 'chest' : null }) : null;
   if (plan && plan.lofted) plan.wind = windOf(v) * plan.dur * 0.6;
-  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind };
+  s.receiving = null;                                      // the next first touch belongs to this pass
+  const thrown = !!(s.throwIn && !s.throwIn.done && s.throwIn.side === s.poss && s.throwIn.idx === s.holder);
+  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind, z0: thrown ? 0.36 : 0 };
+  if (thrown) s.throwIn.done = true;   // kept a moment longer so the 3D taker finishes his throw
   s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: kind === 'long' || kind === 'cross' ? 0.9 : kind === 'through' ? 0.75 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
   s.carry = null;
   if (kind === 'cross' && Math.random() < 0.5) say('cross', { player: surname(h.name), club: clubOf(v, s.poss) });
@@ -1240,8 +1303,11 @@ function simShoot(v, secs){
   }
   s.strike = { side: a.side, idx: a.shooter, t0: s.t, power: 1, dir: [to[0] - d.x, to[1] - d.y] };
   const def = otherSide(a.side);
-  s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t,
-    kind: type === 'saved' ? (z1 > 0.22 ? 'punch' : Math.abs(to[1] - 0.5) < 0.022 ? 'catch' : 'dive') : 'dive' };
+  const tlShot = v.m.tl ? v.m.tl.find(x => x.type === 'SHOT' && x.side === a.side && x.pid === e.playerId && x.t > e.min * 60 - 60 && x.t <= e.min * 60 + 0.5) : null;
+  const tlSv = tlShot ? v.m.tl.find(x => x.type === 'SAVE' && x.t >= tlShot.t && x.t <= tlShot.t + 2) : null, tlSave = tlSv ? tlSv.kind : null;   // the timeline says how he saves it
+  const wayOff = type === 'off' && !wood && (Math.abs(to[1] - 0.5) > 0.085 || z1 > 0.5);   // well wide or over: he watches it go
+  s.dive = { side: def, idx: s.gk[def], y: type === 'goal' ? 0.5 + (to[1] - 0.5) * (Math.random() < 0.45 ? -0.9 : 0.55) : to[1], t0: s.t, z: z1,
+    kind: wayOff ? 'watch' : type === 'saved' ? (tlSave === 'catch' || (!tlSave && z1 <= 0.22 && Math.abs(to[1] - 0.5) < 0.022) ? 'catch' : tlSave === 'parry' || (!tlSave && z1 > 0.22) ? 'punch' : 'dive') : 'dive' };
   s.block = null;
   if (type === 'off' && Math.random() < 0.35) { const [bi] = simNearest(v.dots[def], d.x + dir * 0.03, d.y, s.gk[def]); if (bi >= 0) s.block = { side: def, idx: bi, t0: s.t + 0.05, x: d.x + dir * 0.025, y: d.y + (to[1] - d.y) * 0.15 }; }
   // A blocked shot comes off the defender and loops away wide (it was a miss anyway).
@@ -1288,7 +1354,7 @@ function stepPositions(now, dt){
   const k = simSpeed(); dt *= k; s.t += dt;
   const ball = v.ball, ev = v.m.events[v.idx];
   const isShot = ev && (ev.type === 'goal' || ev.type === 'shot') && ev.min <= v.to;
-  const secsTo = isShot ? Math.max(0, (ev.min - v.minute) / Math.max(0.05, v.rate || 3)) * k : 99;
+  const secsTo = isShot ? (v.chanceDue === ev ? Math.max(0, v.chanceAt - s.t) : Math.max(0, (ev.min - v.minute) / Math.max(0.05, v.rate || 3)) * k) : 99;
 
   // Build-up to the next shot: that side wins the ball and works it to the shooter.
   if (s.phase === 'play') {
@@ -1317,13 +1383,15 @@ function stepPositions(now, dt){
       const p0 = Math.max(0, Math.min(1, (s.t - s.pass.t0) / s.pass.dur));
       const fl = s.pass.plan ? GafferBall.at(s.pass.plan, Math.max(0, s.t - s.pass.t0)) : null;
       const p = fl ? fl.p : s.pass.lob ? p0 : 1 - (1 - p0) ** 1.6;
-      ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = fl ? fl.z : Math.sin(p * Math.PI) * s.pass.lob;
+      ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = (fl ? fl.z : Math.sin(p * Math.PI) * s.pass.lob) + (s.pass.z0 || 0) * Math.max(0, 1 - p * 1.6);
       if (fl && fl.side) { const o = GafferBall.sidewaysUnits(s.pass.from, s.pass.to, fl.side); ball.x += o[0]; ball.y += o[1]; }
+      if (!s.receiving && s.pass.steal == null && s.t >= s.pass.t0 + s.pass.dur - 0.2) s.receiving = { side: s.poss, idx: s.pass.toIdx, t0: s.t, chest: !!(s.pass.plan && s.pass.plan.chest) };
       if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t, chest: !!(ps.plan && ps.plan.chest && ps.steal == null) }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
     } else {
       const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
       ball.x += (h.x + ox - ball.x) * 0.5; ball.y += (h.y + oy - ball.y) * 0.5; ball.z *= 0.6;
+      if (s.throwIn && !s.throwIn.done && s.poss === s.throwIn.side && s.holder === s.throwIn.idx) { ball.x = h.x; ball.y = h.y; ball.z = 0.36; }
       if (s.t >= s.nextAt) simPass(v, secsTo);
       else if (v.m.tl) tlTurnovers(v);
       else if (!s.attack) { const [oi, od] = simNearest(opp, h.x, h.y, s.gk[otherSide(s.poss)]); if (oi >= 0 && od < 0.022 && Math.random() < 0.4 * dt) { s.tackle = { side: otherSide(s.poss), idx: oi, t0: s.t }; audioEv('TACKLE', { side: otherSide(s.poss), x: ball.x, slide: true }); simGive(v, otherSide(s.poss), oi, rnd(0.7, 1.5)); }
@@ -1380,7 +1448,7 @@ function stepPositions(now, dt){
         if (!inPoss && i === pressIdx) { tx = ball.x - d0 * 0.012; ty = ball.y; sp = carry && carry.beat === i ? 0.06 : 0.08; }
         if (!inPoss && i === press2) { tx = ball.x - d0 * 0.03; ty = ball.y + (d.y < ball.y ? -0.03 : 0.03); sp = 0.075; }
         if (!inPoss && carry && carry.beat === i && i !== pressIdx) { tx = ball.x - d0 * 0.01; ty = ball.y; sp = 0.07; }
-        if (s.dive && s.dive.side === side && i === s.dive.idx) { ty = s.dive.y; sp = s.dive.kind === 'dive' ? 0.16 : 0.08; }
+        if (s.dive && s.dive.kind !== 'watch' && s.dive.side === side && i === s.dive.idx) { ty = s.dive.y; sp = s.dive.kind === 'dive' ? 0.16 : 0.08; }
         if (s.block && s.phase === 'shot' && s.block.side === side && i === s.block.idx) { tx = s.block.x; ty = s.block.y; sp = 0.13; }
       } else if (s.phase === 'celebrate') {
         const c = s.celebrate;
@@ -1466,17 +1534,101 @@ async function resumeMatch(withChanges){
     body.instructions = Object.fromEntries(INSTR_UI.map(([key]) => [key, Number((document.getElementById('ht_' + key) || {}).value ?? 50)]));
     body.subs = HT.subs.slice();
   }
+  body.live = true;
   closeMo('genMo');
   busy = true; updateTopbar();
   const r = await post('/api/match/resume', body);
   busy = false;
   if (!r.ok) { updateTopbar(); return notify(r.error || 'Could not resume', 'd'); }
   applyCurrent(r); refresh();
-  const finished = r.halftime ? r.finished : (r.out && r.out.reports && r.out.reports.length ? r.out.reports[r.out.reports.length - 1] : null);
-  const next = () => { if (r.halftime) playHalf(r.halftime, 0, 45, () => showHalftime(r.halftime)); else afterWeek(r.out, true); };
-  if (!finished) return next();
-  const end = finished.events.some(e => e.min > 90) ? 120 : 90;
-  playHalf(finished, 45, end, () => showFullTime(finished, next));
+  LIVE = r.live;
+  if (!LIVE) return finishLive();
+  playHalf(LIVE, 45, LIVE.minute > 90 ? 120 : 90, () => finishLive());
+}
+// Full time: the result is recorded, then the rest of the week plays while the report is read.
+async function finishLive(){
+  busy = true; updateTopbar();
+  const r = await post('/api/match/finish', {});
+  if (!r.ok) { busy = false; updateTopbar(); return notify(r.error || 'Could not finish the match', 'd'); }
+  applyCurrent(r); LIVE = null; drop3D();
+  const rest = post('/api/step-week', { interactive: true });
+  const next = async () => {
+    const w = await rest;
+    busy = false; updateTopbar();
+    if (!w.ok) { applyCurrent(w); refresh(); if (w.sacked) navTo('career'); return notify(w.error || 'Could not continue', 'd'); }
+    applyCurrent(w); refresh();
+    if (w.halftime) { LIVE = w.halftime; playHalf(w.halftime, 0, 45, () => showHalftime(LIVE)); } else afterWeek(w.out, true);
+  };
+  showFullTime(r.finished, next);
+}
+
+// ── Changes while the match is paused ──────────────────────────────
+// Pause opens the dressing-room board: shape, style, instructions and substitutions. The engine
+// applies them from the next five-minute mark (GameWorld.liveChange) and the rest of the half is
+// played again from there; nothing already shown changes.
+let LIVE = null;
+const liveOpen = () => !!(VIEW && LIVE && LIVE.live && VIEW.m.myKey && !VIEW.finished && hlKey(VIEW.m) === hlKey(normalizeMatch(LIVE)));
+async function openLivePanel(){
+  if (!liveOpen()) return;
+  const v = VIEW, minute = v.minute;
+  openMo('liveMo');
+  const box = document.getElementById('liveMoContent');
+  box.innerHTML = '<div class="mo-title">⏸ Paused</div><div class="small dim">Loading your team…</div>';
+  const st = await post('/api/match/state', { minute });
+  if (VIEW !== v || !v.paused) return;
+  if (!st.ok) { box.innerHTML = `<div class="mo-title">⏸ Paused · ${Math.floor(minute)}'</div><div class="card small">${esc(st.error || 'No changes possible now.')}</div><button class="btn bp fw" onclick="togglePause()">▶ Resume</button>`; return; }
+  HT = { h: st, subs: [] };
+  const winLeft = st.maxWindows - st.windowsUsed;
+  box.innerHTML = `<div class="mo-title">⏸ Paused · ${Math.floor(minute)}'</div>
+    <div class="small dim" style="margin-bottom:8px">Changes take effect at <b>${st.minute}'</b>. ${winLeft > 0 ? `${winLeft} substitution window${winLeft === 1 ? '' : 's'} left.` : 'No substitution windows left.'}</div>
+    <div class="g2"><div><label class="lbl">Style</label><select id="lvTactic">${st.tactics.map(t => `<option value="${t}" ${t === st.tactic ? 'selected' : ''}>${t.replace('_', ' ')}</option>`).join('')}</select></div>
+      <div><label class="lbl">Formation</label><select id="lvFormation">${st.formations.map(f => `<option ${f === st.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></div></div>
+    <div class="mt8">${INSTR_UI.map(([key, label, lo, hi]) => instrSlider(key, label, lo, hi, instrVal((st.instructions || {})[key]), 'lv_', '')).join('')}</div>
+    <div class="card" style="padding:0;overflow:hidden;margin-top:8px" id="htSubs"></div>
+    <button class="btn bp fw mt8" id="lvApply" onclick="applyLiveChanges()">✓ Make the changes</button>
+    <button class="btn bg fw mt4" onclick="togglePause()">▶ Resume without changes</button>`;
+  if (winLeft <= 0) { HT.h = { ...st, maxSubs: st.subsUsed }; }
+  renderHtSubs();
+}
+async function applyLiveChanges(){
+  const v = VIEW; if (!v || !HT.h) return;
+  const st = HT.h;
+  const body = { minute: v.minute, subs: HT.subs.slice() };
+  const tac = document.getElementById('lvTactic').value, form = document.getElementById('lvFormation').value;
+  if (tac !== st.tactic) body.tactic = tac;
+  if (form !== st.formation) body.formation = form;
+  const ins = Object.fromEntries(INSTR_UI.map(([key]) => [key, Number((document.getElementById('lv_' + key) || {}).value ?? 50)]));
+  if (INSTR_UI.some(([key]) => ins[key] !== instrVal((st.instructions || {})[key]))) body.instructions = ins;
+  if (!body.subs.length && !body.tactic && !body.formation && !body.instructions) return togglePause();
+  const btn = document.getElementById('lvApply'); if (btn) { btn.disabled = true; btn.textContent = 'Telling the players…'; }
+  const r = await post('/api/match/change', body);
+  if (VIEW !== v) return;
+  if (!r.ok) { if (btn) { btn.disabled = false; btn.textContent = '✓ Make the changes'; } return notify(r.error || 'Could not make the changes', 'w'); }
+  applyCurrent(r);
+  spliceLive(v, r.live, r.minute, r.shape);
+  const errs = (r.applied && r.applied.errors) || [];
+  notify(errs.length ? errs[0] : `Changes made: they take effect at ${r.minute}'`, errs.length ? 'w' : 'g');
+  togglePause();
+}
+// The engine sends the half again from the change: events and the timeline after the current
+// clock are replaced; everything already on screen stays.
+function spliceLive(v, live, mark, shape){
+  LIVE = live;
+  const m2 = normalizeMatch(live);
+  v.m.events = m2.events; v.m.tl = m2.tl; v.m.spells = m2.spells; v.m.ts = m2.ts;
+  v.m.tactics = m2.tactics || v.m.tactics; v.m.instructions = m2.instructions || v.m.instructions;
+  v.m.lineups = { ...v.m.lineups, looks: { ...((v.m.lineups || {}).looks || {}), ...((m2.lineups || {}).looks || {}) } };
+  v.tlPass = 0; v.tlPoss = 0; v.spellIdx = 0;
+  const s = v.sim;
+  if (s && s.attack && s.attack.ev.min > mark) { s.attack = null; if (s.phase === 'shot') { s.phase = 'play'; s.shot = null; s.dive = null; } }
+  if (shape && v.m.myKey) v.liveShape = { at: mark, side: v.m.myKey, slots: shape };
+  if (v.to > 45) v.to = Math.max(Math.ceil(v.minute), live.minute > 90 ? 120 : 90);   // a change can take a tie into, or out of, extra time
+}
+// A new formation: each player's place in the shape follows his new slot.
+function applyLiveShape(v, sh){
+  const mirror = sh.side === 'away';
+  const base = basePositions(sh.slots.map(x => ({ playerId: x.playerId, slot: x.slot, name: '' })), mirror);
+  for (const d of v.dots[sh.side]) { const b = base.find(x => x.id === d.id); if (b && !d.off) { d.slot = b.slot; d.bx = b.bx; d.by = b.by; } }
 }
 
 function matchReportHTML(m){
@@ -1552,7 +1704,7 @@ function rDash(){
   </div>
   <div class="g2">
     <div>
-      <div class="card"><div class="ch">Next match</div>
+      <div class="card hidden"><div class="ch">Next match</div>
         ${nf ? `<div style="font-size:15px;font-weight:600;margin-bottom:6px">${esc(nf.home)} <span class="dim">vs</span> ${esc(nf.away)}</div><div class="small dim">${esc(nf.comp)} · ${nf.venue === 'H' ? 'Home' : nf.venue === 'N' ? 'Neutral ground' : 'Away'}${nf.count > 1 ? ` · ${nf.count} matches this week` : ''}</div>` : '<div class="small dim">No league match this round (rest week).</div>'}
         <div class="row mt8">${recent.map(m => `<span class="fw-${m.result}" title="${esc(m.opponent)} ${m.gf}-${m.ga}">${m.result}</span>`).join('') || '<span class="small dim">No results yet.</span>'}</div>
         ${STATE.lastMatch ? `<button class="btn bg bsm mt8" onclick="showMatchReport(STATE.lastMatch)">Last match report</button>` : ''}
@@ -2023,8 +2175,12 @@ function rContinental(){
 }
 
 // ── TRANSFERS ───────────────────────────────────────────────────────
+// The market lists players at other clubs; free agents have their own tab so they do not crowd it.
+let MKT_VIEW = 'clubs';
+function marketView(k){ MKT_VIEW = k; renderSection('transfers'); }
 function rTransfers(){
-  const w = STATE.transferWindow || {}, bids = STATE.pendingBids || [], market = STATE.market || [];
+  const w = STATE.transferWindow || {}, bids = STATE.pendingBids || [], all = STATE.market || [];
+  const free = all.filter(p => !p.fromClubId), market = MKT_VIEW === 'free' ? free : all.filter(p => p.fromClubId);
   return `<div class="sct">Transfers <span class="win-pill ${w.open ? 'win-open' : 'win-closed'}">${esc(w.label)}</span></div>
   ${!w.open ? '<div class="banner or">The window is closed: club-to-club deals and loans wait for the next window. Free agents can be signed any time.</div>' : ''}
   ${STATE.debtStatus?.frozen ? '<div class="banner red">The board has frozen transfer spending until the club is out of debt.</div>' : ''}
@@ -2032,7 +2188,8 @@ function rTransfers(){
   <div class="row" style="margin-bottom:10px"><input id="tSearch" placeholder="Search name…" oninput="filterMarket()" style="flex:1;min-width:130px">
     <select id="tPos" onchange="filterMarket()" style="max-width:110px"><option value="">Any pos</option>${['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST','CF'].map(p => `<option>${p}</option>`).join('')}</select>
     <select id="tAge" onchange="filterMarket()" style="max-width:110px"><option value="99">Any age</option><option value="21">≤21</option><option value="23">≤23</option><option value="27">≤27</option></select></div>
-  <div class="small dim" style="margin-bottom:8px">Transfer budget <b style="color:var(--ac)">${money(STATE.transferBudget)}</b> · wage room ${money(STATE.budget?.wageHeadroom || 0)}/wk · balance ${money(STATE.finances)}. Ratings of players you have not scouted are ranges (~). Shown: listed, unhappy, final-year, free-agent and scouted players.</div>
+  <div class="row" style="margin-bottom:8px">${[['clubs', `At other clubs (${all.length - free.length})`], ['free', `Free agents (${free.length})`]].map(([k, l]) => `<button class="btn bsm ${MKT_VIEW === k ? 'bact' : 'bg'}" onclick="marketView('${k}')">${l}</button>`).join('')}</div>
+  <div class="small dim" style="margin-bottom:8px">Transfer budget <b style="color:var(--ac)">${money(STATE.transferBudget)}</b> · wage room ${money(STATE.budget?.wageHeadroom || 0)}/wk · balance ${money(STATE.finances)}. Ratings of players you have not scouted are ranges (~). ${MKT_VIEW === 'free' ? 'Free agents have no club: no fee, just wages and a signing bonus, any time of the season.' : 'Shown: listed, unhappy, final-year and scouted players at other clubs.'}</div>
   <div class="card" style="overflow-x:auto;padding:0"><table class="st" id="tTbl" style="min-width:820px"><thead><tr><th>PLAYER</th><th class="tc">POS</th><th class="tc">AGE</th><th class="tc">OVR</th><th class="tc">POT</th><th>CLUB</th><th class="tc">CONTRACT</th><th class="tc">VALUE</th><th class="tc">WAGE</th><th></th></tr></thead><tbody>
   ${market.map(p => `<tr data-s="${esc(p.name.toLowerCase())}" data-pos="${esc(p.position)}" data-age="${p.age}"><td><a href="#" onclick="showPlayer(${p.id});return false" style="color:var(--tx);font-weight:600">${esc(p.name)}</a> ${statusTag(p)}<div class="small dim">${esc(p.pers || '?')} · ${esc(p.nation)}${p.fog ? ` · ${p.known}% known` : ''}</div></td><td class="tc"><span class="tag tb2">${esc(p.position)}</span></td><td class="tc dim">${p.age}</td><td class="tc">${ovrCell(p)}</td><td class="tc">${potCell(p)}</td><td class="small dim">${esc(p.fromClub)}${p.shortlisted ? ' <span class="tag tb2">SCOUTED</span>' : ''}</td><td class="tc dim">${p.contractYears} yr</td><td class="tc" style="color:var(--ac)">${money(p.marketValue)}</td><td class="tc dim">${money(p.weeklyWage)}</td>
     <td><div class="row"><button class="btn bp bxs" onclick="openBid(${p.id})">${p.fromClubId ? 'Offer' : 'Sign'}</button>${p.loanAvailable && p.fromClubId ? `<button class="btn bs bxs" onclick="openLoan(${p.id})">Loan</button>` : ''}${p.fog ? `<button class="btn bg bxs" title="Scout him" onclick="scoutPlayer(${p.id})">🔭</button>` : ''}</div></td></tr>`).join('')}
@@ -2594,7 +2751,8 @@ function heroCard(){
         <div class="row mt8">${recent.map(m => `<span class="fw-${m.result}" title="${esc(m.opponent)} ${m.gf}-${m.ga}">${m.result}</span>`).join('') || '<span class="small dim">No results yet</span>'}</div></div>
     </div>
     <div class="hero-match">${nf ? `<div><div class="small dim">NEXT MATCH · ${esc(nf.comp)} · ${nf.venue === 'H' ? 'Home' : nf.venue === 'N' ? 'Neutral' : 'Away'}</div><div class="hero-vs">${esc(nf.home)} <span class="dim">vs</span> ${esc(nf.away)}</div></div>` : '<div class="small dim">No match this week — a rest week.</div>'}
-      <button class="btn bp bm" onclick="advance()">▶ ${esc(STATE.continueLabel || 'Continue')}</button></div>
+      <div class="hero-go"><button class="btn bp bm" onclick="advance()">▶ ${esc(STATE.continueLabel || 'Continue')}</button>
+        <div class="hero-links"><a href="#" onclick="navTo('lineup');return false">Line-up</a> · <a href="#" onclick="navTo('tactics');return false">Tactics</a>${STATE.lastMatch ? ' · <a href="#" onclick="showMatchReport(STATE.lastMatch);return false">Last match</a>' : ''}</div></div></div>
     ${tip ? `<div class="small mt8" style="padding-top:10px;border-top:1px solid rgba(127,127,127,.2)">👋 <b>How it works:</b> deal with the Decisions below (one tap each), then press Play. Watch the match, make changes at half-time, and climb the divisions. <a href="#" onclick="PREFS.tipDone=1;savePrefs();renderSection('dash');return false" style="color:var(--bl)">Got it</a></div>` : ''}</div>`;
 }
 function radar(a){
