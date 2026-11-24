@@ -39,6 +39,12 @@ ratios are meaningful).*
 * **In the renderer:** the clips play in real matches (logged) and in the animation lab
   (screenshots: high and low dives, punch, first touch, chest control, header, tackle).
 
+## Ara's own export check
+Ara's `npm run test:gltf` had timed out for Grok. With a configurable limit and its progress log it
+completed in 214 s. All 7 rig and pose configurations pass: 259 clips each, worst rotation error
+0.0327°, root error 0, 34 face shapes, hand deformation working. So Ara's GLB exports themselves are
+sound in three.js.
+
 ## Ara characters tested in the Gaffer renderer
 
 The three stored footballers (`outputs/footballer-models/*.glb`) are 32–36 MB each. `Kofi_Mensah.glb`

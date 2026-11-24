@@ -1103,8 +1103,12 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
   const weak = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || (navigator.deviceMemory && navigator.deviceMemory <= 4) || window.innerWidth < 720;
   const low = quality === 'low' || (quality === 'auto' && weak);
   const renderer = matchRenderer(quality !== 'low');
-  renderer.setPixelRatio(Math.min(quality === 'low' ? 1 : low ? 1.75 : 2, window.devicePixelRatio || 1));
-  renderer.shadowMap.enabled = !low && !night;
+  // The renderer is shared (the warm-up, a match, highlights): the view that draws claims it,
+  // puts the canvas in its own container and sets its own size, pixel ratio and shadows.
+  const self = {}, pixelRatio = Math.min(quality === 'low' ? 1 : low ? 1.75 : 2, window.devicePixelRatio || 1), shadows = !low && !night;
+  renderer.__owner = self;
+  renderer.setPixelRatio(pixelRatio);
+  renderer.shadowMap.enabled = shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1249,8 +1253,15 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
   function resize() {
     const w = container.clientWidth || 640, h = container.clientHeight || 360;
     viewW = w;
-    renderer.setSize(w, h, false);
+    if (renderer.__owner === self) renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  function own() {
+    if (renderer.__owner === self && renderer.domElement.parentNode === container) return;
+    renderer.__owner = self;
+    if (renderer.domElement.parentNode !== container) container.prepend(renderer.domElement);
+    renderer.setPixelRatio(pixelRatio); renderer.shadowMap.enabled = shadows; renderer.shadowMap.needsUpdate = true;
+    resize();
   }
   resize();
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
@@ -1305,6 +1316,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
 
   return {
     render(v, now) {
+      own();
       ensurePlayers(v);
       const t = now / 1000, sim = v.sim || {};
       const dt = lastNow ? Math.min(0.1, Math.max(0.001, (now - lastNow) / 1000)) : 0.016; lastNow = now;
@@ -1541,6 +1553,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
     },
     // Builds the players and compiles every shader before the first frame is shown.
     async prepare(v, { textures = true } = {}) {
+      own();
       ensurePlayers(v);
       const hidden = [];
       scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });   // eyes, lips and effects that appear later
@@ -1558,9 +1571,8 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       if (!host || host === container) return;
       if (ro) ro.disconnect();
       container = host;
-      host.prepend(renderer.domElement);
       if (ro) ro.observe(host);
-      resize();
+      renderer.__owner = null; own();
     },
     // A new half: the same figures follow the players to their new places in the line-up, players
     // who came on at half-time get theirs, and nothing carries over from the last frame.
@@ -1582,7 +1594,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       // compiled shader programs stay with the shared renderer for the next match.
       scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (m.map) m.map.dispose(); }); } });
       renderer.renderLists.dispose();
-      renderer.domElement.remove();
+      if (renderer.__owner === self) { renderer.__owner = null; if (renderer.domElement.parentNode === container) renderer.domElement.remove(); }
     },
   };
 }

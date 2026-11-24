@@ -58,6 +58,8 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
   The first half on this machine is dominated by software texture uploads. On a real GPU these
   take milliseconds; real-device timing was not measured.
 
+* **Found on production and fixed (follow-up commit):** the warm-up and the match share one renderer. When the warm-up finished after the match view had started (slower network), its clean-up removed the shared canvas and the match played with a blank 3D view. Each view now claims the renderer when it draws (canvas, size, pixel ratio, shadows) and removes the canvas only if it still owns it. Reproduced locally by forcing a warm-up during a match: the match keeps rendering.
+
 ## 3. Skip removed
 * `Skip ⏭` removed from the match controls. Tapping the intro or a replay still skips that
   cinematic only.
