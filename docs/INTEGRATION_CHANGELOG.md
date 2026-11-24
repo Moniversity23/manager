@@ -176,6 +176,21 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
   * 0 problems;
   * 13 of 16 header chances were shown as headers.
 
+## 11. Phones, and what a full match costs to draw (follow-up)
+* **All 25 screens checked at 390 × 844:** no undefined, NaN or [object Object] text, and nothing
+  wider than the screen. The tab strips scroll sideways.
+* **On phones** the bottom bar already holds Play and More. The hero's Play button and the top bar's
+  menu button only repeated them, so they are hidden there, and the top bar keeps balance and
+  position next to Back.
+* **Measured, a full 3D match (22 players, referee, stadium):**
+  * about 270 draw calls and 385,000 triangles per frame (shadow passes included);
+  * 17–21 shader programs and 235 small textures (64–256 px each, about 25 MB of GPU memory).
+
+  These are within what mid-range phones draw. Without a GPU here the frame rate cannot be judged
+  (software rendering gives 1–2 fps), so no further optimisation was made blind. The automatic
+  quality setting already picks "low" on touch devices, small screens and devices with 4 GB of
+  memory or less.
+
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|

@@ -213,6 +213,9 @@ table{border-collapse:collapse;width:100%}
 .hub-tab:hover{color:var(--tx)}.hub-tab.on{color:var(--ac);border-bottom-color:var(--ac);font-weight:600}
 .hero-go{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.hero-links{font-size:12px;color:var(--dim)}.hero-links a{color:var(--dim)}.hero-links a:hover{color:var(--ac)}
 @media (min-width:769px){body[data-sec="dash"] #continueBtn{display:none}}
+/* Phones: the bottom bar already has Play and More, so the hero's Play button and the top bar's menu button would only repeat them; the top bar keeps balance and position. */
+@media (max-width:768px){.hero-go .bm{display:none}#app .tb-mob{display:none}}
+@media (max-width:480px){.tb-stats .tbi:nth-child(n+3){display:none}}
 .nv-h{font-family:var(--fm);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:12px 14px 4px}
 .hero{border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid var(--bd2);background:radial-gradient(120% 140% at 0% 0%,rgba(0,229,204,.16),transparent 55%),linear-gradient(135deg,#0d1b2e,#101f38)}
 :root[data-theme="light"] .hero{background:linear-gradient(135deg,#e6f7f5,#eaf1fb)}

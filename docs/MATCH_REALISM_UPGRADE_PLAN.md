@@ -34,7 +34,7 @@ matchEngine (result, events)  ──►  timeline (passes, tackles, fouls, throw
 | 4 | **Players' movement off the ball (AI) on screen** | **Done:** the timeline's next receiver makes a run into the pass's space and his marker tracks him; on crosses, attackers attack the near and far post and are marked goal-side; the keeper narrows the angle |
 | 5 | **Player appearance** | Existing Studio and procedural faces. Ara 3D Gen bodies **evaluated, not shipped** (see `PLAYER_STUDIO_INTEGRATION_AUDIT.md`) |
 | 6 | **Replays and presentation** | Existing replays and highlights now show the new clips. Header shots are now shown as headers after a cross (most of them; see the changelog), and keepers throw or roll the ball out after a catch |
-| 7 | **Performance** | **Done:** one shared WebGL renderer per session with compiled shaders kept, a shader warm-up during the week's simulation, and the first half's view reused for the second half. Second-half start in headless Chrome: about 20 s → 0.7–1.5 s. First frame of the second half: 10 s → 0.04 s |
+| 7 | **Performance** | Measured: a full match draws about 270 calls and 385K triangles a frame, with 235 small textures (about 25 MB). **Done:** one shared WebGL renderer per session with compiled shaders kept, a shader warm-up during the week's simulation, and the first half's view reused for the second half. Second-half start in headless Chrome: about 20 s → 0.7–1.5 s. First frame of the second half: 10 s → 0.04 s |
 
 ## Live match management (new)
 
