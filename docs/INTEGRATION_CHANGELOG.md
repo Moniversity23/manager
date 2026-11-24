@@ -141,6 +141,26 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
 * Asset registers updated (Ara clips; the SoccerDribble rejection).
 * Two unused variables removed from `test/studio-api.test.js` (lint warnings).
 
+## 9. Header shots and the keeper's distribution (follow-up)
+* **Before:** the timeline marks about 15% of shots as headers, but the view always struck them
+  with the foot. After a catch the keeper put the ball down and kicked it.
+* **Change:**
+  * For a header the scorer gets a cross. When time is short the ball goes straight to him; if he
+    already has it he lays it off wide first. The cross lands about half a second before the shot,
+    and a late chance holds the clock briefly, as `chanceShown` does.
+  * The header leaves from the height the cross arrived at, with `headerA` or `headerJump` timed
+    to meet the ball.
+  * A keeper who caught the ball keeps it in his hands, then rolls it (`gkRoll`) to a team-mate
+    within about 20 m, throws it (`gkThrow`) further, or kicks it long. The choice follows the
+    timeline's next pass from him.
+* **Checked in the browser:**
+  * 9 matches in 3 careers: 10 of the last 12 header chances were shown as headers (0 of 18
+    before), keepers threw and rolled the ball out, and still 0 accuracy problems;
+  * the 3D clip log shows `headerA`, `headerJump`, `gkThrow` and `gkRoll` playing.
+* **Fixed along the way:** the throw-in and keeper-throw windows could outlast their clips and
+  replay the release. A keeper whose side lost the ball before he released it no longer mimes a
+  throw.
+
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -156,8 +176,7 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
 | Real phone, real GPU | **Not tested** |
 
 ## Remaining issues
-* Header shots are still struck with the foot; the timeline marks them as headers.
-* Goalkeeper distribution clips (`gkPick`, `gkThrow`, `gkRoll`) are in the Studio but not yet in
-  matches.
+* About one header chance in six is still struck with the foot. This happens when the chance
+  starts while the other side has the ball.
 * Ara 3D Gen bodies are evaluated, not shipped (size).
 * Real-phone frame rate and first-half start on a real GPU were not measured.

@@ -986,6 +986,12 @@ function animateFootballer(u, a, dt, t, simRate) {
   else if (a.punch != null) { want = has('gkPunch') ? 'gkPunch' : 'block'; opts = has('gkPunch') ? meet('gkPunch', a.eta ?? 0.3, 1.2 * k) : { speed: 1.4 * k }; }
   else if (a.slide != null) { want = has('slideA') ? 'slideA' : 'slide'; opts = has('slideA') ? { at: 0.12, speed: 1.4 * k } : { at: 0.15, speed: 1.5 * k }; }
   else if (a.poke != null && a.poke < 0.3) { want = has('tackleA') ? 'tackleA' : 'kickSide'; opts = { at: has('tackleA') ? 0.1 : 0.08, speed: 1.4 * k }; }   // standing tackle: a foot in
+  else if (a.gkDist && has('gkThrow')) { want = a.gkDist.kind === 'roll' ? 'gkRoll' : 'gkThrow'; opts = { at: Math.max(0, Math.min(C[want].contact - 0.1, a.gkDist.age)), speed: k }; }
+  else if (a.strike != null && a.strike < 0.3 && a.headerShot && has('headerA')) {
+    // A header at goal: the forehead meets the ball as it leaves.
+    want = a.headerHigh && has('headerJump') ? 'headerJump' : 'headerA';
+    opts = { at: Math.max(0, (C[want].contact || 0.3) - (0.11 - a.strike) - dt * k), speed: k };
+  }
   else if (a.throwIn != null && has('throwIn')) { want = 'throwIn'; opts = { at: Math.max(0, Math.min(0.7, a.throwIn)), speed: k }; }
   else if (a.strike != null && a.strike < 0.3) {
     // Time the kick so the foot meets the ball as it leaves (the ball leaves 0.11 s of match time after the strike starts).
@@ -1358,12 +1364,13 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
           }
           else if (sim.block && sim.block.side === side && sim.block.idx === i && sim.t - sim.block.t0 < 0.7) a.block = sim.t - sim.block.t0;
           else if (!u.gk && by > 1.5 && by < 3 && ballNear < 1.3 && (sim.pass || sim.phase === 'shot')) { u.hd = (u.hd || 0) + dt * 2.2; a.header = Math.min(1, u.hd); a.headerHigh = by > 2.3; }
-          else if (sim.throwIn && sim.throwIn.side === side && sim.throwIn.idx === i && sim.t >= sim.throwIn.at - 0.8 && sim.t < sim.throwIn.at + 0.8) a.throwIn = sim.t - (sim.throwIn.at - 0.8);
+          else if (sim.throwIn && sim.throwIn.side === side && sim.throwIn.idx === i && sim.t >= sim.throwIn.at - 0.8 && sim.t < sim.throwIn.at + 0.6) a.throwIn = sim.t - (sim.throwIn.at - 0.8);
+          else if (sim.gkBall && sim.gkBall.side === side && sim.poss === side && sim.gkBall.idx === i && sim.t >= sim.gkBall.at - (sim.gkBall.kind === 'roll' ? 0.72 : 0.62) && sim.t < sim.gkBall.at + 0.6) a.gkDist = { kind: sim.gkBall.kind, age: sim.t - (sim.gkBall.at - (sim.gkBall.kind === 'roll' ? 0.72 : 0.62)) };
           else if (sim.receiving && sim.receiving.side === side && sim.receiving.idx === i && sim.t - sim.receiving.t0 < 0.8) { a.receive = sim.t - sim.receiving.t0; a.receiveChest = !!sim.receiving.chest; }
           else if (sim.touch && sim.touch.chest && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.5) a.chest = sim.t - sim.touch.t0;
           else if (sim.touch && sim.touch.side === side && sim.touch.idx === i && sim.t - sim.touch.t0 < 0.35) a.touch = sim.t - sim.touch.t0;
           else if (sim.tackle && sim.tackle.side === side && sim.tackle.idx === i && tackleAge < 0.6) { if (sim.tackle.kind === 'standing') a.poke = tackleAge; else a.slide = tackleAge; }
-          else if (sim.strike && sim.strike.side === side && sim.strike.idx === i && strikeAge < 0.55) { a.strike = strikeAge; a.power = sim.strike.power || 0.7; }
+          else if (sim.strike && sim.strike.side === side && sim.strike.idx === i && strikeAge < 0.55) { a.strike = strikeAge; a.power = sim.strike.power || 0.7; a.headerShot = !!sim.strike.header; a.headerHigh = (sim.strike.z0 || 0) > 0.38; }
           else if (sim.phase === 'held' && !sim.goalKick && isHolder && u.gk) a.hold = true;
           else if (u.gk && threat && sim.attack.side !== side) a.ready = true;
           // Where he looks: the man on the ball and anyone sprinting face the way they run; everyone

@@ -50,8 +50,8 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
   * this file.
 
 ## Outstanding
-* Header shots are struck with the foot in the view (the timeline marks them as headers).
-* Keeper distribution clips exist but are not used in matches yet.
+* About one header chance in six is still struck with the foot (it starts while the other side has
+  the ball). Keepers now throw or roll the ball out after a catch.
 * Ara bodies are not shipped. They are about 6× the rendering cost and identity is baked at export;
   the plan is in the integration audit. The stored sample `Kofi_Mensah.glb` renders with a female
   body despite a male recipe, so regenerate before evaluating further.
@@ -77,7 +77,7 @@ node scripts/anim/extract-ara.js [file.glb]      # only when the Ara source clip
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v20`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v21`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

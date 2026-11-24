@@ -33,7 +33,7 @@ matchEngine (result, events)  ──►  timeline (passes, tackles, fouls, throw
 | 3 | **Ball interaction** | **Done in part:** the receiver plays a first touch or chest control as the pass arrives. Throw-ins are taken from above the head and the ball flies from the hands. Shots, passes and crosses keep the constrained flights of `public/ball.js` |
 | 4 | **Players' movement off the ball (AI) on screen** | **Planned:** use the timeline's pass receivers to start support runs earlier; track runners into the box on crosses |
 | 5 | **Player appearance** | Existing Studio and procedural faces. Ara 3D Gen bodies **evaluated, not shipped** (see `PLAYER_STUDIO_INTEGRATION_AUDIT.md`) |
-| 6 | **Replays and presentation** | Existing replays and highlights now show the new clips. **Planned:** header shots shown as headers (the timeline marks them; the view still strikes them with the foot) |
+| 6 | **Replays and presentation** | Existing replays and highlights now show the new clips. Header shots are now shown as headers after a cross (most of them; see the changelog), and keepers throw or roll the ball out after a catch |
 | 7 | **Performance** | **Done:** one shared WebGL renderer per session with compiled shaders kept, a shader warm-up during the week's simulation, and the first half's view reused for the second half. Second-half start in headless Chrome: about 20 s → 0.7–1.5 s. First frame of the second half: 10 s → 0.04 s |
 
 ## Live match management (new)
@@ -52,8 +52,7 @@ Substitutions during play use one of three windows, as in real football; half-ti
 
 ## Implementation sequence for what remains
 
-1. Header shots: start the shot from head height after a cross; play `headerA` or `headerJump`.
-2. Goalkeeper distribution after a save: `gkPick`, then `gkThrow` or `gkRoll` to the timeline's
-   next receiver.
+1. ~~Header shots~~ and ~~keeper distribution~~: done.
+2. Header chances that start while the other side has the ball: a quicker cross.
 3. Support runs and tracking runners from the timeline's upcoming receivers.
 4. A reduced Ara-based body for close-up cameras only (see the integration audit), loaded on demand.

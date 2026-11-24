@@ -1106,7 +1106,7 @@ function simForward(team, side){
   team.forEach((d, i) => { if (d.off) return; const val = sideDir(side) * d.bx; if (val > bv) { bv = val; best = i; } });
   return best;
 }
-function simGive(v, side, idx, wait = 0.7){ const s = v.sim; s.poss = side; s.holder = Math.max(0, idx); s.pass = null; s.nextAt = s.t + wait; }
+function simGive(v, side, idx, wait = 0.7){ const s = v.sim; if (s.gkBall && !s.gkBall.done && (side !== s.gkBall.side || idx !== s.gkBall.idx)) s.gkBall = null; s.poss = side; s.holder = Math.max(0, idx); s.pass = null; s.nextAt = s.t + wait; }
 
 // ── The match timeline (src/engine/timeline.js) ──
 // The engine sends every match you watch as a second-by-second timeline of real actions between
@@ -1208,11 +1208,21 @@ function simPass(v, secsTo){
   const a = s.attack && s.attack.side === s.poss ? s.attack : null;
   let to = -1;
   const finalBall = a && secsTo < (a.chain ? 2.6 : 2);
-  if (a && s.holder === a.shooter && (finalBall || !v.m.tl)) { s.nextAt = s.t + 0.25; return; }
   let tlSteal = null, viaChain = false, tlKind = null;
+  if (a && s.holder === a.shooter && (finalBall || !v.m.tl)) {
+    // A header needs a cross: the scorer lays it off wide (once) and gets into the box for the return.
+    let wide = -1;
+    if (a.header && !a.laidOff && secsTo > 1.2) {
+      let best = -9;
+      team.forEach((r, i) => { if (r.off || i === s.holder || i === s.gk[s.poss]) return; const d = Math.hypot(r.x - h.x, (r.y - h.y) * 0.65); if (d < 0.05 || d > 0.32) return; const sc = Math.abs(r.y - 0.5) * 2 + dir * (r.x - h.x) - d; if (sc > best) { best = sc; wide = i; } });
+    }
+    if (wide < 0) { s.nextAt = s.t + 0.25; return; }
+    a.laidOff = true; to = wide;
+  }
   const next = !finalBall ? tlNextPass(v, s.poss) : null;
   { const D = window.__tlDebug; if (D) { D.calls = (D.calls || 0) + 1; if (next) D.nextFound = (D.nextFound || 0) + 1; if (a) D.inAttack = (D.inAttack || 0) + 1; } }   // test hook
-  if (a && a.chain && finalBall) {
+  if (to >= 0) { /* lay-off for a header, chosen above */ }
+  else if (a && a.chain && finalBall) {
     // The real build-up: get the ball to the first man in the chain, then along it to the shooter.
     const k = a.chain.indexOf(s.holder);
     const nx = k >= 0 ? a.chain[k + 1] : a.chain[0];
@@ -1252,11 +1262,23 @@ function simPass(v, secsTo){
     if (to < 0) { s.nextAt = s.t + 0.5; return; }
   }
   { const D = window.__tlDebug; if (D) { const k = viaChain ? 'timelineBuildUp' : a && secsTo < 2 ? 'buildUpToShooter (no timeline chain)' : next && v.tlPass === next.i ? 'feedToTimelinePasser' : next ? 'timelinePass' : a ? 'attackSupportPass' : 'invented'; D[k] = (D[k] || 0) + 1; if (tlSteal != null) D.timelineInterceptions = (D.timelineInterceptions || 0) + 1; } }   // test hook
+  // A header is met from a cross: when time runs short the ball goes straight to the scorer, crossed
+  // so that it lands about half a second before the shot (the holder waits for that moment).
+  if (a && a.header && tlSteal == null && s.holder !== a.shooter && team[a.shooter] && window.GafferBall) {
+    const sh = team[a.shooter], cd = GafferBall.plan('cross', Math.hypot(sh.x - v.ball.x, (sh.y - v.ball.y) * 0.65)).dur;
+    if (to === a.shooter || secsTo < cd + 1.3) {
+      to = a.shooter; tlKind = 'cross';
+      if (secsTo - cd > 0.7) { s.nextAt = s.t + 0.12; return; }
+    }
+  }
   const r = team[to];
   const tp = [Math.max(0.03, Math.min(0.97, r.x + ((r.tx ?? r.x) - r.x) * 0.6)), Math.max(0.04, Math.min(0.96, r.y + ((r.ty ?? r.y) - r.y) * 0.6))];
   const share = v.m.pos ? (s.poss === 'home' ? v.m.pos : 100 - v.m.pos) / 100 : 0.5;
   let steal = tlSteal;
   if (tlSteal != null) { tp[0] += (opp[tlSteal].x - tp[0]) * 0.5; tp[1] += (opp[tlSteal].y - tp[1]) * 0.5; }
+  // The keeper with the ball in his hands rolls it, throws it or kicks it, as the timeline's pass needs.
+  const gkDist = s.gkBall && !s.gkBall.done && s.gkBall.side === s.poss && s.gkBall.idx === s.holder ? s.gkBall.kind : null;
+  if (gkDist) { s.gkBall.done = true; if (gkDist === 'roll') tlKind = 'short'; else if (gkDist === 'throw') tlKind = 'long'; }
   if (!v.m.tl && !a && Math.random() < Math.max(0.08, Math.min(0.24, 0.27 - 0.2 * share))) {
     const [oi] = simNearest(opp, tp[0], tp[1], s.gk[otherSide(s.poss)]);
     if (oi >= 0) { steal = oi; tp[0] += (opp[oi].x - tp[0]) * 0.5; tp[1] += (opp[oi].y - tp[1]) * 0.5; }
@@ -1274,9 +1296,9 @@ function simPass(v, secsTo){
   if (plan && plan.lofted) plan.wind = windOf(v) * plan.dur * 0.6;
   s.receiving = null;                                      // the next first touch belongs to this pass
   const thrown = !!(s.throwIn && !s.throwIn.done && s.throwIn.side === s.poss && s.throwIn.idx === s.holder);
-  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind, z0: thrown ? 0.36 : 0 };
+  s.pass = { from: [v.ball.x, v.ball.y], to: tp, toIdx: to, steal, t0: s.t + 0.11, dur: plan ? plan.dur : dist / 0.25 + 0.1, lob: plan ? plan.peak : dist > 0.27 ? 0.42 : 0, plan, kind, z0: thrown ? 0.36 : gkDist === 'throw' ? 0.3 : gkDist === 'roll' ? 0.06 : 0 };
   if (thrown) s.throwIn.done = true;   // kept a moment longer so the 3D taker finishes his throw
-  s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: kind === 'long' || kind === 'cross' ? 0.9 : kind === 'through' ? 0.75 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y] };
+  s.strike = { side: s.poss, idx: s.holder, t0: s.t, power: kind === 'long' || kind === 'cross' ? 0.9 : kind === 'through' ? 0.75 : 0.6, dir: [tp[0] - v.ball.x, tp[1] - v.ball.y], gk: gkDist === 'kick' ? null : gkDist };
   s.carry = null;
   if (kind === 'cross' && Math.random() < 0.5) say('cross', { player: surname(h.name), club: clubOf(v, s.poss) });
   else if (kind === 'through' && Math.random() < 0.4) say('through', { player: surname(h.name), club: clubOf(v, s.poss) });
@@ -1361,20 +1383,31 @@ function stepPositions(now, dt){
     if (isShot && secsTo < (v.m.tl ? 3.4 : 4.5) && (!s.attack || s.attack.ev !== ev)) {
       const team = v.dots[ev.side];
       let sh = team.findIndex(d => d.id === ev.playerId && !d.off); if (sh < 0) sh = simForward(team, ev.side);
-      s.attack = { ev, side: ev.side, shooter: sh, spot: [goalX(ev.side) - sideDir(ev.side) * rnd(0.09, 0.17), 0.5 + rnd(-0.16, 0.16)], chain: tlBuildUp(v, ev) };
+      const tlSh = v.m.tl ? v.m.tl.find(x => x.type === 'SHOT' && x.side === ev.side && x.pid === ev.playerId && x.t > ev.min * 60 - 60 && x.t <= ev.min * 60 + 0.5) : null;
+      s.attack = { ev, side: ev.side, shooter: sh, spot: [goalX(ev.side) - sideDir(ev.side) * rnd(0.09, 0.17), 0.5 + rnd(-0.16, 0.16)], chain: tlBuildUp(v, ev), header: !!(tlSh && tlSh.kind === 'header') };
+      // A header needs time for a cross: a late one holds the clock (as chanceShown does) for about 2.6 s.
+      if (s.attack.header && secsTo < 2.6 * k && v.chanceDue !== ev) { v.chanceDue = ev; v.chanceAt = s.t + 2.6 * k; v.chanceSince = performance.now(); }
       say('attack', { club: clubOf(v, ev.side), player: surname((team[sh] || {}).name) });
       audioEv('GK_SHOUT', { side: otherSide(ev.side), x: goalX(otherSide(ev.side)) });
       if (s.poss !== ev.side && !v.m.tl) simGive(v, ev.side, simNearest(team, ball.x, ball.y, s.gk[ev.side])[0], 0.4);
     } else if (s.attack && (!isShot || s.attack.ev !== ev)) s.attack = null;
     // With a timeline, the attacking side gets the ball when its real build-up starts (at the latest now).
     if (s.attack && v.m.tl && s.poss !== s.attack.side && !s.pass && secsTo < 2.6) { const c = s.attack.chain; simGive(v, s.attack.side, c ? c[0] : s.attack.shooter, 0.15); }
-    if (s.attack && secsTo <= 0.55) simShoot(v, secsTo / 1);
+    const secsLeft = s.attack && v.chanceDue === s.attack.ev ? Math.max(0, v.chanceAt - s.t) : secsTo;   // a hold set just above counts this frame
+    if (s.attack && secsLeft <= 0.55 && !(s.attack.header && s.pass && s.pass.toIdx === s.attack.shooter && s.pass.steal == null)) simShoot(v, secsLeft / 1);
   }
 
   // Phase changes
   if (s.phase === 'celebrate' && s.t >= s.until) { s.phase = 'reset'; s.until = s.t + 1.7; s.kick = otherSide(s.celebrate.side); s.celebrate = null; }
   else if (s.phase === 'reset' && s.t >= s.until) { const taker = simForward(v.dots[s.kick], s.kick); simGive(v, s.kick, taker, 0.5); s.phase = 'play'; ball.x = 0.5; ball.y = 0.5; ball.z = 0; audioEv('RESTART'); }
-  else if (s.phase === 'held' && s.t >= s.until) { s.phase = 'play'; s.nextAt = s.t + 0.35; if (s.goalKick) { const g = v.dots[s.poss][s.holder]; ball.x = g.x + sideDir(s.poss) * 0.04; ball.y = 0.5 + rnd(-0.04, 0.04); } }
+  else if (s.phase === 'held' && s.t >= s.until) { s.phase = 'play'; s.nextAt = s.t + 0.35;
+    if (!s.goalKick && s.holder === s.gk[s.poss]) {
+      const nx = tlNextPass(v, s.poss), team0 = v.dots[s.poss], g0 = team0[s.holder];
+      let kind = Math.random() < 0.7 ? 'throw' : 'roll';
+      if (nx && nx.e.type === 'PASS' && dotOf(v, s.poss, nx.e.pid) === s.holder) { const r = team0[dotOf(v, s.poss, nx.e.tid)]; if (r) { const d = Math.hypot(r.x - g0.x, (r.y - g0.y) * 0.65); kind = d < 0.2 ? 'roll' : d < 0.42 ? 'throw' : 'kick'; } }
+      if (kind !== 'kick') { s.nextAt = s.t + 1.0; s.gkBall = { side: s.poss, idx: s.holder, kind, at: s.nextAt }; }
+    }
+    if (s.goalKick) { const g = v.dots[s.poss][s.holder]; ball.x = g.x + sideDir(s.poss) * 0.04; ball.y = 0.5 + rnd(-0.04, 0.04); } }
 
   // Ball
   const team = v.dots[s.poss], opp = v.dots[otherSide(s.poss)], dir = sideDir(s.poss), h = team[s.holder] || team[0];
@@ -1386,12 +1419,14 @@ function stepPositions(now, dt){
       ball.x = s.pass.from[0] + (s.pass.to[0] - s.pass.from[0]) * p; ball.y = s.pass.from[1] + (s.pass.to[1] - s.pass.from[1]) * p; ball.z = (fl ? fl.z : Math.sin(p * Math.PI) * s.pass.lob) + (s.pass.z0 || 0) * Math.max(0, 1 - p * 1.6);
       if (fl && fl.side) { const o = GafferBall.sidewaysUnits(s.pass.from, s.pass.to, fl.side); ball.x += o[0]; ball.y += o[1]; }
       if (!s.receiving && s.pass.steal == null && s.t >= s.pass.t0 + s.pass.dur - 0.2) s.receiving = { side: s.poss, idx: s.pass.toIdx, t0: s.t, chest: !!(s.pass.plan && s.pass.plan.chest) };
-      if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t, chest: !!(ps.plan && ps.plan.chest && ps.steal == null) }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
+      if (p0 >= 1 && s.attack && s.attack.header && s.pass.toIdx === s.attack.shooter && s.pass.steal == null && s.poss === s.attack.side) { const z = ball.z; simShoot(v, Math.max(0.3, secsTo)); if (s.shot) { s.shot.z0 = z; s.strike.header = true; s.strike.z0 = z; } }
+      else if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, s.attack && s.attack.header && s.attack.side === s.poss ? 0.2 : rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t, chest: !!(ps.plan && ps.plan.chest && ps.steal == null) }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
     } else {
       const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
       const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
       ball.x += (h.x + ox - ball.x) * 0.5; ball.y += (h.y + oy - ball.y) * 0.5; ball.z *= 0.6;
       if (s.throwIn && !s.throwIn.done && s.poss === s.throwIn.side && s.holder === s.throwIn.idx) { ball.x = h.x; ball.y = h.y; ball.z = 0.36; }
+      if (s.gkBall && !s.gkBall.done && s.poss === s.gkBall.side && s.holder === s.gkBall.idx) { ball.x = h.x + dir * 0.004; ball.y = h.y; ball.z = 0.2; }
       if (s.t >= s.nextAt) simPass(v, secsTo);
       else if (v.m.tl) tlTurnovers(v);
       else if (!s.attack) { const [oi, od] = simNearest(opp, h.x, h.y, s.gk[otherSide(s.poss)]); if (oi >= 0 && od < 0.022 && Math.random() < 0.4 * dt) { s.tackle = { side: otherSide(s.poss), idx: oi, t0: s.t }; audioEv('TACKLE', { side: otherSide(s.poss), x: ball.x, slide: true }); simGive(v, otherSide(s.poss), oi, rnd(0.7, 1.5)); }
@@ -1407,7 +1442,7 @@ function stepPositions(now, dt){
       ball.z = (df.z0 || 0.05) + (df.z - (df.z0 || 0.05)) * q + Math.sin(q * Math.PI) * 0.25;
     } else if (sh.plan) {
       const f = GafferBall.shotAt(sh.plan, p);
-      ball.x = sh.from[0] + (sh.to[0] - sh.from[0]) * f.p; ball.y = sh.from[1] + (sh.to[1] - sh.from[1]) * f.p; ball.z = f.z;
+      ball.x = sh.from[0] + (sh.to[0] - sh.from[0]) * f.p; ball.y = sh.from[1] + (sh.to[1] - sh.from[1]) * f.p; ball.z = f.z + (sh.z0 || 0) * Math.max(0, 1 - f.p * 1.4);
       if (f.side) { const o = GafferBall.sidewaysUnits(sh.from, sh.to, f.side); ball.x += o[0]; ball.y += o[1]; }
     } else { ball.x = sh.from[0] + (sh.to[0] - sh.from[0]) * p; ball.y = sh.from[1] + (sh.to[1] - sh.from[1]) * p; ball.z = sh.z1 * p + Math.sin(p * Math.PI) * 0.1; }
   } else if (s.phase === 'held') {

@@ -70,6 +70,8 @@ fitted shirt with a number. Problems found:
 * faces and bodies are baked: twenty players need twenty exports, or a shared body with swapped
   textures.
 
+**A low-detail export, measured (2026-11-24):** the same recipe exported with Ara's CLI at `--detail low`, game rig and `--no-animations` is still **54,336 triangles, 19 materials and 29.8 MB**, and takes 44 s to build. Ara writes full-size photo textures at every detail level, so the textures dominate the file. Its "about 5k triangles" applies to an undressed low-detail body, not a dressed footballer. A usable player body therefore needs a reduction step: textures to 512 px or less, the 19 materials merged, the mesh simplified to about 10–15k triangles. That would need a new tool (for example glTF-Transform) and its own licence check, so it was not done here.
+
 **Conclusion:** Ara's bodies cannot replace the match players as exported. They are about 6× the
 rendering cost, there is a megabyte-scale download per distinct player, and their identity is fixed
 at export. Shipping them would break the "every player has his own permanent look" system unless
