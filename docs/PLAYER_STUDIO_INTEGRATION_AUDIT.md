@@ -179,6 +179,10 @@ fewer meshes.
   offline.
 * **Fallback:** if the index or file fails, the classic figure is used. This was tested with
   simulated failures: no errors.
+* **Slow connections:** an award ceremony waits at most 6 s for the body, then uses the classic
+  figure; the body keeps downloading and is cached for the next ceremony. Tested with the body
+  delayed 15 s: the ceremony appeared after 11.3 s, against 6.3 s with no delay. The Studio never
+  waits: it shows the classic figure until the body arrives.
 * **Setting:** Settings → "Close-ups" turns realistic bodies off.
 * **First load:** the Studio waits for the profile's look before fetching, so it downloads only the
   body it will show. It had been fetching the default light body first and then the right one.

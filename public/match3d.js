@@ -910,6 +910,7 @@ function shapeBody(model, bone, lk) {
 // texture is then tinted to his exact tone and the hair layer to his hair colour. Any failure falls
 // back to the classic figure.
 const BODY_URL = new URL('./models/bodies/', import.meta.url).href;
+const BODY_WAIT_MS = 6000;                                     // the longest an award ceremony waits for one
 let BODY_INDEX = null; const BODIES = new Map();
 function bodyIndex() {
   if (!BODY_INDEX) BODY_INDEX = fetch(BODY_URL + 'index.json').then(r => { if (!r.ok) throw new Error('bodies ' + r.status); return r.json(); }).catch(e => { BODY_INDEX = null; throw e; });
@@ -1942,7 +1943,9 @@ export async function readStudioGLB(arrayBuffer) {
 // holding his trophy and celebrating, with confetti. Built by the match renderer: his own look, his
 // club's kit and badges.
 export async function createAwardView(container, { look = null, kit = {}, gk = false, badge = null, trophy = 'cup', quality = 'auto', bodies = true } = {}) {
-  const [F, B] = await Promise.all([loadFootballer(), bodies ? bodyFor(look) : null]);
+  // The close-up body if it is ready within a few seconds; on a slow connection the ceremony goes ahead
+  // with the classic figure, and the body (still downloading) is cached for the next one.
+  const [F, B] = await Promise.all([loadFootballer(), bodies ? Promise.race([bodyFor(look), new Promise(r => setTimeout(() => r(null), BODY_WAIT_MS))]) : null]);
   const weak = (navigator.hardwareConcurrency || 4) <= 4 && /Mobi|Android/i.test(navigator.userAgent || '');
   const hq = quality === 'high' || (quality === 'auto' && !weak);
   const renderer = new THREE.WebGLRenderer({ antialias: hq });

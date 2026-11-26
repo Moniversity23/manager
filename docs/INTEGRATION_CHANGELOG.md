@@ -224,6 +224,7 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
   * the Studio and award views use the body when it has loaded, and the classic figure until then
     or on any failure;
   * the Studio fetches nothing until a look is set;
+  * an award ceremony waits at most 6 s for the body (a slow connection gets the classic figure);
   * a Studio .glb export of a realistic body carries the club colours in its vertex colours.
 * **Studio:** a "Close-up body" choice (`baseBody`: Automatic, one of the four, or Classic), saved in
   the profile. `assetId` was left as it is (it is the library link).
