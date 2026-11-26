@@ -1,0 +1,695 @@
+{
+ "built": "2026-11-26T17:13:27.795Z",
+ "tools": {
+  "glTF Transform": "4.5.1",
+  "meshoptimizer": "1.3.0",
+  "sharp": "0.35.5"
+ },
+ "bodies": [
+  {
+   "id": "f-test",
+   "recipe": "recipes/f-test.params.json",
+   "before": {
+    "bytes": 3924204,
+    "triangles": 25664,
+    "vertices": 16717,
+    "primitives": 17,
+    "materials": 17,
+    "morphTargets": 0,
+    "textures": 12,
+    "textureBytes": 2806738,
+    "joints": 66,
+    "animations": 0
+   },
+   "after": {
+    "bytes": 703744,
+    "triangles": 14030,
+    "vertices": 9716,
+    "primitives": 4,
+    "materials": 4,
+    "morphTargets": 0,
+    "textures": 5,
+    "textureBytes": 255868,
+    "joints": 66,
+    "animations": 0
+   },
+   "rebind": {
+    "joints": 66,
+    "scale": 0.9936374721877801,
+    "hips": 0.9167000950781481,
+    "araHips": 0.9225699721848934
+   },
+   "skinUnderKit": {
+    "skinTriangles": 2316,
+    "removed": 1,
+    "split": 108,
+    "newCorners": 127,
+    "nearEdges": 156,
+    "moved": 24,
+    "maxMoveMm": 26.5,
+    "clothEdgeVertices": 410
+   },
+   "optimiseMs": 31243,
+   "validation": {
+    "scale": 0.9936,
+    "vertices": {
+     "original": 284189,
+     "optimised": 9716
+    },
+    "rest": {
+     "meanMm": 0.221,
+     "maxMm": 4.968
+    },
+    "hiddenSkin": {
+     "moved": 24,
+     "newCorners": 127,
+     "matched": 151,
+     "movedMaxMm": 26.3,
+     "unmatched": []
+    },
+    "clips": {
+     "shoot": {
+      "meanMm": 1.45,
+      "p95Mm": 4.11,
+      "maxMm": 25.56,
+      "fingers": {
+       "meanMm": 13.1,
+       "maxMm": 24.5
+      }
+     },
+     "receive": {
+      "meanMm": 1.53,
+      "p95Mm": 4.23,
+      "maxMm": 25.17,
+      "fingers": {
+       "meanMm": 13.1,
+       "maxMm": 24
+      }
+     },
+     "headerJump": {
+      "meanMm": 1.5,
+      "p95Mm": 4.15,
+      "maxMm": 26.03,
+      "fingers": {
+       "meanMm": 14.1,
+       "maxMm": 25.7
+      }
+     },
+     "gkDiveL": {
+      "meanMm": 1.43,
+      "p95Mm": 4.11,
+      "maxMm": 27.64,
+      "fingers": {
+       "meanMm": 13.1,
+       "maxMm": 26.7
+      }
+     },
+     "celJump": {
+      "meanMm": 1.34,
+      "p95Mm": 4.13,
+      "maxMm": 26.11,
+      "fingers": {
+       "meanMm": 13,
+       "maxMm": 25
+      }
+     },
+     "tackleA": {
+      "meanMm": 1.75,
+      "p95Mm": 5.02,
+      "maxMm": 25.23,
+      "fingers": {
+       "meanMm": 13.1,
+       "maxMm": 23.7
+      }
+     },
+     "throwIn": {
+      "meanMm": 1.24,
+      "p95Mm": 4.27,
+      "maxMm": 26.15,
+      "fingers": {
+       "meanMm": 13.2,
+       "maxMm": 24.7
+      }
+     }
+    },
+    "pass": true
+   },
+   "skin": "#ce9e84",
+   "heightM": 1.696,
+   "chest": {
+    "front": 0.132,
+    "back": -0.045,
+    "spineY": 1.127
+   },
+   "shipped": false
+  },
+  {
+   "id": "m-asian",
+   "recipe": "recipes/m-asian.params.json",
+   "before": {
+    "bytes": 2474704,
+    "triangles": 21690,
+    "vertices": 13461,
+    "primitives": 16,
+    "materials": 16,
+    "morphTargets": 0,
+    "textures": 11,
+    "textureBytes": 1563989,
+    "joints": 66,
+    "animations": 0
+   },
+   "after": {
+    "bytes": 544844,
+    "triangles": 12072,
+    "vertices": 7617,
+    "primitives": 4,
+    "materials": 4,
+    "morphTargets": 0,
+    "textures": 5,
+    "textureBytes": 175874,
+    "joints": 66,
+    "animations": 0
+   },
+   "rebind": {
+    "joints": 66,
+    "scale": 0.9869633029270806,
+    "hips": 0.9167000950781481,
+    "araHips": 0.928808692642827
+   },
+   "skinUnderKit": {
+    "skinTriangles": 2280,
+    "removed": 4,
+    "split": 100,
+    "newCorners": 119,
+    "nearEdges": 178,
+    "moved": 45,
+    "maxMoveMm": 27.9,
+    "clothEdgeVertices": 406
+   },
+   "optimiseMs": 47514,
+   "validation": {
+    "scale": 0.987,
+    "vertices": {
+     "original": 215376,
+     "optimised": 7617
+    },
+    "rest": {
+     "meanMm": 0.312,
+     "maxMm": 4.935
+    },
+    "hiddenSkin": {
+     "moved": 45,
+     "newCorners": 119,
+     "matched": 164,
+     "movedMaxMm": 27.2,
+     "unmatched": []
+    },
+    "clips": {
+     "shoot": {
+      "meanMm": 1.58,
+      "p95Mm": 4.74,
+      "maxMm": 31.01,
+      "fingers": {
+       "meanMm": 14.7,
+       "maxMm": 28.4
+      }
+     },
+     "receive": {
+      "meanMm": 1.63,
+      "p95Mm": 4.79,
+      "maxMm": 30.66,
+      "fingers": {
+       "meanMm": 14.8,
+       "maxMm": 27.9
+      }
+     },
+     "headerJump": {
+      "meanMm": 1.6,
+      "p95Mm": 4.74,
+      "maxMm": 31.47,
+      "fingers": {
+       "meanMm": 15.5,
+       "maxMm": 28.4
+      }
+     },
+     "gkDiveL": {
+      "meanMm": 1.59,
+      "p95Mm": 4.69,
+      "maxMm": 33.08,
+      "fingers": {
+       "meanMm": 14.9,
+       "maxMm": 30.6
+      }
+     },
+     "celJump": {
+      "meanMm": 1.49,
+      "p95Mm": 4.75,
+      "maxMm": 31.7,
+      "fingers": {
+       "meanMm": 14.7,
+       "maxMm": 28.9
+      }
+     },
+     "tackleA": {
+      "meanMm": 1.96,
+      "p95Mm": 5.69,
+      "maxMm": 30.7,
+      "fingers": {
+       "meanMm": 14.8,
+       "maxMm": 27.6
+      }
+     },
+     "throwIn": {
+      "meanMm": 1.47,
+      "p95Mm": 4.91,
+      "maxMm": 31.65,
+      "fingers": {
+       "meanMm": 14.8,
+       "maxMm": 28.7
+      }
+     }
+    },
+    "pass": true
+   },
+   "skin": "#c7936e",
+   "heightM": 1.691,
+   "chest": {
+    "front": 0.159,
+    "back": -0.042,
+    "spineY": 1.118
+   },
+   "shipped": true
+  },
+  {
+   "id": "m-brown",
+   "recipe": "recipes/m-brown.params.json",
+   "before": {
+    "bytes": 2482668,
+    "triangles": 21850,
+    "vertices": 13561,
+    "primitives": 16,
+    "materials": 16,
+    "morphTargets": 0,
+    "textures": 11,
+    "textureBytes": 1565285,
+    "joints": 66,
+    "animations": 0
+   },
+   "after": {
+    "bytes": 531056,
+    "triangles": 12228,
+    "vertices": 7758,
+    "primitives": 4,
+    "materials": 4,
+    "morphTargets": 0,
+    "textures": 5,
+    "textureBytes": 155416,
+    "joints": 66,
+    "animations": 0
+   },
+   "rebind": {
+    "joints": 66,
+    "scale": 0.9039108617928798,
+    "hips": 0.9167000950781481,
+    "araHips": 1.014148777081737
+   },
+   "skinUnderKit": {
+    "skinTriangles": 2280,
+    "removed": 5,
+    "split": 106,
+    "newCorners": 125,
+    "nearEdges": 173,
+    "moved": 39,
+    "maxMoveMm": 28.9,
+    "clothEdgeVertices": 414
+   },
+   "optimiseMs": 16798,
+   "validation": {
+    "scale": 0.9039,
+    "vertices": {
+     "original": 216976,
+     "optimised": 7758
+    },
+    "rest": {
+     "meanMm": 0.288,
+     "maxMm": 4.52
+    },
+    "hiddenSkin": {
+     "moved": 39,
+     "newCorners": 125,
+     "matched": 164,
+     "movedMaxMm": 24.6,
+     "unmatched": []
+    },
+    "clips": {
+     "shoot": {
+      "meanMm": 1.53,
+      "p95Mm": 4.35,
+      "maxMm": 30.36,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.9
+      }
+     },
+     "receive": {
+      "meanMm": 1.58,
+      "p95Mm": 4.42,
+      "maxMm": 30.02,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.4
+      }
+     },
+     "headerJump": {
+      "meanMm": 1.55,
+      "p95Mm": 4.36,
+      "maxMm": 30.84,
+      "fingers": {
+       "meanMm": 15.3,
+       "maxMm": 28
+      }
+     },
+     "gkDiveL": {
+      "meanMm": 1.54,
+      "p95Mm": 4.29,
+      "maxMm": 32.42,
+      "fingers": {
+       "meanMm": 14.6,
+       "maxMm": 30.1
+      }
+     },
+     "celJump": {
+      "meanMm": 1.43,
+      "p95Mm": 4.37,
+      "maxMm": 31.03,
+      "fingers": {
+       "meanMm": 14.4,
+       "maxMm": 28.4
+      }
+     },
+     "tackleA": {
+      "meanMm": 1.94,
+      "p95Mm": 5.31,
+      "maxMm": 30.05,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.1
+      }
+     },
+     "throwIn": {
+      "meanMm": 1.42,
+      "p95Mm": 4.57,
+      "maxMm": 30.99,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 28.2
+      }
+     }
+    },
+    "pass": true
+   },
+   "skin": "#8b4f2f",
+   "heightM": 1.668,
+   "chest": {
+    "front": 0.154,
+    "back": -0.04,
+    "spineY": 1.115
+   },
+   "shipped": true
+  },
+  {
+   "id": "m-dark",
+   "recipe": "recipes/m-dark.params.json",
+   "before": {
+    "bytes": 2521608,
+    "triangles": 21834,
+    "vertices": 13547,
+    "primitives": 16,
+    "materials": 16,
+    "morphTargets": 0,
+    "textures": 11,
+    "textureBytes": 1605344,
+    "joints": 66,
+    "animations": 0
+   },
+   "after": {
+    "bytes": 541788,
+    "triangles": 12267,
+    "vertices": 7811,
+    "primitives": 4,
+    "materials": 4,
+    "morphTargets": 0,
+    "textures": 5,
+    "textureBytes": 163772,
+    "joints": 66,
+    "animations": 0
+   },
+   "rebind": {
+    "joints": 66,
+    "scale": 0.8883646442404047,
+    "hips": 0.9167000950781481,
+    "araHips": 1.031896193777468
+   },
+   "skinUnderKit": {
+    "skinTriangles": 2288,
+    "removed": 5,
+    "split": 117,
+    "newCorners": 138,
+    "nearEdges": 180,
+    "moved": 34,
+    "maxMoveMm": 29,
+    "clothEdgeVertices": 410
+   },
+   "optimiseMs": 17788,
+   "validation": {
+    "scale": 0.8884,
+    "vertices": {
+     "original": 216752,
+     "optimised": 7811
+    },
+    "rest": {
+     "meanMm": 0.268,
+     "maxMm": 4.442
+    },
+    "hiddenSkin": {
+     "moved": 34,
+     "newCorners": 138,
+     "matched": 172,
+     "movedMaxMm": 24,
+     "unmatched": []
+    },
+    "clips": {
+     "shoot": {
+      "meanMm": 1.51,
+      "p95Mm": 4.26,
+      "maxMm": 30.23,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.8
+      }
+     },
+     "receive": {
+      "meanMm": 1.56,
+      "p95Mm": 4.34,
+      "maxMm": 29.89,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.2
+      }
+     },
+     "headerJump": {
+      "meanMm": 1.53,
+      "p95Mm": 4.27,
+      "maxMm": 30.74,
+      "fingers": {
+       "meanMm": 15.3,
+       "maxMm": 28
+      }
+     },
+     "gkDiveL": {
+      "meanMm": 1.53,
+      "p95Mm": 4.2,
+      "maxMm": 32.29,
+      "fingers": {
+       "meanMm": 14.6,
+       "maxMm": 30
+      }
+     },
+     "celJump": {
+      "meanMm": 1.41,
+      "p95Mm": 4.28,
+      "maxMm": 30.9,
+      "fingers": {
+       "meanMm": 14.4,
+       "maxMm": 28.2
+      }
+     },
+     "tackleA": {
+      "meanMm": 1.94,
+      "p95Mm": 5.26,
+      "maxMm": 29.92,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27
+      }
+     },
+     "throwIn": {
+      "meanMm": 1.41,
+      "p95Mm": 4.47,
+      "maxMm": 30.86,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 28
+      }
+     }
+    },
+    "pass": true
+   },
+   "skin": "#5d3b2a",
+   "heightM": 1.667,
+   "chest": {
+    "front": 0.155,
+    "back": -0.042,
+    "spineY": 1.115
+   },
+   "shipped": true
+  },
+  {
+   "id": "m-light",
+   "recipe": "recipes/m-light.params.json",
+   "before": {
+    "bytes": 2513772,
+    "triangles": 21842,
+    "vertices": 13553,
+    "primitives": 16,
+    "materials": 16,
+    "morphTargets": 0,
+    "textures": 11,
+    "textureBytes": 1596946,
+    "joints": 66,
+    "animations": 0
+   },
+   "after": {
+    "bytes": 557044,
+    "triangles": 12174,
+    "vertices": 7706,
+    "primitives": 4,
+    "materials": 4,
+    "morphTargets": 0,
+    "textures": 5,
+    "textureBytes": 183842,
+    "joints": 66,
+    "animations": 0
+   },
+   "rebind": {
+    "joints": 66,
+    "scale": 0.9200109747886037,
+    "hips": 0.9167000950781481,
+    "araHips": 0.9964012606358132
+   },
+   "skinUnderKit": {
+    "skinTriangles": 2280,
+    "removed": 4,
+    "split": 96,
+    "newCorners": 115,
+    "nearEdges": 168,
+    "moved": 39,
+    "maxMoveMm": 26.5,
+    "clothEdgeVertices": 410
+   },
+   "optimiseMs": 22338,
+   "validation": {
+    "scale": 0.92,
+    "vertices": {
+     "original": 216848,
+     "optimised": 7706
+    },
+    "rest": {
+     "meanMm": 0.284,
+     "maxMm": 4.6
+    },
+    "hiddenSkin": {
+     "moved": 39,
+     "newCorners": 115,
+     "matched": 154,
+     "movedMaxMm": 24.3,
+     "unmatched": []
+    },
+    "clips": {
+     "shoot": {
+      "meanMm": 1.53,
+      "p95Mm": 4.42,
+      "maxMm": 30.49,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 28.1
+      }
+     },
+     "receive": {
+      "meanMm": 1.58,
+      "p95Mm": 4.46,
+      "maxMm": 30.15,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.6
+      }
+     },
+     "headerJump": {
+      "meanMm": 1.55,
+      "p95Mm": 4.42,
+      "maxMm": 30.95,
+      "fingers": {
+       "meanMm": 15.3,
+       "maxMm": 28.1
+      }
+     },
+     "gkDiveL": {
+      "meanMm": 1.54,
+      "p95Mm": 4.36,
+      "maxMm": 32.55,
+      "fingers": {
+       "meanMm": 14.6,
+       "maxMm": 30.3
+      }
+     },
+     "celJump": {
+      "meanMm": 1.43,
+      "p95Mm": 4.43,
+      "maxMm": 31.17,
+      "fingers": {
+       "meanMm": 14.4,
+       "maxMm": 28.6
+      }
+     },
+     "tackleA": {
+      "meanMm": 1.93,
+      "p95Mm": 5.38,
+      "maxMm": 30.19,
+      "fingers": {
+       "meanMm": 14.5,
+       "maxMm": 27.3
+      }
+     },
+     "throwIn": {
+      "meanMm": 1.42,
+      "p95Mm": 4.61,
+      "maxMm": 31.12,
+      "fingers": {
+       "meanMm": 14.6,
+       "maxMm": 28.4
+      }
+     }
+    },
+    "pass": true
+   },
+   "skin": "#e0a989",
+   "heightM": 1.669,
+   "chest": {
+    "front": 0.154,
+    "back": -0.042,
+    "spineY": 1.116
+   },
+   "shipped": true
+  }
+ ]
+}

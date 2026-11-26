@@ -1,0 +1,66 @@
+{
+ "version": 1,
+ "note": "Close-up footballer bodies (Ara 3D Gen, CC0 MakeHuman data) optimised by tools/character-pipeline",
+ "bodies": [
+  {
+   "id": "m-light",
+   "file": "m-light.glb",
+   "label": "Light skin",
+   "gender": "male",
+   "bytes": 557044,
+   "triangles": 12174,
+   "skin": "#e0a989",
+   "chest": {
+    "front": 0.154,
+    "back": -0.042,
+    "spineY": 1.116
+   },
+   "heightM": 1.669
+  },
+  {
+   "id": "m-brown",
+   "file": "m-brown.glb",
+   "label": "Brown skin",
+   "gender": "male",
+   "bytes": 531056,
+   "triangles": 12228,
+   "skin": "#8b4f2f",
+   "chest": {
+    "front": 0.154,
+    "back": -0.04,
+    "spineY": 1.115
+   },
+   "heightM": 1.668
+  },
+  {
+   "id": "m-dark",
+   "file": "m-dark.glb",
+   "label": "Dark skin",
+   "gender": "male",
+   "bytes": 541788,
+   "triangles": 12267,
+   "skin": "#5d3b2a",
+   "chest": {
+    "front": 0.155,
+    "back": -0.042,
+    "spineY": 1.115
+   },
+   "heightM": 1.667
+  },
+  {
+   "id": "m-asian",
+   "file": "m-asian.glb",
+   "label": "East Asian",
+   "gender": "male",
+   "bytes": 544844,
+   "triangles": 12072,
+   "skin": "#c7936e",
+   "chest": {
+    "front": 0.159,
+    "back": -0.042,
+    "spineY": 1.118
+   },
+   "heightM": 1.691
+  }
+ ]
+}

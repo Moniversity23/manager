@@ -10,8 +10,10 @@ function legacyLook(player) {
   return LOOK.describe(player.look ?? LOOK.makeLook(player.id, player.nation, player.position), player.age);
 }
 
+// Heritage hint for the close-up body (public/match3d.js chooseBody); the look itself is unchanged.
+const EAST_ASIA = new Set(['Japan', 'South Korea', 'Korea Republic', 'China']);
 function mergeForRenderer(player) {
-  const legacy = { ...legacyLook(player), faceSeed: player.id };      // a face of his own, the same every match
+  const legacy = { ...legacyLook(player), faceSeed: player.id, ...(EAST_ASIA.has(player.nation) ? { heritage: 'east-asian' } : {}) };      // a face of his own, the same every match
   const studio = player.studioProfile;
   if (!studio || typeof studio !== 'object' || studio.schemaVersion !== 1 || !studio.appearance || typeof studio.appearance !== 'object') return legacy;
   try {

@@ -1,0 +1,16 @@
+{
+  "name": "gaffer-character-pipeline",
+  "private": true,
+  "description": "Build-time tool: optimises Ara 3D Gen footballer exports for The Gaffer's close-up views (not shipped to the browser).",
+  "type": "module",
+  "scripts": {
+    "optimise": "node optimise.mjs"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
+    "meshoptimizer": "1.3.0",
+    "sharp": "0.35.5"
+  }
+}

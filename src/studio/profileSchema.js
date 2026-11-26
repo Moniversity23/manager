@@ -21,6 +21,9 @@ const ENUMS = {
   beardStyle: ['none', 'stubble', 'goatee', 'full', 'moustache', 'chin-strap'], moustacheStyle: ['none', 'pencil', 'chevron', 'natural'],
   bodyType: ['lean', 'athletic', 'muscular', 'stocky', 'broad', 'slim'],
   lipShape: ['thin', 'natural', 'full'], eyebrowShape: ['natural', 'straight', 'arched', 'thick'],
+  // The realistic body used where he fills the screen (Studio, award ceremonies): chosen from his skin
+  // tone and heritage (auto), one of the optimised Ara 3D Gen bodies, or the classic figure.
+  baseBody: ['auto', 'classic', 'm-light', 'm-brown', 'm-dark', 'm-asian'],
 };
 const SLIDERS = ['forehead', 'jaw', 'chin', 'cheekbones', 'noseWidth', 'earSize', 'hairline', 'muscularity', 'shoulderWidth', 'chest', 'waist', 'hipProportion', 'armLength', 'legLength'];
 const POSITIONS = ['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CAM', 'LW', 'RW', 'ST', 'CF'];

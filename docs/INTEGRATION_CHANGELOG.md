@@ -191,6 +191,90 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
   quality setting already picks "low" on touch devices, small screens and devices with 4 GB of
   memory or less.
 
+## 12. Realistic close-up bodies: Ara 3D Gen, optimised (2026-11-26)
+**Before:**
+* The Player Studio and award ceremonies drew the classic Mesh2Motion figure: 30 meshes and 18,477
+  triangles in the Studio.
+* Ara 3D Gen bodies had been evaluated and rejected at 29.8 MB each.
+* Every Ara body came out with the same androgynous build, because Ara's morph-target pack was empty
+  on Windows.
+
+**Changed:**
+* **Ara's Windows bug:** fixed in the lab copy, outside this repository. Target keys were built with
+  backslashes and looked up with slashes.
+* **New `tools/character-pipeline/`:** glTF Transform 4.5, meshoptimizer 1.3 and sharp 0.35; build
+  time only. Four male recipes (light, brown, dark skin, East Asian) and a female test body.
+* **Per body:**
+  * the kit and boots are simplified;
+  * the skin under the kit is cut away along a line 1.2 cm inside its edges, so the arm cannot come
+    through the sleeve when it is raised;
+  * the mesh is rebound onto the game's skeleton (every one of the 61 clips works);
+  * 16 materials become 4 (WebP atlases);
+  * attributes are quantised.
+* **Results:** 12,072–12,267 triangles, 4 materials, 0.53–0.56 MB per body, from 2.5 MB (or 29.8 MB
+  for the earlier Kofi export).
+* **Checked on the CPU against Ara's own skeleton and clips:**
+  * at rest: mean 0.27–0.31 mm;
+  * in 16 moments of 7 clips: mean 1.9–2.0 mm, 95% under 5.7 mm;
+  * skin under the kit is counted on its own.
+* **`public/match3d.js`:**
+  * `bodyFor` and `chooseBody`, with `makeBodyFootballer` and a kit shader for club colours and
+    patterns;
+  * `shapeBody` taken out of `makeFootballer` (same code, now shared);
+  * the Studio and award views use the body when it has loaded, and the classic figure until then
+    or on any failure;
+  * the Studio fetches nothing until a look is set;
+  * a Studio .glb export of a realistic body carries the club colours in its vertex colours.
+* **Studio:** a "Close-up body" choice (`baseBody`: Automatic, one of the four, or Classic), saved in
+  the profile. `assetId` was left as it is (it is the library link).
+* **Settings:** "Close-ups": realistic bodies on or off.
+* **East Asian bodies:** nationality and nation give an East Asian hint (Japan, Korea, China).
+
+**Not changed:** the 22 players on the pitch, match results, the save format beyond one optional
+appearance field, and every API.
+
+**Files:**
+* `tools/character-pipeline/*`;
+* `public/models/bodies/*` and `assets/characters/build-report.json`;
+* `public/match3d.js`, `public/appearance.js` and `public/index.html`;
+* `studio/js/app.js` (and `public/studio/js/app.js`);
+* `src/studio/profileSchema.js` and `src/studio/appearanceService.js`;
+* `test/character-bodies.test.js`;
+* the licence registers.
+
+**Tests:**
+* `test/character-bodies.test.js` (7):
+  * the shipped bodies, their skeleton, materials and extensions;
+  * the build report, with a passed deformation check and every hidden skin vertex found;
+  * the profile field;
+  * the look mapping;
+  * identity through save, reload and transfer;
+  * the East Asian hint.
+* **Browser:**
+  * four profiles: faces, kits (plain, stripes, hoops), idle, shot, dive, sprint, celebration, and the
+    throw-in for every body;
+  * the female body before and after the morph-target fix;
+  * the award ceremony: realistic, classic setting, and a failed load falling back to the classic
+    figure;
+  * Studio save, reload and reopen;
+  * the Studio export loaded back with GLTFLoader;
+  * a 3D match: no body files requested, and the figures unchanged.
+
+## Test results for section 12 (2026-11-26, Windows 10, 4 cores, Node 22)
+| Check | Result |
+|---|---|
+| Build (`scripts/build-web.js`) and ESLint | **Passed** |
+| Vitest, full run | **131 of 132 passed**. The one failure is the soak's speed limit under parallel load (440 ms/week; it was 443 before any of this work) |
+| `soak.test.js` alone | **Passed:** 348 ms/week (baseline 341–343) |
+| New: `character-bodies.test.js` (7) | **Passed** |
+| Body pipeline: 5 bodies optimised and checked | **Passed:** rest mean 0.22–0.31 mm; motion mean 1.75–1.96 mm and 95% under 5.7 mm; every hidden skin vertex found |
+| Browser: Studio, 4 profiles, motion, throw-in for every body, classic and realistic | Done (screenshots); no skin through the sleeves |
+| Browser: Studio save, page reload, reopen from the library | **Passed** (the body choice is kept) |
+| Browser: Studio .glb export loaded back with GLTFLoader | **Passed** (club colours in the file, 66 joints, 61 clips, profile read back) |
+| Browser: award ceremony (realistic, classic setting, failed load → classic, nothing left after close) | **Passed** |
+| Browser: 3D match | **Passed:** no body files requested; figures as before |
+| Real phone, real GPU | **Not tested** |
+
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -208,5 +292,6 @@ Each entry: what was there before, what changed, the files, why, the tests, and 
 ## Remaining issues
 * About one header chance in five or six is still struck with the foot. This happens when there is
   no way to get a cross in, such as a turnover right before the shot.
-* Ara 3D Gen bodies are evaluated, not shipped (size).
+* Realistic Ara bodies are used for close-ups only. Studio face sliders, hairstyles, beards and
+  goalkeeper gloves are not shown on them (see the integration audit).
 * Real-phone frame rate and first-half start on a real GPU were not measured.

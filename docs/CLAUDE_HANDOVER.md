@@ -1,6 +1,6 @@
 # Claude handover: The Gaffer
 
-*Updated 2026-11-24. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
+*Updated 2026-11-26. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
 through `.github/workflows/pages.yml`).*
 
 ## Architecture
@@ -23,14 +23,24 @@ through `.github/workflows/pages.yml`).*
   * `warmUp` and `prepare` for shaders;
   * view reuse across halves (`attach`, `rebind`);
   * mocap players (`makeFootballer`, `animateFootballer`);
-  * the Studio and award views.
+  * the Studio and award views;
+  * close-up bodies (`bodyFor`, `chooseBody`, `makeBodyFootballer`), loaded on demand from
+    `public/models/bodies/`.
 * **Animation pipeline:** `scripts/anim/` (`glb.js`, `inspect.js`, `extract-ara.js`, `retarget.js`,
   `build-footballer.js`), producing `public/models/footballer.glb` and `footballer-anims.json`
   (61 clips).
 * **Player Studio:** `studio/` → `public/studio/`, `src/studio/*`, `public/appearance.js`.
+* **Character pipeline (build time):** `tools/character-pipeline/` (its own `npm install`). It turns
+  Ara 3D Gen exports into the close-up bodies; see its README.
 
 ## Completed in this release
 See `docs/INTEGRATION_CHANGELOG.md`. In short:
+* **Realistic close-up bodies (2026-11-26):**
+  * four Ara 3D Gen bodies, optimised to about 12,100 triangles, 4 materials and 0.54 MB, on the
+    game skeleton;
+  * shown in the Player Studio and award ceremonies, with a "Close-up body" choice in the Studio and
+    an on/off setting;
+  * Ara's empty morph-target pack on Windows found and fixed (in the lab).
 * **Changes while paused:** style, formation, instructions and substitutions, applied from the
   next five-minute mark; three in-play substitution windows.
 * **No more wait at the start of each half:** shared renderer, shader warm-up, view reused at
@@ -52,9 +62,12 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
 ## Outstanding
 * About one header chance in six is still struck with the foot (it starts while the other side has
   the ball). Keepers now throw or roll the ball out after a catch.
-* Ara bodies are not shipped. They are about 6× the rendering cost and identity is baked at export;
-  the plan is in the integration audit. The stored sample `Kofi_Mensah.glb` renders with a female
-  body despite a male recipe, so regenerate before evaluating further.
+* **Realistic bodies are for close-ups only.**
+  * Not shown on them: Studio face sliders, hairstyles (all have short hair, tinted), beards, and
+    goalkeeper gloves.
+  * Fingers differ from Ara's by about 15 mm (held poses).
+  * Only male bodies ship.
+  * Next steps are in the integration audit.
 * Real-phone frame rate and first-half start on a real GPU are unmeasured. Headless Chrome on this
   machine renders in software.
 * The soak test's 400 ms/week limit fails when the whole suite runs in parallel on this 4-core
@@ -69,6 +82,7 @@ npm start                 # server mode on PORT (unset MONGODB_URI locally; .env
 python -m http.server 3157 --directory public   # the GitHub Pages setup (offline engine in a worker)
 node scripts/anim/build-footballer.js            # rebuild the model and clips (fails if a retarget is > 1° off)
 node scripts/anim/extract-ara.js [file.glb]      # only when the Ara source clips must be refreshed
+cd tools/character-pipeline && npm install && node build-bodies.mjs [--export]   # rebuild the close-up bodies
 ```
 * **Browser checks** were driven over the Chrome DevTools protocol, including:
   * a frame-by-frame audit that every shot, dive, goal and substitution on screen matches an engine
@@ -77,7 +91,7 @@ node scripts/anim/extract-ara.js [file.glb]      # only when the Ara source clip
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v23`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v24`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

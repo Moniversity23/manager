@@ -70,6 +70,8 @@ fitted shirt with a number. Problems found:
 * faces and bodies are baked: twenty players need twenty exports, or a shared body with swapped
   textures.
 
+**Correction (2026-11-26):** two statements below were wrong. The 29.8 MB came mostly from the face-expression morph targets (34 shapes across the whole mesh) and the braided hair, not from textures. The body shapes were all wrong because Ara's morph-target pack was empty on this machine (a Windows path bug; see the next section). With face shapes, teeth and tongue off and the bug fixed, a dressed low-detail footballer exports at about 21,800 triangles and 2.5 MB.
+
 **A low-detail export, measured (2026-11-24):** the same recipe exported with Ara's CLI at `--detail low`, game rig and `--no-animations` is still **54,336 triangles, 19 materials and 29.8 MB**, and takes 44 s to build. Ara writes full-size photo textures at every detail level, so the textures dominate the file. Its "about 5k triangles" applies to an undressed low-detail body, not a dressed footballer. A usable player body therefore needs a reduction step: textures to 512 px or less, the 19 materials merged, the mesh simplified to about 10–15k triangles. That would need a new tool (for example glTF-Transform) and its own licence check, so it was not done here.
 
 **Conclusion:** Ara's bodies cannot replace the match players as exported. They are about 6× the
@@ -100,3 +102,118 @@ each look were exported.
 Its customiser (material tints, hair, hat and glasses GLBs, face handles) has no licence and its
 accessory models are of unknown origin, so none of it was used. The Studio already covers face,
 hair, body and kit editing on the shared rig.
+
+## Close-up bodies: optimised, integrated and shipped (2026-11-26)
+
+### What was found first
+* **Every Ara character was MakeHuman's neutral base mesh.** On Windows, Ara's asset build wrote an
+  empty morph-target pack (153 bytes): target keys were built with backslashes but looked up with
+  forward slashes. Gender, height, build and heritage therefore did nothing; every export was 168 cm
+  with the same androgynous shape, which explains the female-looking "Kofi Mensah".
+* **Fixed in the lab copy of Ara.** After the fix there are 1,037 targets: men are male, the woman
+  is female, and heights range from 170 to 187 cm. Screenshots before and after were checked.
+* **Recipes for game use:** low detail, game rig, T-pose, no clips, no face shapes, no teeth or
+  tongue, a white kit. A dressed footballer is then about 21,800 triangles, 16 materials and 2.5 MB.
+
+### The pipeline
+`tools/character-pipeline/` (see its README). It uses glTF Transform 4.5, meshoptimizer 1.3 and
+sharp 0.35; it is build-time only and not shipped.
+* **Simplification:** the kit and boots are simplified; the face, eyes, brows and hair keep every
+  triangle.
+* **Skin under the kit:** removed, so the body cannot come through the cloth. At low detail, Ara's
+  skin around each garment's edge is a few big triangles; without this step, the upper arm came
+  through both sleeves whenever the arms were raised (throw-in, keeper's catch). The skin is now cut
+  1.2 cm inside the kit's edges. Triangles crossing that line are split, with interpolated weights,
+  UVs and normals. The narrow band left near the edges is moved in under the cloth.
+* **Socks and boots:** fitted (the boot's upper becomes sock).
+* **Skeleton:** the mesh is rebound onto the game's skeleton, so every one of the 61 game clips and
+  the body-shape bone scaling drive it.
+* **Materials:** 4 (skin, hair, kit, boots). The kit parts are coded so the game paints club
+  colours and patterns.
+* **Data:** textures in WebP, attributes quantised.
+
+### Measured: before (Ara export) → after (shipped)
+| Body | Triangles | Vertices | Materials | File | Textures | Rest error (mean / max) | Body in motion (mean / 95%) |
+|---|---|---|---|---|---|---|---|
+| m-light | 21,842 → 12,174 | 13,553 → 7,706 | 16 → 4 | 2.51 → 0.56 MB | 1.60 → 0.18 MB | 0.28 / 4.6 mm | 1.93 / 5.4 mm |
+| m-brown | 21,850 → 12,228 | 13,561 → 7,758 | 16 → 4 | 2.48 → 0.53 MB | 1.57 → 0.16 MB | 0.29 / 4.5 mm | 1.94 / 5.3 mm |
+| m-dark | 21,834 → 12,267 | 13,547 → 7,811 | 16 → 4 | 2.52 → 0.54 MB | 1.61 → 0.16 MB | 0.27 / 4.4 mm | 1.94 / 5.3 mm |
+| m-asian | 21,690 → 12,072 | 13,461 → 7,617 | 16 → 4 | 2.47 → 0.54 MB | 1.56 → 0.18 MB | 0.31 / 4.9 mm | 1.96 / 5.7 mm |
+| f-test (checked, not shipped) | 25,664 → 14,030 | 16,717 → 9,716 | 17 → 4 | 3.92 → 0.70 MB | 2.81 → 0.26 MB | 0.22 / 5.0 mm | 1.75 / 5.0 mm |
+
+* **Rest error (visible skin and kit):** the socks are moved out 4–5 mm on purpose; everything else is
+  under 1 mm.
+* **Skin under the kit:** each body has 96–117 skin triangles cut, 4–5 removed, 115–138 new corners
+  and 34–45 vertices moved in (at most 27 mm). All of these are under the cloth. The check finds
+  every one of them in the file and reports them on their own.
+* **Motion:** 16 moments of 7 clips (shot, first touch, jumping header, keeper's dive,
+  celebration, tackle, throw-in), compared with the original on Ara's own skeleton and clips.
+* **Fingers:** reported apart (mean about 15 mm). The game holds each finger at one pose per clip,
+  so this is a pose difference, not a skinning error.
+* **Exact numbers:** in `assets/characters/build-report.json`.
+
+**Targets:**
+* triangles: 10,000–15,000 met (12,072–12,267);
+* materials: 2–4 met (4);
+* textures: at most 512 px, except the 1024 px skin and face texture, which was judged necessary for
+  close-ups;
+* file size: much smaller, 0.53–0.56 MB from 2.5 MB, or from 29.8 MB for the old Kofi export.
+
+### Measured in the game's renderer (three.js r170, headless Chrome, software rendering)
+| | Classic figure | Realistic body |
+|---|---|---|
+| Meshes (Studio preview) | 30 | 8 |
+| Triangles (Studio preview) | 18,477 | 12,236 |
+| Draw calls (body file alone) | — | 6 (4 materials + shadow) |
+| First load of a body | — | 0.16–0.7 s (award) and 0.5–2.5 s (Studio): served locally, software rendering, first visit |
+
+The realistic body is lighter than the classic figure it replaces in close-ups: fewer triangles and
+fewer meshes.
+
+### Integration
+* **Where:** Player Studio preview and award ceremonies (man of the match, player of the season,
+  Golden Ball) only. The 22 players on the pitch keep the Mesh2Motion figures; nothing new loads for
+  a match.
+* **How it loads:** `public/models/bodies/index.json` and one body file (about 0.5 MB) the first
+  time a close-up needs it, then cached in memory and by the service worker, so it also works
+  offline.
+* **Fallback:** if the index or file fails, the classic figure is used. This was tested with
+  simulated failures: no errors.
+* **Setting:** Settings → "Close-ups" turns realistic bodies off.
+* **First load:** the Studio waits for the profile's look before fetching, so it downloads only the
+  body it will show. It had been fetching the default light body first and then the right one.
+* **Export .glb:** a realistic body exports with its club colours and pattern written into the kit's
+  vertex colours, so it looks right in any glTF viewer. The kit's region codes had been leaking into
+  the file. Tested: 66 joints, 61 clips and the Studio profile read back from the file.
+* **Body choice:**
+  * the Studio's new appearance field `baseBody` (Automatic, one of the four bodies, or Classic);
+  * otherwise East Asian heritage (Studio nationality, or a career player's nation) gives m-asian;
+  * otherwise skin tone: 0–2 m-light, 3–4 m-brown, 5–7 m-dark.
+* **Tinting:** the skin texture is tinted towards the player's exact tone, and the hair layer to his
+  hair colour.
+* **Kit:** club colours, the second colour for collar and cuffs, stripes, hoops and yokes,
+  sponsor, crest and number.
+* **`assetId` was investigated and left alone.** It means "the library character this profile
+  came from" and drives assign, clear and "no delete while worn", so overloading it would break the
+  library. The base body is the separate field `baseBody`. Old profiles without it are valid and
+  mean Automatic.
+* **Identity (tested):**
+  * the choice survives a career save and load and a transfer;
+  * Studio save, page reload and reopening from the library keep it;
+  * ratings, contract, wage and history are unchanged.
+
+### What the realistic body does not do yet
+* **Face sliders:** the Studio's face sliders (jaw, nose, chin, cheekbones, eyes, lips, ears) and
+  face shape do not reshape the Ara head. Those features are baked in at export; they still shape
+  the classic figure.
+* **Hair and beards:** hair styles (afro, long, fade and others) and beards are not reproduced;
+  every realistic body has short hair, tinted to his colour.
+* **Bodies:** only the four bodies and male players. The female body was built to prove the
+  pipeline, not shipped.
+* **Keepers:** goalkeepers on the realistic body show bare hands, not gloves.
+* **Pitch:** realistic bodies on the pitch are not enabled; that needs real-device frame-rate
+  measurements first.
+* **Sock tops:** a small V at the front of each sock top is the shape of Ara's sock band (its opening),
+  not skin coming through. It shows most on white socks.
+* **Exported patterns:** stripes and hoops in an exported .glb have soft edges, because they are vertex
+  colours in the file.

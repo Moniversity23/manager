@@ -19,6 +19,7 @@
   const EYE_SIZE = { almond: 0.5, round: 0.7, hooded: 0.35, 'deep-set': 0.3, upturned: 0.55 };
   const LIP_SIZE = { thin: 0.25, natural: 0.5, full: 0.8 };
 
+  const EAST_ASIA = /japan|korea|china|chinese|taiwan|hong kong|mongolia/i;
   const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null);
   const unit = v => num(v, 0, 1);
 
@@ -32,6 +33,9 @@
     if (EYES[a.eyeColour] != null) out.eyes = EYES[a.eyeColour];
     if (BEARD[a.beardStyle]) out.beardStyle = BEARD[a.beardStyle];
     if (BROWS[a.eyebrowShape] != null) out.brows = BROWS[a.eyebrowShape];
+    // Close-up body: the Studio's choice, and East Asian heritage from his nationality.
+    if (typeof a.baseBody === 'string' && a.baseBody !== 'auto') out.baseBody = a.baseBody;
+    if (typeof a.nationality === 'string' && EAST_ASIA.test(a.nationality)) out.heritage = 'east-asian';
     const h = num(a.heightCm, 150, 215);
     if (h != null) { out.heightCm = h; out.height = Math.max(0, Math.min(39, Math.round(h) - 165)); }
     // Build from muscularity, nudged by weight for the height (BMI around 23 is average for a footballer).

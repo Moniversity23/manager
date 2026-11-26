@@ -1,0 +1,54 @@
+{
+ "gender": 1,
+ "age": 0.42,
+ "muscle": 0.68,
+ "weight": 0.42,
+ "height": 0.62,
+ "proportions": 0.8,
+ "eyes": "brown",
+ "hair": "buzz",
+ "hairColor": "#1a1410",
+ "facialHair": "none",
+ "expression": "neutral",
+ "outfit": "none",
+ "top": "football_shirt",
+ "bottom": "resort_shorts",
+ "shoes": "shoes06",
+ "accessories": [
+  "sport_socks"
+ ],
+ "garmentStyles": {
+  "football_shirt": {
+   "pattern": "solid",
+   "color": "#f2f2f2",
+   "color2": "#f2f2f2"
+  },
+  "resort_shorts": {
+   "pattern": "solid",
+   "color": "#f2f2f2",
+   "color2": "#f2f2f2"
+  },
+  "sport_socks": {
+   "pattern": "solid",
+   "color": "#f2f2f2",
+   "color2": "#f2f2f2"
+  }
+ },
+ "detail": "low",
+ "rig": "game",
+ "restPose": "T",
+ "faceBones": false,
+ "faceShapes": false,
+ "speechShapes": false,
+ "teeth": "none",
+ "tongue": false,
+ "animations": false,
+ "tattoos": [],
+ "earrings": "none",
+ "name": "m-brown",
+ "african": 0.5,
+ "asian": 0,
+ "caucasian": 0.5,
+ "skin": "young_caucasian_male2",
+ "skinTint": "#b4835f"
+}
