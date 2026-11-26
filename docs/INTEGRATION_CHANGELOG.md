@@ -274,6 +274,7 @@ appearance field, and every API.
 | Browser: Studio .glb export loaded back with GLTFLoader | **Passed** (club colours in the file, 66 joints, 61 clips, profile read back) |
 | Browser: award ceremony (realistic, classic setting, failed load → classic, nothing left after close) | **Passed** |
 | Browser: 3D match | **Passed:** no body files requested; figures as before |
+| Live site (GitHub Pages, service worker v25) | **Passed:** the four bodies and `index.json` return 200 at their built sizes. Studio: only the needed body loaded, export with club colours, throw-in clean. Award ceremony shown, no errors. 3D match played with no body files requested. The connection measured about 22 KB/s that day, so first loads were slow (a 0.5 MB body took 33–37 s, the existing 1.4 MB clip file 63 s) |
 | Real phone, real GPU | **Not tested** |
 
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
