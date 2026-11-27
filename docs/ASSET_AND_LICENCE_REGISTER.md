@@ -35,3 +35,9 @@ records what was found in the lab and what was decided for each item.*
   verified means the asset is not shipped.
 * A row goes into the register before an asset is used; the MIT notice travels with any MIT material.
 * No real clubs' crests, kits or players; no paid or non-commercial assets.
+
+## 2026-11-27
+
+No new third-party files. The match board, player cards, camera, ball and athletes on the pitch use
+only the game's own code and the already registered close-up bodies. Dream League Soccer was a visual
+reference for the cards and the substitution screen; none of its graphics, models or code were used.

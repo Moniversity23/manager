@@ -32,7 +32,9 @@ const YOUTH_CAPS = { ovr: 55, attr: 75, wonderkidOvr: 60, wonderkidAttr: 82 };
 // Fields only some players/clubs have (dressing room, agents, scouting): saved only when set, so
 // 14,000 players do not carry empty keys and a save/load round trip stays identical.
 const PLAYER_OPTIONAL = ['releaseClause', 'promise', 'playLog', 'unhappy', 'unhappyWeeks', 'talkWeek', 'talksBlockedUntil', 'seasonStartAbility', 'ratings', 'career', 'moves', 'honours', 'look', 'studioProfile'];
-const CLUB_OPTIONAL = ['captainId', 'unbeatenRun', 'sackedSeason', 'managerName', 'kits'];
+// instructions and playerInstructions: the manager's team and player instructions (before 2026-11-27 they
+// were not saved, so they went back to normal whenever a career was reloaded).
+const CLUB_OPTIONAL = ['captainId', 'unbeatenRun', 'sackedSeason', 'managerName', 'kits', 'instructions', 'playerInstructions'];
 function withOptional(obj, out, keys) {
   for (let i = 0; i < keys.length; i++) {
     const v = obj[keys[i]];

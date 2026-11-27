@@ -261,6 +261,90 @@ appearance field, and every API.
   * the Studio export loaded back with GLTFLoader;
   * a 3D match: no body files requested, and the figures unchanged.
 
+## 13. Match board, tactics, player cards, ball, camera and athletes (2026-11-27)
+**Interface:**
+* **Free agents:** the Transfers screen lists only deals with other clubs. Free agents have their
+  own tab in the Transfers hub (Transfers · Free agents · Scouting), with a message when there are
+  none. Nothing about signing them changed, and no transactions are created by looking at them.
+* **Skip:** stays removed (section 3). Speed buttons remain.
+* **Player cards:** the Squad screen opens on cards (Cards · List · Season stats); the player profile
+  has a large card. A card shows the rating (its colour is the tier: bronze, silver, gold, elite,
+  icon), position, nation, portrait, name, role and six key numbers (pace, shooting, passing,
+  dribbling, defending, physical), age, condition and potential. The role (for example "Target
+  striker" or "Ball-winning midfielder") is the archetype for his position whose key attributes are
+  his own strongest. Nothing new is invented and no rating changes.
+* **Look:** a brighter "stadium night" palette for the default theme, rounder cards with depth, pill
+  tabs, clearer buttons. The light theme is unchanged.
+
+**The match board (pause and half-time), DLS-inspired:**
+* **Substitutions tab:** your team on a pitch in its formation (each line left to right) with the
+  bench beside it, or below it on phones. Tap the player to take off (OUT), then a substitute (or the
+  substitute first). The bench is sorted by how well each fits the outgoing position. The preview
+  shows both players, the substitute's rating there and a warning when he is weaker. Then Confirm or
+  Cancel; "Compare all" opens the detailed comparison.
+* **Positions:** a substitute takes the outgoing player's position, so the formation is kept.
+  "⇄ Move positions" swaps two outfield players (engine decision `swaps`).
+* **Limits:** substitutions and windows left are shown and enforced. Injured players cannot come on,
+  nobody comes back on, and the goalkeeper cannot be swapped.
+* **Tactics tab:** style, formation and six sliders: mentality, pressing, defensive line, width,
+  passing and tempo.
+* **Players tab:** player instructions: shoot on sight, create chances, get forward, stay back.
+* **Apply:** changes are applied by the engine at the next five-minute mark, and the toast says when.
+  The 3D view swaps the figures when the substitution happens.
+
+**Engine (all deterministic; neutral settings give exactly the old results):**
+* **New instructions:** `mentality`, `press` and `passing` (0–100, 50 = no change) in
+  `instrMods`.
+* **Player instructions:** `PLAYER_INSTRUCTIONS` change the weights of the shooter and assister
+  draws the engine already makes, never the number of chances.
+* **Position swaps:** `swaps` in `applyHalftime`.
+* **Saving:** club instructions and player instructions are now saved with the career (before this
+  they went back to normal whenever a career was reloaded).
+* **Speed and identical results:** neutral instructions (every AI club, and most of yours) skip the
+  instruction work. Measured on 24 weeks, alternating with the previous engine, the median week
+  took 296–304 ms against 298–303 ms. After 12 weeks every league table, every player's goals,
+  assists, appearances and fitness, and every club's balance match the previous engine exactly.
+
+**Ball and camera:**
+* **Ball flight:** lofted balls slow in the air, long balls bounce twice, and a new driven pass
+  skims the grass. Spin follows the flight: backspin on lofted passes, sidespin on curl.
+* **Ball visibility:** the ball is 1.7× real size (was 2.2×), with a dark outline and a slight glow.
+* **Broadcast camera:** about a quarter closer and lower; it leads the ball and adapts its zoom
+  slowly. The old view is kept as "Standard".
+
+**Athletes:** the optimised Ara bodies play in matches, each with his own hairstyle, build, skin
+tone and kit (see the integration audit), with the mannequins as the fallback and a setting.
+
+**Half starts (measured, headless Chrome, software rendering):**
+* Second half: the engine's reply took 0.95 s, the 3D view was rebuilt in 0.47 s, and the clock ran
+  2.1 s after Resume, the same with athletes or mannequins. In Node the engine's resume takes 82 ms.
+* First half: 29.5 s from Play. This includes simulating the rest of the week's first matches and,
+  on a first match, loading the players, bodies and shaders in software.
+* No further change was made, because a real GPU is needed to tell the rest apart from the slow
+  software rendering.
+
+**Files:**
+* `public/index.html`: board, cards, theme, free-agents tab, camera names, settings, driven pass.
+* `public/match3d.js`: camera, ball, `loadBodySet`, athletes, hair fitting.
+* `public/ball.js`.
+* `src/engine/matchEngine.js`, `src/engine/timeline.js`, `src/api.js`, `src/index.js` and
+  `src/models.js`.
+* Tests: `test/tactics-extra.test.js` (new), `test/ball.test.js` and `test/instructions.test.js`.
+
+## Test results for section 13 (2026-11-27, Windows 10, 4 cores, Node 22)
+| Check | Result |
+|---|---|
+| Build (`scripts/build-web.js`) and ESLint | **Passed** |
+| Vitest, full run | **145 of 146 passed**. The one failure is the soak's speed limit under parallel load (500 ms/week). It failed the same way before this work (440–493 ms in earlier full runs) |
+| `soak.test.js` alone | **Passed:** 336 ms/week (baseline 341–348) |
+| New: `tactics-extra.test.js` (10) and 4 new ball tests | **Passed** |
+| Changed: `instructions.test.js` | The exact-object checks now include the three new instructions at 50 (still exact) |
+| Changed: `ui.test.js` | Its stub element gained `querySelector` (returns nothing, as a real DOM would when nothing matches); the test now also renders the half-time board |
+| Browser, live 3D match: board out/in, preview, confirm, cancel, swap, mentality and pressing, a player instruction, apply; substitute on at the next mark; half-time substitution; second half | **Passed** |
+| Browser, phone width (390 × 844): board, cards, profile | **Passed** after one fix (the bench strip had widened the board) |
+| Browser: before and after screenshots (desktop and phone), Standard and Broadcast cameras, athletes and mannequins, six hairstyles | Done |
+| Real phone, real GPU | **Not tested** |
+
 ## Test results for section 12 (2026-11-26, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|

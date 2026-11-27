@@ -31,7 +31,7 @@ const SPELL_MEAN = { possession: 34, high_press: 24, counter: 18, low_block: 22 
 // width changes who gets it.
 const WORD_VALUE = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
 const slide = v => { if (v == null || v === '') return 0; const n = typeof v === 'string' ? (WORD_VALUE[v] ?? Number(v)) : Number(v); return Number.isFinite(n) ? (Math.max(0, Math.min(100, n)) - 50) / 30 : 0; };   // 80 → 1, 20 → −1
-const instrOf = (m, side) => { const x = m[side].instr || {}; return { line: slide(x.line), width: slide(x.width), tempo: slide(x.tempo) }; };
+const instrOf = (m, side) => { const x = m[side].instr || {}; return { line: slide(x.line), width: slide(x.width), tempo: slide(x.tempo), passing: slide(x.passing) }; };
 const tempoGap = t => (t > 0 ? 1 - 0.2 * t : 1 - 0.22 * t);        // fast passes come sooner
 const tempoTilt = t => (t > 0 ? -0.02 * t : -0.03 * t);           // slow sides keep the ball longer                      // seconds a spell lasts on average
 const TYPES = ['KICKOFF', 'PASS', 'INTERCEPTION', 'TACKLE', 'FOUL', 'FREE_KICK', 'SHOT', 'GOAL', 'SAVE', 'GOAL_KICK', 'YELLOW', 'RED', 'INJURY', 'SUB', 'HALF_TIME', 'FULL_TIME', 'RECOVERY', 'THROW_IN', 'DRIBBLE'];   // new types go on the end (packed by index)

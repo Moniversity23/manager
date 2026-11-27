@@ -19,6 +19,8 @@ function series(instructions, n = 60, seed = 909) {
   return out;
 }
 const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+// Mentality, pressing and passing (added later, see tactics-extra.test.js) read 50 unless set.
+const NEW_NEUTRAL = { mentality: 50, press: 50, passing: 50 };
 
 describe('team instructions', () => {
   it("'normal' instructions give exactly the results of no instructions", () => {
@@ -70,12 +72,12 @@ describe('team instructions', () => {
   it('the manager sets them from the tactics screen and at half-time', () => {
     const w = new GameWorld({ seed: 12, startCountry: 'England' });
     w.applyDecisions({ line: 'high', tempo: 'fast' });
-    expect(w.snapshot().instructions).toEqual({ line: 80, width: 50, tempo: 80 });
+    expect(w.snapshot().instructions).toEqual({ line: 80, width: 50, tempo: 80, ...NEW_NEUTRAL });
     w.applyDecisions({ width: 'wide', line: 'nonsense' });
-    expect(w.club().instructions).toEqual({ line: 80, width: 80, tempo: 80 });
+    expect(w.club().instructions).toEqual({ line: 80, width: 80, tempo: 80, ...NEW_NEUTRAL });
     // Sliders: any value from 0 to 100; out-of-range values are clamped.
     w.applyDecisions({ line: 35, width: 140, tempo: '65' });
-    expect(w.club().instructions).toEqual({ line: 35, width: 100, tempo: 65 });
+    expect(w.club().instructions).toEqual({ line: 35, width: 100, tempo: 65, ...NEW_NEUTRAL });
   });
 
   it('the sliders are gradual: a stronger setting has a stronger effect, and 50 is exactly normal', () => {

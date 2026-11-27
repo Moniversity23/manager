@@ -82,3 +82,44 @@ describe('ball flight', () => {
     expect(B.kindFor(0.2, true, true)).toBe('cross');
   });
 });
+
+describe('ball flight: drag, bounces and the driven pass', () => {
+  it('a lofted ball slows in the air, yet lands where and when it was planned', () => {
+    const pl = B.plan('long', 0.4);
+    const s = sample(pl, 80);
+    expect(s[0].p).toBe(0);
+    expect(s[80].p).toBeCloseTo(1, 6);                                  // arrives on time at the target
+    expect(s[5].speed).toBeGreaterThan(s[60].speed * 1.3);              // fast off the boot, slower later
+    // Drag makes the descent steeper than the rise: at the apex (half the time to landing) more than
+    // half the ground to the landing point is already covered.
+    const landT = pl.land * pl.dur, apex = B.at(pl, landT / 2), land = B.at(pl, landT);
+    expect(apex.p / land.p).toBeGreaterThan(0.55);
+  });
+
+  it('a long ball bounces twice, each lower, and a cross does not bounce', () => {
+    const pl = B.plan('long', 0.4), s = sample(pl, 400);
+    const after = s.filter((_, i) => i / 400 > pl.land);
+    let lows = 0;
+    for (let i = 1; i < after.length - 1; i++) if (after[i].z < after[i - 1].z && after[i].z <= after[i + 1].z && after[i].z < 0.12) lows++;
+    expect(lows).toBeGreaterThanOrEqual(1);                             // touches down between the two bounces
+    const firstPeak = Math.max(...after.filter((_, i) => i < after.length * 0.6).map(x => x.z));
+    const secondPeak = Math.max(...after.filter((_, i) => i > after.length * 0.66).map(x => x.z - pl.zEnd * 0.9));
+    expect(firstPeak).toBeGreaterThan(secondPeak);
+    const cr = B.plan('cross', 0.3);
+    expect(cr.land).toBe(1);
+  });
+
+  it('a driven pass is quicker than a short one over the same distance and skims the grass', () => {
+    const d = B.plan('driven', 0.22), sh = B.plan('short', 0.22);
+    expect(d.dur).toBeLessThan(sh.dur);
+    const s = sample(d, 60);
+    expect(Math.max(...s.map(x => x.z))).toBeGreaterThan(0);
+    expect(Math.max(...s.map(x => x.z)) * 6).toBeLessThan(0.3);        // under 30 cm: along the ground, not lofted
+    expect(s[60].p).toBeCloseTo(1, 6);
+    expect(s[60].z).toBeCloseTo(0, 9);
+  });
+
+  it('the same pass always flies the same way', () => {
+    expect(sample(B.plan('long', 0.33, { curl: 2 }))).toEqual(sample(B.plan('long', 0.33, { curl: 2 })));
+  });
+});

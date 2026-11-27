@@ -221,3 +221,40 @@ fewer meshes.
   not skin coming through. It shows most on white socks.
 * **Exported patterns:** stripes and hoops in an exported .glb have soft edges, because they are vertex
   colours in the file.
+
+## Athletes on the pitch, and hairstyles on realistic bodies (2026-11-27)
+
+* **Match players:** the 22 players can now be the optimised Ara bodies instead of the Mesh2Motion
+  mannequins: Settings → "Players in matches" (Athletes by default). The four bodies (2.2 MB in all)
+  load while the week is simulated and are cached; if they are not ready within 12 s, or fail, the
+  match uses the mannequins.
+* **Choosing a body:** the same choice as the Studio: his `baseBody`, East Asian heritage, then
+  skin tone. Officials keep the mannequin figure.
+* **His identity:** height and build (bone shaping), skin tone (texture tint), hair colour, kit
+  colours and pattern, number, sponsor and crest come from his look and the club, as before.
+* **Hairstyles:** his hairstyle from his look (crop, swept, curly, long, twists, afro, fade) is
+  built with the Studio's own hair shapes and fitted to the body's head. The cranium is measured
+  once per body, from the skin weighted to the head bone. This works in matches, the Studio and award
+  ceremonies. Buzz, receding, bald and mohawk keep the body's own short hair.
+* **Measured in a full 3D match** (headless Chrome, software rendering; same match, same moment):
+
+| | Mannequins | Athletes |
+|---|---|---|
+| Draw calls | 274 | 232 |
+| Triangles | 384,052 | 411,747 |
+| Textures | 236 | 175 |
+| Geometries | 102 | 83 |
+| Shader programs | 21 | 26 |
+
+  The athletes cost fewer draw calls and textures and about 7% more triangles. The frame rate cannot
+  be judged without a GPU (about 1 fps either way here), so real-phone performance is unmeasured.
+
+**What is limited (honestly):**
+* **Faces:** there are four base faces, one per body (light, brown and dark skin, East Asian).
+  Players on the same body share a face, though their height, build, skin tone and hair differ.
+  Studio face sliders still do not reshape these heads.
+* **Style:** the bodies use MakeHuman's photographic skin, so they are semi-realistic rather than the
+  low-to-mid-poly stylised look of a game like Dream League Soccer. A stylised set (painted skin and
+  sculpted stylised faces) needs new art, not just optimisation.
+* **Beards and goalkeeper gloves** are not drawn on the athletes.
+* **The crop hairstyle** sits a little like a cap; long hair frames the face like a hood.

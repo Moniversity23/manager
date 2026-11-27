@@ -1,6 +1,6 @@
 # Reference projects compared with The Gaffer
 
-*Recorded 2026-11-24. Sources inspected: the working trees in `FOOTBALL-RALISM-LAB/` (Ara3DGen,
+*Recorded 2026-11-24, updated 2026-11-27. Sources inspected: the working trees in `FOOTBALL-RALISM-LAB/` (Ara3DGen,
 SoccerDribble, outputs, docs). These are not part of The Gaffer's repository and nothing was copied
 wholesale.*
 
@@ -42,7 +42,7 @@ are plainly third-party property (a Nintendo sound effect, real club kits).
 | Football clips | Shoot, straight pass, three inside-foot passes, receive, chest control, header, jumping header, standing and slide tackle, keeper ready/catch/punch/dives/low dives, pick-up, throws, throw-in, a jump-and-turn celebration (Ara's own keyframes) | **Yes: 23 clips retargeted** onto the Gaffer skeleton by `scripts/anim/retarget.js`, proven within 0.3° per limb (see `PLAYER_STUDIO_INTEGRATION_AUDIT.md`) |
 | Locomotion clips | CMU motion capture (walk, run, strafes, turns) | Not used: the Mesh2Motion set already covers locomotion and matches the existing blend |
 | Characters | MakeHuman bodies, photo skins, faces with blend shapes, hair, clothes; 5k–120k triangles | **Evaluated, not shipped**: the sample footballers are 32–36 MB each with a 40,505-vertex mesh and 20 materials (measurements in the audit). Using them needs a reduced export pipeline first |
-| Exporter | GLB/FBX/OBJ, game/lite/full rigs, A- or T-pose | Documented as the path for a future reduced footballer body |
+| Exporter | GLB/FBX/OBJ, game/lite/full rigs, A- or T-pose | **Used** (2026-11-26) through `tools/character-pipeline`: four reduced footballer bodies, 12,100 triangles and 0.54 MB each |
 
 ## What The Gaffer already had that neither reference has
 
@@ -51,3 +51,21 @@ are plainly third-party property (a Nintendo sound effect, real club kits).
 * Saved careers, transfers, contracts and history behind every player on the pitch.
 * A permanent appearance for every player, with Studio overrides that never touch football data.
 * An offline browser build (GitHub Pages and a PWA) with saves in IndexedDB.
+
+## 2026-11-27: what this milestone took from each
+
+Each brief item was classified against the two references. As before, nothing was copied from
+SoccerDribble (no licence from its author). Dream League Soccer was used only as a visual
+reference for player cards and the substitution screen; none of its graphics or code were used.
+
+| Area | Reference | Classification | What The Gaffer did |
+|---|---|---|---|
+| Ball: air drag, bounces, spin | SoccerDribble integrates quadratic drag, restitution and a Magnus term every frame | **Reimplemented independently, adapted to the event model** | `public/ball.js`: lofted balls slow in the air (they land where and when the timeline says), long balls bounce twice, and a new driven pass skims the grass. The renderer gives a lofted ball backspin and a curling ball sidespin. A free physics simulation was **unsuitable**: it would decide where the ball ends up, and the engine must |
+| Ball visibility | SoccerDribble: a real-size ball with an HDR material | **Independent** | Ball at 1.7× real size (was 2.2×), a thin dark outline and a slight glow, so it reads against lines, white kits and sky |
+| Camera | SoccerDribble: third-person follow behind the controlled player | **Unsuitable** as the main view (it is a management game); the *idea* of following the action **adapted** | New default Broadcast camera: about a quarter closer and lower, leads the ball and zooms slowly (wider for long balls, tighter near goal). The old view stays as Standard |
+| Substitutions | Neither reference has a substitution screen | **Independent** (DLS as a visual reference) | A pitch-and-bench board with out/in selection, preview, confirm, cancel and position swaps |
+| Tactics | SoccerDribble: lane assignment and marking for 3v3 | **Unsuitable** (3v3) | Mentality, pressing, passing and player instructions in the engine, deterministic and neutral by default |
+| Players on the pitch | Ara 3D Gen: MakeHuman bodies | **Adapted** | The optimised Ara bodies now play in matches (a setting turns them off), each with his own build, skin tone, kit and hairstyle |
+| Player customisation | SoccerDribble: hat, glasses and hair GLBs | **Unsuitable** (unlicensed) | The Studio's own hairstyles are fitted onto the realistic heads |
+| three.js | SoccerDribble uses r183 | **Not worth changing** | The Gaffer stays on r170: everything it loads and draws works there, and no tested requirement needs r183 |
+| Boost pads, nitro, power-ups, electric shots, 3v3 | SoccerDribble | **Unsuitable** | Not used |

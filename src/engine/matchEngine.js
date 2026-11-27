@@ -27,8 +27,19 @@ const TACTIC_INTENSITY = { high_press: 1.15, counter: 0.95, possession: 1.0, low
 // instructions are exactly what they were. They scale a side's shot volume and quality, what it
 // concedes and how fast its players tire — no extra random draws. 20 and 80 are the old
 // deep/narrow/slow and high/wide/fast settings (saved careers that used them keep their meaning).
-const INSTRUCTIONS = { line: ['deep', 'normal', 'high'], width: ['narrow', 'normal', 'wide'], tempo: ['slow', 'normal', 'fast'] };
-const WORD_VALUE = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80 };
+// Mentality, pressing and passing (added later) work the same way; careers saved before them read 50.
+const INSTRUCTIONS = { line: ['deep', 'normal', 'high'], width: ['narrow', 'normal', 'wide'], tempo: ['slow', 'normal', 'fast'],
+  mentality: ['defensive', 'balanced', 'attacking'], press: ['low', 'normal', 'high'], passing: ['short', 'mixed', 'direct'] };
+const WORD_VALUE = { deep: 20, narrow: 20, slow: 20, normal: 50, high: 80, wide: 80, fast: 80, defensive: 20, balanced: 50, attacking: 80, low: 20, short: 20, mixed: 50, direct: 80 };
+// Player instructions: they change who shoots and who sets chances up (the weights of draws the
+// engine makes anyway), never how many chances there are. No instruction = a factor of 1.
+const PLAYER_INSTRUCTIONS = { shoot: { s: 1.6, a: 0.9 }, create: { s: 0.75, a: 1.5 }, forward: { s: 1.3, a: 1.3 }, hold: { s: 0.5, a: 0.7 } };
+function cleanPlayerInstr(x) {
+  const o = {};
+  if (x && typeof x === 'object') for (const [id, v] of Object.entries(x)) if (PLAYER_INSTRUCTIONS[v] && /^\d+$/.test(id)) o[id] = v;
+  return o;
+}
+const piFactor = (side, id, k) => { const x = side.pinstr && PLAYER_INSTRUCTIONS[side.pinstr[id]]; return x ? x[k] : 1; };
 function instrValue(v) {
   if (typeof v === 'string' && WORD_VALUE[v] != null) return WORD_VALUE[v];
   if (v == null || v === '') return 50;
@@ -46,8 +57,12 @@ function avgAttr(side, ctx, slots, attr) {
   for (const x of side.onPitch) if (slots.includes(x.slot)) { const p = ctx.getPlayer(x.playerId); if (p) { s += p.attributes[attr]; n++; } }
   return n ? s / n : 60;
 }
+// Neutral instructions change nothing; most clubs (every AI club) have them, so they skip the work.
+const NEUTRAL_MODS = Object.freeze({ vol: 1, qual: 1, concVol: 1, concQual: 1, fatigue: 1 });
+const isNeutral = x => !x || (x.line === 50 && x.width === 50 && x.tempo === 50 && (x.mentality ?? 50) === 50 && (x.press ?? 50) === 50 && (x.passing ?? 50) === 50);
 function instrMods(m, key, ctx) {
   const side = m[key], opp = m[key === 'home' ? 'away' : 'home'];
+  if (isNeutral(side.instr)) return NEUTRAL_MODS;
   const me = normInstr(side.instr);
   const r = { vol: 1, qual: 1, concVol: 1, concQual: 1, fatigue: 1 };
   const l = (me.line - 50) / 30, w = (me.width - 50) / 30, t = (me.tempo - 50) / 30;   // 80 → 1, 20 → −1
@@ -64,6 +79,19 @@ function instrMods(m, key, ctx) {
   // Tempo: fast means more, hurried attacks, an open game and tired legs; slow the reverse.
   if (t > 0) { r.vol *= 1 + 0.08 * t; r.qual *= 1 - 0.04 * t; r.concVol *= 1 + 0.03 * t; r.fatigue *= 1 + 0.08 * t; }
   else if (t < 0) { const d = -t; r.vol *= 1 - 0.08 * d; r.qual *= 1 + 0.04 * d; r.concVol *= 1 - 0.05 * d; r.fatigue *= 1 - 0.06 * d; }
+  const mt = (me.mentality - 50) / 30, pr = (me.press - 50) / 30, ps = (me.passing - 50) / 30;
+  // Mentality: attacking commits players forward (more and slightly better chances, more space
+  // behind); defensive keeps them back (fewer chances either way).
+  if (mt > 0) { r.vol *= 1 + 0.07 * mt; r.qual *= 1 + 0.02 * mt; r.concVol *= 1 + 0.06 * mt; r.concQual *= 1 + 0.04 * mt; }
+  else if (mt < 0) { const d = -mt; r.vol *= 1 - 0.08 * d; r.concVol *= 1 - 0.07 * d; r.concQual *= 1 - 0.03 * d; }
+  // Pressing: winning the ball higher gives more attacks and fewer to them, costs legs, and leaves
+  // space when the press is beaten. Sitting off is the reverse.
+  if (pr > 0) { r.vol *= 1 + 0.04 * pr; r.concVol *= 1 - 0.05 * pr; r.concQual *= 1 + 0.05 * pr; r.fatigue *= 1 + 0.1 * pr; }
+  else if (pr < 0) { const d = -pr; r.vol *= 1 - 0.03 * d; r.concVol *= 1 + 0.04 * d; r.concQual *= 1 - 0.03 * d; r.fatigue *= 1 - 0.06 * d; }
+  // Passing: direct balls reach the forwards sooner but are more speculative; short passing builds
+  // fewer, better chances.
+  if (ps > 0) { r.vol *= 1 + 0.05 * ps; r.qual *= 1 - 0.05 * ps; r.concVol *= 1 + 0.02 * ps; }
+  else if (ps < 0) { const d = -ps; r.vol *= 1 - 0.05 * d; r.qual *= 1 + 0.04 * d; r.fatigue *= 1 - 0.02 * d; }
   return r;
 }
 
@@ -93,7 +121,7 @@ function buildSide(club, isHome) {
   const apps = {};
   for (const s of onPitch) apps[s.playerId] = { start: true, minIn: 0, minOut: null };
   return {
-    clubId: club.id, isHome, tactic: club.tactic, formation: club.formation, instr: normInstr(club.instructions),
+    clubId: club.id, isHome, tactic: club.tactic, formation: club.formation, instr: normInstr(club.instructions), pinstr: cleanPlayerInstr(club.playerInstructions),
     startXI: onPitch.map(s => ({ slotKey: s.slotKey, playerId: s.playerId })),
     onPitch, bench, apps, subsUsed: 0, windowsUsed: 0, manualSubs: 0,
     goals: 0, xg: 0, shots: 0, form: 1, selectionChanges: changes,
@@ -252,7 +280,7 @@ function playSegment(m, from, to, ctx) {
     const gk = gkSlot ? ctx.getPlayer(gkSlot.playerId) : null;
     const keeperAdj = gk ? clamp(1 - (positionAbility(gk, 'GK') - 55) / 400, 0.88, 1.15) : 1.35;
     for (let i = 0; i < nShots; i++) {
-      const shooter = pickWeighted(rng, side.onPitch, ctx, SHOOT_W, p => 0.5 + p.attributes.finishing / 100);
+      const shooter = pickWeighted(rng, side.onPitch, ctx, SHOOT_W, p => (0.5 + p.attributes.finishing / 100) * piFactor(side, p.id, 's'));
       if (!shooter) break;
       const sp = ctx.getPlayer(shooter.playerId);
       const q = SHOT_XG * rng.float(0.3, 1.7) * mods[key].qual * mods[oppKey].concQual;
@@ -264,7 +292,7 @@ function playSegment(m, from, to, ctx) {
         const minute = rng.int(from + 1, to);
         let assistId = null;
         if (rng.chance(0.7)) {
-          const a = pickWeighted(rng, side.onPitch, ctx, ASSIST_W, p => 0.5 + (p.attributes.passing + p.attributes.vision) / 200, sp.id);
+          const a = pickWeighted(rng, side.onPitch, ctx, ASSIST_W, p => (0.5 + (p.attributes.passing + p.attributes.vision) / 200) * piFactor(side, p.id, 'a'), sp.id);
           assistId = a ? a.playerId : null;
         }
         m.events.push({ min: minute, type: 'goal', side: key, playerId: sp.id, assistId, xg: round2(q) });
@@ -348,6 +376,7 @@ function applyHalftime(m, key, decisions = {}, ctx, minute = 45) {
   const applied = { subs: 0, tactic: null, formation: null, errors: [] };
   if (decisions.tactic && TACTIC_MATRIX[decisions.tactic]) { side.tactic = decisions.tactic; club.tactic = decisions.tactic; applied.tactic = decisions.tactic; }
   if (decisions.instructions && typeof decisions.instructions === 'object') { side.instr = normInstr({ ...side.instr, ...decisions.instructions }); club.instructions = { ...side.instr }; applied.instructions = side.instr; }
+  if (decisions.playerInstructions && typeof decisions.playerInstructions === 'object') { side.pinstr = cleanPlayerInstr(decisions.playerInstructions); club.playerInstructions = { ...side.pinstr }; applied.playerInstructions = side.pinstr; }
   const inPlay = minute !== 45 && minute !== 90;
   const subs = (decisions.subs || []).slice(0, MAX_SUBS);
   if (inPlay && subs.length && side.windowsUsed >= MAX_WINDOWS) applied.errors.push('All three substitution windows have been used');
@@ -358,6 +387,14 @@ function applyHalftime(m, key, decisions = {}, ctx, minute = 45) {
       else applied.errors.push(`Invalid substitution ${offId} → ${onId}`);
     }
     if (inPlay && applied.subs) side.windowsUsed++;
+  }
+  // Swapped positions: two players on the pitch exchange slots (after the substitutions, so a
+  // substitute can be moved). Free, like a formation change; no random draws.
+  for (const sw of (decisions.swaps || []).slice(0, 11)) {
+    const a = side.onPitch.find(s => s.playerId === parseInt(sw && sw[0], 10)), b = side.onPitch.find(s => s.playerId === parseInt(sw && sw[1], 10));
+    if (!a || !b || a === b || a.slot === 'GK' || b.slot === 'GK') { applied.errors.push('Invalid position swap'); continue; }
+    [a.playerId, b.playerId] = [b.playerId, a.playerId];
+    applied.swaps = (applied.swaps || 0) + 1;
   }
   if (decisions.formation && decisions.formation !== side.formation && buildSlotMap(decisions.formation).length === 11) {
     reslot(side, decisions.formation, ctx);
@@ -552,5 +589,5 @@ function squadStrength(club) {
 
 module.exports = {
   createMatch, playFirstHalf, applyHalftime, playSecondHalf, finalizeMatch, playMatch, squadStrength,
-  drainFactor, MAX_SUBS, MAX_WINDOWS, LIVE_SEGMENT, segmentsOf, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods, instrValue,
+  drainFactor, MAX_SUBS, MAX_WINDOWS, LIVE_SEGMENT, segmentsOf, TACTIC_MATRIX, DRAIN_PER_MIN, INSTRUCTIONS, normInstr, instrMods, instrValue, PLAYER_INSTRUCTIONS, cleanPlayerInstr,
 };

@@ -12,7 +12,7 @@ function stubElement() {
     innerHTML: '', textContent: '', value: '', style: {}, dataset: {}, children: [], disabled: false,
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     addEventListener() {}, appendChild() {}, remove() {}, focus() {}, click() {},
-    querySelectorAll() { return []; },
+    querySelectorAll() { return []; }, querySelector() { return null; },   // as the DOM: nothing found
   };
   return el;
 }

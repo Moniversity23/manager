@@ -7,16 +7,25 @@
 //
 //  short / through — along the ground, slowing under rolling friction (a through ball is hit harder
 //                    so it is still running when it reaches the receiver's stride)
-//  long            — lofted: flies, lands short of the receiver and bounces up to him
+//  driven          — a firm pass along the ground: hit hard, it skims the grass for its first metres
+//                    and still arrives quickly
+//  long            — lofted: flies (slowing in the air), lands short of the receiver, bounces twice
+//                    and runs up to him
 //  cross           — lofted from wide, still at head height when it reaches the man in the box
 //  shot            — driven at goal; long shots rise and dip; any ball can curl
 //
 // Curl bends the ball sideways and brings it back onto its target (it still arrives where it was
 // aimed); wind pushes a ball in the air sideways and does not bring it back. Both are in metres,
 // sideways to the line of the ball (+ = to the left of the direction of travel).
+// Air drag: a lofted ball slows as it flies, so it covers ground quickly at first and drops more
+// steeply than it rose. Its time of flight and landing point do not change.
 (function (root) {
   const FRICTION = 0.06;                          // ground deceleration, units/s² (≈ 6 m/s²: grass plus drag)
-  const ARRIVE = { short: 0.11, through: 0.16 };  // speed when it reaches the receiver, units/s
+  const ARRIVE = { short: 0.11, through: 0.16, driven: 0.24 };   // speed when it reaches the receiver, units/s
+  const DRAG = { long: 0.6, cross: 0.45 };        // how much a lofted ball slows in the air (0 = not at all)
+  // Fraction of the distance covered at fraction u of the flight time, with drag k (and its rate).
+  const dragP = (u, k) => (k > 0 ? (1 - Math.exp(-k * u)) / (1 - Math.exp(-k)) : u);
+  const dragRate = (u, k) => (k > 0 ? (k * Math.exp(-k * u)) / (1 - Math.exp(-k)) : 1);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
   function plan(kind, dist, opts = {}) {
@@ -28,11 +37,11 @@
       const peak = cross ? clamp(0.2 + dist * 0.6, 0.3, 0.55) : clamp(0.12 + dist * 0.75, 0.2, 0.55);
       // A long ball can also be played onto the receiver's chest (no bounce, arrives at ~1.1 m).
       const chest = !cross && opts.arrive === 'chest';
-      return { kind, dist, dur, peak, land: cross || chest ? 1 : 0.88, zEnd: cross ? 0.32 : chest ? 0.19 : 0.1, lofted: true, curl, wind: opts.wind || 0, chest };
+      return { kind, dist, dur, peak, land: cross || chest ? 1 : 0.86, zEnd: cross ? 0.32 : chest ? 0.19 : 0.1, lofted: true, curl, wind: opts.wind || 0, chest, drag: DRAG[kind] || 0 };
     }
     const vEnd = ARRIVE[kind] || ARRIVE.short;
     const v0 = Math.sqrt(vEnd * vEnd + 2 * FRICTION * dist);
-    return { kind: kind === 'through' ? 'through' : 'short', dist, dur: (2 * dist) / (v0 + vEnd), v0, vEnd, peak: 0, zEnd: 0, lofted: false, curl, wind: 0 };
+    return { kind: kind === 'through' || kind === 'driven' ? kind : 'short', dist, dur: (2 * dist) / (v0 + vEnd), v0, vEnd, peak: 0, zEnd: 0, lofted: false, curl, wind: 0, skim: kind === 'driven' ? 0.035 : 0 };
   }
 
   // Sideways offset (metres) at fraction u of the flight: curl comes back to the line, wind does not.
@@ -43,18 +52,21 @@
     t = clamp(t, 0, pl.dur);
     if (!pl.lofted) {
       const s = pl.v0 * t - 0.5 * FRICTION * t * t, p = clamp(s / pl.dist, 0, 1);
-      return { p, z: 0, speed: Math.max(pl.vEnd, pl.v0 - FRICTION * t), side: sideways(pl, p) };
+      const z = pl.skim ? pl.skim * Math.max(0, Math.sin(Math.min(1, p / 0.35) * Math.PI)) : 0;   // a driven pass skims at first
+      return { p, z, speed: Math.max(pl.vEnd, pl.v0 - FRICTION * t), side: sideways(pl, p) };
     }
-    // Lofted: constant ground speed (air drag ignored), a parabola to the landing point, then
-    // for a long ball one bounce up to the receiver.
-    const u = t / pl.dur, speed = pl.dist / pl.dur;
+    // Lofted: a parabola in time to the landing point; drag makes it cover ground fast early and
+    // fall steeply. A long ball then bounces twice, each lower, and runs up to the receiver.
+    const u = t / pl.dur, k = pl.drag || 0, p = dragP(u, k), speed = pl.dist / pl.dur * dragRate(u, k);
     if (u <= pl.land) {
       const w = u / pl.land;
       const end = pl.land < 1 ? 0 : pl.zEnd;
-      return { p: u, z: 4 * pl.peak * w * (1 - w) + end * w, speed, side: sideways(pl, u) };
+      return { p, z: 4 * pl.peak * w * (1 - w) + end * w, speed, side: sideways(pl, p) };
     }
-    const w = (u - pl.land) / (1 - pl.land);
-    return { p: u, z: 4 * pl.peak * 0.2 * w * (1 - w) + pl.zEnd * w, speed, side: sideways(pl, u) };
+    const w = (u - pl.land) / (1 - pl.land), b1 = 0.62;        // first bounce takes 62% of the rest
+    const z = w < b1 ? 4 * pl.peak * 0.2 * (w / b1) * (1 - w / b1)
+      : 4 * pl.peak * 0.05 * ((w - b1) / (1 - b1)) * (1 - (w - b1) / (1 - b1));
+    return { p, z: z + pl.zEnd * w, speed, side: sideways(pl, p) };
   }
 
   // A shot: its duration is set by the match (the shot must arrive on the event's second); its

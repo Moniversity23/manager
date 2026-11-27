@@ -193,7 +193,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   // The live match while it is watched (see GameWorld.liveChange): the second half is played but
   // kept open ({ live: true }), changes can be made from the next five-minute mark, and /finish
   // records the result at full time. The week then carries on with /api/step-week.
-  const liveDecisions = body => ({ tactic: body.tactic, formation: body.formation, instructions: body.instructions && typeof body.instructions === 'object' ? body.instructions : null, subs: Array.isArray(body.subs) ? body.subs.slice(0, 5) : [], talk: body.talk });
+  const liveDecisions = body => ({ tactic: body.tactic, formation: body.formation, playerInstructions: body.playerInstructions && typeof body.playerInstructions === 'object' ? body.playerInstructions : null, instructions: body.instructions && typeof body.instructions === 'object' ? body.instructions : null, subs: Array.isArray(body.subs) ? body.subs.slice(0, 5) : [], swaps: Array.isArray(body.swaps) ? body.swaps.slice(0, 11) : [], talk: body.talk });
   route('POST', '/api/match/state', async (m, body) => {
     if (!world.liveMatch) return { ok: false, status: 409, error: 'No live match' };
     return world.liveState(Number(body.minute));
@@ -214,7 +214,7 @@ function createApi({ store, stateHash, randomSeed, log = console, now = () => ne
   route('POST', '/api/match/resume', async (m, body) => {
     if (!world.liveMatch) return { ok: false, status: 409, error: 'No match is paused at halftime' };
     if (body.live) { const live = world.liveResume(liveDecisions(body)); queueAutoSave(); return { ok: true, live, current: snap() }; }
-    return playOn({ tactic: body.tactic, formation: body.formation, instructions: body.instructions && typeof body.instructions === 'object' ? body.instructions : null, subs: Array.isArray(body.subs) ? body.subs : [], talk: body.talk }, body.interactive !== false);
+    return playOn({ tactic: body.tactic, formation: body.formation, playerInstructions: body.playerInstructions && typeof body.playerInstructions === 'object' ? body.playerInstructions : null, instructions: body.instructions && typeof body.instructions === 'object' ? body.instructions : null, subs: Array.isArray(body.subs) ? body.subs : [], talk: body.talk }, body.interactive !== false);
   }, { world: true });
 
   route('POST', '/api/step', async (m, body) => {

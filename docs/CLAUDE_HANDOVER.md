@@ -1,6 +1,6 @@
 # Claude handover: The Gaffer
 
-*Updated 2026-11-26. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
+*Updated 2026-11-27. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
 through `.github/workflows/pages.yml`).*
 
 ## Architecture
@@ -35,6 +35,13 @@ through `.github/workflows/pages.yml`).*
 
 ## Completed in this release
 See `docs/INTEGRATION_CHANGELOG.md`. In short:
+* **Match board, cards, ball, camera and athletes (2026-11-27, section 13):**
+  * a DLS-inspired substitution board (pitch, bench, out/in, preview, swaps) in pause and half-time;
+  * mentality, pressing, passing and player instructions; instructions now saved;
+  * player cards with roles, a brighter palette, free agents in their own tab;
+  * ball drag, bounces, driven passes, spin and visibility;
+  * a closer Broadcast camera with lead and adaptive zoom;
+  * realistic athletes on the pitch with their own hairstyles (Settings → Players in matches).
 * **Realistic close-up bodies (2026-11-26):**
   * four Ara 3D Gen bodies, optimised to about 12,100 triangles, 4 materials and 0.54 MB, on the
     game skeleton;
@@ -62,9 +69,9 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
 ## Outstanding
 * About one header chance in six is still struck with the foot (it starts while the other side has
   the ball). Keepers now throw or roll the ball out after a catch.
-* **Realistic bodies are for close-ups only.**
-  * Not shown on them: Studio face sliders, hairstyles (all have short hair, tinted), beards, and
-    goalkeeper gloves.
+* **Realistic bodies (close-ups and, since 2026-11-27, the pitch):**
+  * Four base faces only. Not shown on them: Studio face sliders, beards and goalkeeper gloves.
+  * Semi-realistic (MakeHuman photo skin), not a stylised low-poly art style.
   * Fingers differ from Ara's by about 15 mm (held poses).
   * Only male bodies ship.
   * Next steps are in the integration audit.
@@ -91,7 +98,7 @@ cd tools/character-pipeline && npm install && node build-bodies.mjs [--export]  
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v25`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v26`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

@@ -10,7 +10,7 @@ import * as THREE from './vendor/three.module.min.js';
 const L = 105, W = 68;                  // pitch size in metres
 const PX = 120, PZ = 80;                // grass area incl. run-off
 const S = 1.2;                          // players are drawn a little larger than life so they read on a phone
-const BALL_R = 0.24;
+const BALL_R = 0.19;   // about 1.7× a real ball (0.11 m): it reads at match distance; the outline and glow do the rest
 const clamp01 = x => (x < 0 ? 0 : x > 1 ? 1 : x);
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -936,6 +936,35 @@ function loadBody(entry) {
   }
   return BODIES.get(entry.id);
 }
+// Every body, for the players on the pitch: { index, byId }, or null when any part fails or takes
+// longer than timeoutMs (the match then uses the classic figures; loading carries on and is cached).
+export async function loadBodySet(timeoutMs = 15000) {
+  try {
+    const run = (async () => { const index = await bodyIndex(); const list = await Promise.all(index.bodies.map(loadBody)); return { index, byId: Object.fromEntries(list.map(b => [b.id, b])) }; })();
+    return await Promise.race([run, new Promise(r => setTimeout(() => r(null), timeoutMs))]);
+  } catch (e) { console.warn('Match bodies unavailable, using the classic figures:', e && e.message); return null; }
+}
+// The head of a body at its bind pose: the cranium's centre and size (from the skin weighted to the
+// head bone) and the head joint, in the model's space. Measured once per body.
+function bodyHead(B) {
+  if (B.headInfo !== undefined) return B.headInfo;
+  let info = null;
+  B.scene.traverse(o => {
+    if (info || !o.isSkinnedMesh || !o.material || o.material.name !== 'skin') return;
+    const bones = o.skeleton.bones, hi = bones.findIndex(b => b.name === 'head'); if (hi < 0) return;
+    const P = o.geometry.attributes.position, SI = o.geometry.attributes.skinIndex, SW = o.geometry.attributes.skinWeight;
+    const gI = [i => SI.getX(i), i => SI.getY(i), i => SI.getZ(i), i => SI.getW(i)], gW = [i => SW.getX(i), i => SW.getY(i), i => SW.getZ(i), i => SW.getW(i)];
+    const box = new THREE.Box3(), v = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (gI[k](i) === hi) w += gW[k](i); if (w > 0.6) box.expandByPoint(v.fromBufferAttribute(P, i)); }
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+    const width = Math.min(size.x, size.z * 1.05);
+    info = { width, cranium: new THREE.Vector3(c.x, box.max.y - width * 0.64, c.z - size.z * 0.05), joint: new THREE.Vector3().setFromMatrixPosition(o.skeleton.boneInverses[hi].clone().invert()) };
+  });
+  return (B.headInfo = info);
+}
+// Hairstyles drawn as shapes (the body's own short hair and brows stay underneath them).
+const BODY_HAIR = new Set(['crop', 'swept', 'curly', 'long', 'twists', 'afro', 'fade']);
 // The close-up body for a look, or null (classic figure) when it is turned off or cannot load.
 export async function bodyFor(look) {
   try { const e = chooseBody(await bodyIndex(), look); return e ? await loadBody(e) : null; }
@@ -1039,6 +1068,16 @@ function makeBodyFootballer(F, B, geo, m) {
   const spine = bone('spine_03'), handR = bone('hand_r');
   const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
   shapeBody(model, bone, lk);
+  // His hairstyle from his look, fitted to this body's head: the procedural styles (built for the
+  // classic head) scaled to the cranium's width and placed on its centre, on the head bone.
+  const hd = lk && BODY_HAIR.has(lk.hairStyle) && m.hair ? bodyHead(B) : null, headBone = bone('head');
+  if (hd && headBone) {
+    const hair = buildHead(geo, m, lk);
+    for (const c of [...hair.children]) if (!(c.isMesh && c.material === m.hair)) hair.remove(c);
+    hair.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+    const k = S * hs, d = hd.cranium.clone().sub(hd.joint);                 // model space: the body faces +Z
+    attachToBone(g, headBone, hair, new THREE.Vector3(d.z * k * bw, d.y * k, -d.x * k * bw), k * hd.width / 0.198);
+  }
   // Number, sponsor and crest sit on the shirt: the chest's depth comes from the body's own build.
   const k = S * hs, ch = B.chest || { front: 0.15, back: -0.04 }, plateScale = k * 0.92;
   if (spine && m.number != null) {
@@ -1269,11 +1308,12 @@ export function warmUp({ night = false, quality = 'auto' } = {}) {
 
 export async function createView(container, opts = {}) {
   const t0 = performance.now();
+  if (opts.bodies && !opts.bodySet) opts = { ...opts, bodySet: await loadBodySet(12000) };   // realistic players (cached after the first match)
   const view = await buildView(container, opts);
   if (globalThis.__m3dDebug) console.log('prepare createView', Math.round(performance.now() - t0), 'ms');
   return view;
 }
-async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null } = {}) {
+async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null, bodySet = null } = {}) {
   let F = null;
   if (models !== 'classic') {
     try { F = await Promise.race([loadFootballer(), new Promise((_, no) => setTimeout(() => no(new Error('timed out')), 30000))]); }
@@ -1360,6 +1400,13 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
     t.shirt3d = kitShirtMaterial(shirt, t.pattern, new THREE.Color(k.second || '#ffffff'), F ? F.height : 1.8);
     if (k.gk) gkKit[side] = [k.gk, new THREE.Color(k.gk).getHex()];
   }
+  // Kit colours for the realistic bodies (their kit is coded by part and painted in these colours).
+  const hex = c => '#' + new THREE.Color(c).getHexString();
+  for (const side of ['home', 'away']) {
+    const t = team[side], k = kits && kits[side];
+    t.kc = k && k.shirt ? { shirt: k.shirt, second: k.second || '#ffffff', shorts: k.shorts || '#f4f4f4', socks: k.socks || k.shirt, pattern: t.pattern }
+      : { shirt: hex(kitCol(t.hue)), second: t.pattern === 1 ? '#f4f4f4' : hex(new THREE.Color().setHSL(t.hue / 360, 0.8, 0.3)), shorts: hex(t.shorts.color), socks: hex(t.sock.color), pattern: t.pattern };
+  }
   const gloves = lam(0xffffff);
   const players = { home: [], away: [] };
   const refMats = { shirt: new THREE.MeshLambertMaterial({ map: shirtTexture(0, 0, null, '#16181c') }), sleeve: lam(0x16181c), shorts: lam(0x16181c), sock: lam(0x16181c), skin: skins[1], face: faces[1], hair: hairs[0], hairSoft: hairs[0], hairStyle: 0, boot: boots[0], blob: blobMat };
@@ -1397,8 +1444,12 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
     boardTex.needsUpdate = true;
   }
 
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 20, 16), new THREE.MeshLambertMaterial({ map: ballTexture() }));
+  // The ball: already drawn about twice real size so it reads at match distance; a slight glow keeps
+  // it white under floodlights and a thin dark outline separates it from white lines, kits and sky.
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 20, 16), new THREE.MeshLambertMaterial({ map: ballTexture(), emissive: 0x3a3a3a }));
   ball.castShadow = true; scene.add(ball);
+  const ballEdge = new THREE.Mesh(new THREE.SphereGeometry(BALL_R * 1.13, 16, 12), new THREE.MeshBasicMaterial({ color: 0x0a0f18, side: THREE.BackSide, transparent: true, opacity: 0.7 }));
+  ball.add(ballEdge);
   const ballBlob = new THREE.Mesh(geo.blob, new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false })); ballBlob.rotation.x = -Math.PI / 2; ballBlob.position.y = 0.035; ballBlob.renderOrder = 1; scene.add(ballBlob);
   // Trail behind a fast ball
   const TRAIL = 7, trailGeo = new THREE.SphereGeometry(BALL_R * 0.85, 8, 6), trail = [], hist = [];
@@ -1462,7 +1513,10 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
     const bd = badges && badges[side];
     const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk, shirtName: String(d.name || '').split(' ').slice(-1)[0], detail: !low,
       sponsor: !gk && bd ? bd.sponsor : null, crest: bd && bd.crest ? bd.crest : null };
-    const p = F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
+    // A realistic body when the set is loaded (chosen as in the Studio: his choice, heritage, skin).
+    const be = F && bodySet ? chooseBody(bodySet.index, lk) : null, B = be ? bodySet.byId[be.id] : null;
+    if (B) mats.kitColours = gk ? { shirt: gkKit[side][0], second: '#20242c', shorts: '#20242c', socks: gkKit[side][0], pattern: 0 } : team[side].kc;
+    const p = B ? makeBodyFootballer(F, B, geo, mats) : F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
     p.userData.gk = gk; p.userData.pid = d.id; p.userData.number = number;
     p.userData.face = side === 'home' ? 0 : Math.PI;
     scene.add(p);
@@ -1618,7 +1672,15 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       ball.position.set(bx, by, bz);
       tmp.copy(ball.position).sub(prevBall); prevBall.copy(ball.position);
       const moved = tmp.length(), ballSpeed = moved / dt;
-      if (moved > 0.001 && moved < 20) { ball.rotation.z -= tmp.x / BALL_R; ball.rotation.x += tmp.z / BALL_R; }
+      // Spin: on the ground it rolls with its movement; a lofted pass carries backspin, a curling
+      // ball spins about its upright axis (the side it bends to), a driven ball topspin.
+      if (moved > 0.001 && moved < 20) {
+        const air = by > BALL_R + 0.25, pl = sim.pass && sim.pass.plan, sp = sim.phase === 'shot' && sim.shot && sim.shot.plan;
+        const back = air && pl && pl.lofted ? -0.6 : 1;
+        ball.rotation.z -= back * tmp.x / BALL_R; ball.rotation.x += back * tmp.z / BALL_R;
+        const curl = (sp && sp.curl) || (pl && pl.curl) || 0;
+        if (air || sp) ball.rotation.y += Math.sign(curl) * Math.min(1, Math.abs(curl) / 3) * dt * 14;
+      }
       ballBlob.position.x = bx; ballBlob.position.z = bz;
       const bh = Math.min(1, (by - BALL_R) / 6);
       ballBlob.scale.setScalar(0.5 + bh * 0.9); ballBlob.material.opacity = 0.9 - bh * 0.6;
@@ -1726,7 +1788,25 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
         else if (mode === 'wide') { camTarget.set(bx * 0.55, 30, 64); tmp.set(bx * 0.7, 0, bz * 0.25); look.lerp(tmp, ease(4)); }
         else if (mode === 'goal') { const s = bx >= 0 ? 1 : -1; camTarget.set(s * (L / 2 + 15), 10, bz * 0.25); tmp.set(bx - s * 6, 1, bz * 0.6); look.lerp(tmp, ease(5)); }
         else if (mode === 'close') { camTarget.set(bx * 0.93, 8.5, bz + 23); tmp.set(bx, 1.1, bz * 0.92); look.lerp(tmp, ease(6)); }
-        else { const zoom = (Math.abs(bx) > 30 ? 0.92 : 1) * near; camTarget.set(bx * 0.88, 12 * zoom, 28 * zoom + bz * 0.42); tmp.set(bx * 0.95, 0.6, bz * 0.66); look.lerp(tmp, ease(4.5)); }
+        else if (mode === 'std' || mode === 'wide2') { const zoom = (Math.abs(bx) > 30 ? 0.92 : 1) * near; camTarget.set(bx * 0.88, 12 * zoom, 28 * zoom + bz * 0.42); tmp.set(bx * 0.95, 0.6, bz * 0.66); look.lerp(tmp, ease(4.5)); }
+        else {
+          // Broadcast (default): closer and lower than the old standard view (about a quarter
+          // nearer), leading the ball a little in the direction it travels, widening gently for a
+          // long ball and tightening near goal. The zoom changes slowly, so it never pumps.
+          const cs = v.camS || (v.camS = { px: bx, pz: bz, vx: 0, vz: 0, zoom: 1 });
+          if (dt > 0 && dt < 0.2) {
+            const k = ease(2.5), vx = Math.max(-35, Math.min(35, (bx - cs.px) / dt)), vz = Math.max(-35, Math.min(35, (bz - cs.pz) / dt));
+            cs.vx += (vx - cs.vx) * k; cs.vz += (vz - cs.vz) * k;
+          }
+          cs.px = bx; cs.pz = bz;
+          const sp = Math.hypot(cs.vx, cs.vz), inBox = Math.abs(bx) > L / 2 - 20;
+          const fast = Math.max(0, Math.min(1, (sp - 7) / 14));
+          const want = (inBox ? 0.88 : 1) * (1 + 0.24 * fast) * (by > 4 ? 1.08 : 1) * near;
+          cs.zoom += (want - cs.zoom) * ease(1.1);
+          const z = cs.zoom, lx = bx + Math.max(-8, Math.min(8, cs.vx * 0.4)), lz = bz + Math.max(-5, Math.min(5, cs.vz * 0.3));
+          camTarget.set(lx * 0.9, 8 * z, 21 * z + lz * 0.5);
+          tmp.set(lx * 0.97 + (inBox ? Math.sign(bx) * 2.5 : 0), 0.8, lz * 0.72); look.lerp(tmp, ease(4.5));
+        }
         camera.position.lerp(camTarget, ease(3));
       }
       camera.lookAt(look);
