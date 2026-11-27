@@ -226,8 +226,11 @@ fewer meshes.
 
 * **Match players:** the 22 players can now be the optimised Ara bodies instead of the Mesh2Motion
   mannequins: Settings → "Players in matches" (Athletes by default). The four bodies (2.2 MB in all)
-  load while the week is simulated and are cached; if they are not ready within 12 s, or fail, the
-  match uses the mannequins.
+  load while the week is simulated and are cached. If none is ready within 12 s, the match uses the
+  mannequins. If one body fails to download, the players who would wear it get the mannequin with
+  their own look (never a body of another skin tone), the rest keep their athletes, and the failed body
+  is tried again for the next match. This was tested by blocking one body: 12 athletes and 10
+  mannequins, no errors. It was added after an HTTP/2 error on the live site cancelled all four.
 * **Choosing a body:** the same choice as the Studio: his `baseBody`, East Asian heritage, then
   skin tone. Officials keep the mannequin figure.
 * **His identity:** height and build (bone shaping), skin tone (texture tint), hair colour, kit

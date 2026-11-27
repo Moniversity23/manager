@@ -313,7 +313,8 @@ appearance field, and every API.
   slowly. The old view is kept as "Standard".
 
 **Athletes:** the optimised Ara bodies play in matches, each with his own hairstyle, build, skin
-tone and kit (see the integration audit), with the mannequins as the fallback and a setting.
+tone and kit (see the integration audit), with the mannequins as the fallback and a setting. A body
+that fails to download only affects the players who would wear it.
 
 **Half starts (measured, headless Chrome, software rendering):**
 * Second half: the engine's reply took 0.95 s, the 3D view was rebuilt in 0.47 s, and the clock ran

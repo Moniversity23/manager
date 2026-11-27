@@ -98,7 +98,7 @@ cd tools/character-pipeline && npm install && node build-bodies.mjs [--export]  
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v26`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v27`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

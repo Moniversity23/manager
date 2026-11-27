@@ -936,11 +936,18 @@ function loadBody(entry) {
   }
   return BODIES.get(entry.id);
 }
-// Every body, for the players on the pitch: { index, byId }, or null when any part fails or takes
-// longer than timeoutMs (the match then uses the classic figures; loading carries on and is cached).
+// The bodies for the players on the pitch: { index, byId } with every body that loaded, or null when
+// none did or they take longer than timeoutMs (the match then uses the mannequins; loading carries
+// on and is cached). A player whose body failed gets the mannequin with his own look (never a body of
+// a different skin tone); the failed body is tried again for the next match.
 export async function loadBodySet(timeoutMs = 15000) {
   try {
-    const run = (async () => { const index = await bodyIndex(); const list = await Promise.all(index.bodies.map(loadBody)); return { index, byId: Object.fromEntries(list.map(b => [b.id, b])) }; })();
+    const run = (async () => {
+      const index = await bodyIndex();
+      const list = (await Promise.allSettled(index.bodies.map(loadBody))).filter(r => r.status === 'fulfilled').map(r => r.value);
+      if (!list.length) throw new Error('no body loaded');
+      return { index, byId: Object.fromEntries(list.map(b => [b.id, b])) };
+    })();
     return await Promise.race([run, new Promise(r => setTimeout(() => r(null), timeoutMs))]);
   } catch (e) { console.warn('Match bodies unavailable, using the classic figures:', e && e.message); return null; }
 }
