@@ -1,0 +1,394 @@
+{
+ "note": "CC0 1.0 recordings from freesound.org (each source page states Creative Commons 0), cut, looped and levelled by tools/stadium-audio/build-stadium.py",
+ "files": {
+  "bed-calm": {
+   "file": "bed-calm.mp3",
+   "seconds": 31.5,
+   "channels": 2,
+   "use": "continuous crowd murmur of a match (loops)",
+   "sources": [
+    {
+     "freesound": 206003,
+     "author": "habbis92",
+     "title": "Norwegian football match/soccer game ambience",
+     "url": "https://freesound.org/s/206003/",
+     "licence": "CC0 1.0"
+    },
+    {
+     "freesound": 39733,
+     "author": "huubjeroen",
+     "title": "noise#01",
+     "url": "https://freesound.org/s/39733/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "bed-lively": {
+   "file": "bed-lively.mp3",
+   "seconds": 25.5,
+   "channels": 2,
+   "use": "a fuller crowd, faded in as an attack builds (loops)",
+   "sources": [
+    {
+     "freesound": 31150,
+     "author": "cognito perceptu",
+     "title": "stadium",
+     "url": "https://freesound.org/s/31150/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "goal-1": {
+   "file": "goal-1.mp3",
+   "seconds": 11.0,
+   "channels": 2,
+   "use": "goal by the home side: the stadium erupts",
+   "sources": [
+    {
+     "freesound": 528799,
+     "author": "D.jones",
+     "title": "Football Crowd - Reaction To Goal",
+     "url": "https://freesound.org/s/528799/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "goal-2": {
+   "file": "goal-2.mp3",
+   "seconds": 11.0,
+   "channels": 2,
+   "use": "goal by the home side: the stadium erupts",
+   "sources": [
+    {
+     "freesound": 189821,
+     "author": "blaukreuz",
+     "title": "Goal!",
+     "url": "https://freesound.org/s/189821/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "goal-3": {
+   "file": "goal-3.mp3",
+   "seconds": 11.0,
+   "channels": 2,
+   "use": "goal by the home side: the stadium erupts",
+   "sources": [
+    {
+     "freesound": 348978,
+     "author": "Kinoton",
+     "title": "Crazy Soccer Crowd Cheering",
+     "url": "https://freesound.org/s/348978/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "goal-away": {
+   "file": "goal-away.mp3",
+   "seconds": 7.0,
+   "channels": 2,
+   "use": "goal by the visitors: a distant cheer, groans nearby",
+   "sources": [
+    {
+     "freesound": 189821,
+     "author": "blaukreuz",
+     "title": "Goal!",
+     "url": "https://freesound.org/s/189821/",
+     "licence": "CC0 1.0"
+    },
+    {
+     "freesound": 619007,
+     "author": "mrrap4food",
+     "title": "crowd 'oh' - disappointed",
+     "url": "https://freesound.org/s/619007/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "nearmiss-2": {
+   "file": "nearmiss-2.mp3",
+   "seconds": 8.0,
+   "channels": 2,
+   "use": "a chance at a real match: the crowd rises and falls",
+   "sources": [
+    {
+     "freesound": 189823,
+     "author": "blaukreuz",
+     "title": "Chance",
+     "url": "https://freesound.org/s/189823/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "gasp": {
+   "file": "gasp.mp3",
+   "seconds": 4.46,
+   "channels": 2,
+   "use": "a shot on target: the crowd gasps",
+   "sources": [
+    {
+     "freesound": 764320,
+     "author": "ShangusBurger",
+     "title": "CRWDReac_Crowd Gasping In Surprise, Voiced 02",
+     "url": "https://freesound.org/s/764320/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "ooh": {
+   "file": "ooh.mp3",
+   "seconds": 2.92,
+   "channels": 1,
+   "use": "a near miss: \"ooh\"",
+   "sources": [
+    {
+     "freesound": 870651,
+     "author": "CHallSmith",
+     "title": "Group Ooh 2",
+     "url": "https://freesound.org/s/870651/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "groan": {
+   "file": "groan.mp3",
+   "seconds": 5.0,
+   "channels": 2,
+   "use": "a shot wide or high: a groan",
+   "sources": [
+    {
+     "freesound": 619007,
+     "author": "mrrap4food",
+     "title": "crowd 'oh' - disappointed",
+     "url": "https://freesound.org/s/619007/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "save-gasp": {
+   "file": "save-gasp.mp3",
+   "seconds": 3.2,
+   "channels": 1,
+   "use": "a big save: a gasp",
+   "sources": [
+    {
+     "freesound": 264376,
+     "author": "HowardV",
+     "title": "small crowd gasp shock surprise",
+     "url": "https://freesound.org/s/264376/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "applause": {
+   "file": "applause.mp3",
+   "seconds": 3.56,
+   "channels": 2,
+   "use": "applause: a good save, a substitution, a fine move",
+   "sources": [
+    {
+     "freesound": 410868,
+     "author": "NobodyYouKnowOf",
+     "title": "crowd cheering and clapping",
+     "url": "https://freesound.org/s/410868/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "cheer": {
+   "file": "cheer.mp3",
+   "seconds": 7.0,
+   "channels": 1,
+   "use": "cheering at half- and full-time",
+   "sources": [
+    {
+     "freesound": 675056,
+     "author": "craigsmith",
+     "title": "S12-01 Crowd reactions; oohs; ahh; cheering",
+     "url": "https://freesound.org/s/675056/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "boo": {
+   "file": "boo.mp3",
+   "seconds": 5.0,
+   "channels": 1,
+   "use": "boos: a card against the home side, the visitors time-wasting",
+   "sources": [
+    {
+     "freesound": 264378,
+     "author": "HowardV",
+     "title": "crowd booing",
+     "url": "https://freesound.org/s/264378/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "whistle-short": {
+   "file": "whistle-short.mp3",
+   "seconds": 0.54,
+   "channels": 1,
+   "use": "a short blast: a foul, a restart",
+   "sources": [
+    {
+     "freesound": 538422,
+     "author": "Rosa-Orenes256",
+     "title": "Referee whistle sound",
+     "url": "https://freesound.org/s/538422/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "whistle-long": {
+   "file": "whistle-long.mp3",
+   "seconds": 1.4,
+   "channels": 1,
+   "use": "a long blast: kick-off, half-time, the last of the full-time three",
+   "sources": [
+    {
+     "freesound": 218318,
+     "author": "SpliceSound",
+     "title": "Referee whistle blow, gymnasium",
+     "url": "https://freesound.org/s/218318/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-1": {
+   "file": "touch-1.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-2": {
+   "file": "touch-2.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-3": {
+   "file": "touch-3.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-4": {
+   "file": "touch-4.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-5": {
+   "file": "touch-5.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "touch-6": {
+   "file": "touch-6.mp3",
+   "seconds": 0.22,
+   "channels": 1,
+   "use": "a touch of the ball on grass (dribbling, passing)",
+   "sources": [
+    {
+     "freesound": 788268,
+     "author": "amsaenz03",
+     "title": "Soccer Ball Kick Dribble in Grass",
+     "url": "https://freesound.org/s/788268/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "kick-1": {
+   "file": "kick-1.mp3",
+   "seconds": 0.35,
+   "channels": 1,
+   "use": "a struck ball: a shot or a long kick",
+   "sources": [
+    {
+     "freesound": 813402,
+     "author": "Luisa_Sanchez",
+     "title": "Soccer ball kick",
+     "url": "https://freesound.org/s/813402/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "kick-2": {
+   "file": "kick-2.mp3",
+   "seconds": 0.35,
+   "channels": 1,
+   "use": "a struck ball: a shot or a long kick",
+   "sources": [
+    {
+     "freesound": 816823,
+     "author": "Luisa_Sanchez",
+     "title": "soccer ball kick 2 edit",
+     "url": "https://freesound.org/s/816823/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  },
+  "kick-3": {
+   "file": "kick-3.mp3",
+   "seconds": 0.35,
+   "channels": 1,
+   "use": "a struck ball: a shot or a long kick",
+   "sources": [
+    {
+     "freesound": 446639,
+     "author": "Nicolas4677",
+     "title": "Ball Kick",
+     "url": "https://freesound.org/s/446639/",
+     "licence": "CC0 1.0"
+    }
+   ]
+  }
+ }
+}

@@ -66,3 +66,41 @@ Substitutions during play use one of three windows, as in real football; half-ti
 * In the 3D match, a lone holding midfielder, centre midfielder, playmaker or striker now stands
   central (y 0.40–0.42 before). The rest of the match view still follows the timeline's own slot table,
   so players stay where the timeline's events put them. The engine and timeline are unchanged.
+
+## Milestone 15: human footballers, football movement, a controlled ball, a real ground (2026-11-28)
+Status of the priorities above after this milestone (details and measurements in
+`INTEGRATION_CHANGELOG.md`, section 15):
+
+* **Posture (5).** The backward lean is gone. The athletes were bound with the Ara bind pose, which
+  left their spine, legs and feet a few degrees off the animation's rest. They now keep the
+  animation's rest there (`--spine-rest` in `optimise.mjs`).
+  * Standing, trunk and upper body measure 2° and 11° forward (−3.6° and −1.6°, leaning back, before).
+  * Running, the trunk leans 6°, 12°, 16° and 18° forward at 1.3, 3.2, 5.5 and 7.2 m/s.
+* **Movement (2).** One stride phase drives every forward gait, advanced by the ground covered, so the
+  planted foot stays put. The long mocap strides are shortened per gait (stride warping) so the
+  cadence is that of a footballer, not a hurdler.
+  * Steps per minute: 111, 152, 205 and 208 at those speeds (89–151 before).
+  * The planted foot drifts along the run at 0.13, 0.20, 0.62 and −0.31 m/s. Its total slip in
+    any direction is 0.25, 0.97, 1.89 and 1.61 m/s, measured on the match athlete with the lab's
+    `runTest`. Before this, the old gaits slipped at 0.9–4.9 m/s: half to three-quarters of the
+    running speed.
+  * The trunk straightens per gait and leans into acceleration.
+* **Ball control (3).** The dribble is physics, not a timer:
+  * the ball rolls and slows with grass friction (2.6 m/s²);
+  * each touch aims it at where he will be a stride or a few later;
+  * he plays it when he gets to it;
+  * the view lines his stride up so the touching foot swings through then, reaches the leg forward,
+    and closes the last few centimetres between boot and ball at contact.
+
+  Touches come within 0.12 s of their plan, with the ball at his feet, never behind him (tests).
+* **Appearance (5).**
+  * Photographic MakeHuman skins by heritage and age, eye colours (brown, light brown, blue, green),
+    image-based light, and fuller beards.
+  * Portraits rendered from each player's own athlete replace the drawn faces on every card.
+* **Sound (new).** A recorded commentator and real stadium recordings (see `AUDIO.md`).
+* **Still to do:**
+  * The athletes for replay close-ups and goal celebrations, after real-phone measurements.
+  * The kick and pass clips' foot contact is timed to the ball (section 13), not yet adjusted to it
+    by IK.
+  * The dribble reaches with the leg on top of the run, not a dedicated dribbling clip; a set of
+    dribbling clips (inside, outside, drag-back) would be the next step.

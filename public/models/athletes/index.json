@@ -3,7 +3,7 @@
  "lods": {
   "match": {
    "base": "athlete-match.glb",
-   "bytes": 1167516,
+   "bytes": 1179312,
    "triangles": 12812,
    "targetScale": {
     "headSquare": 0.0109,
@@ -44,61 +44,93 @@
     "older": 0.00328,
     "younger": 0.00481
    },
-   "skin": "#c6a38d",
+   "skin": "#e0a989",
+   "skins": {
+    "young_caucasian": {
+     "file": "skin-young_caucasian-match.webp",
+     "avg": "#e0a889",
+     "bytes": 18178
+    },
+    "young_african": {
+     "file": "skin-young_african-match.webp",
+     "avg": "#5e3c2b",
+     "bytes": 15850
+    },
+    "young_asian": {
+     "file": "skin-young_asian-match.webp",
+     "avg": "#c79b82",
+     "bytes": 17498
+    },
+    "middleage_caucasian": {
+     "file": "skin-middleage_caucasian-match.webp",
+     "avg": "#cea083",
+     "bytes": 17692
+    },
+    "middleage_african": {
+     "file": "skin-middleage_african-match.webp",
+     "avg": "#653e2c",
+     "bytes": 14720
+    },
+    "middleage_asian": {
+     "file": "skin-middleage_asian-match.webp",
+     "avg": "#d1a387",
+     "bytes": 18366
+    }
+   },
    "hair": {
     "short01": {
      "file": "hair-short01-match.glb",
-     "bytes": 140012,
+     "bytes": 140024,
      "triangles": 1543
     },
     "short02": {
      "file": "hair-short02-match.glb",
-     "bytes": 74184,
+     "bytes": 74200,
      "triangles": 1403
     },
     "short03": {
      "file": "hair-short03-match.glb",
-     "bytes": 57220,
+     "bytes": 57232,
      "triangles": 807
     },
     "short04": {
      "file": "hair-short04-match.glb",
-     "bytes": 88876,
+     "bytes": 88888,
      "triangles": 682
     },
     "afro01": {
      "file": "hair-afro01-match.glb",
-     "bytes": 143780,
+     "bytes": 143792,
      "triangles": 1230
     },
     "long01": {
      "file": "hair-long01-match.glb",
-     "bytes": 87060,
+     "bytes": 87072,
      "triangles": 1207
     },
     "braid01": {
      "file": "hair-braid01-match.glb",
-     "bytes": 110284,
+     "bytes": 110296,
      "triangles": 1976
     },
     "ponytail01": {
      "file": "hair-ponytail01-match.glb",
-     "bytes": 111344,
+     "bytes": 111356,
      "triangles": 1347
     },
     "cornrows": {
      "file": "hair-cornrows-match.glb",
-     "bytes": 110676,
+     "bytes": 110688,
      "triangles": 2318
     },
     "mohawk": {
      "file": "hair-mohawk-match.glb",
-     "bytes": 73736,
+     "bytes": 73752,
      "triangles": 1261
     },
     "buzz": {
      "file": "hair-buzz-match.glb",
-     "bytes": 56588,
+     "bytes": 56600,
      "triangles": 912
     }
    }
@@ -106,8 +138,8 @@
  },
  "note": "The Gaffer athletes: one base with face, heritage, build and age targets, beard and glove shells, and one file per hairstyle (Ara 3D Gen and MakeHuman, CC0; built by tools/character-pipeline/athletes)",
  "base": "athlete.glb",
- "bytes": 1826540,
- "triangles": 23322,
+ "bytes": 2190312,
+ "triangles": 27917,
  "targets": [
   "headSquare",
   "headRound",
@@ -163,21 +195,21 @@
   "noseNarrow": 0.00426,
   "noseLong": 0.00509,
   "noseShort": 0.00703,
-  "noseHump": 0.00342,
+  "noseHump": 0.00407,
   "mouthWide": 0.00466,
   "mouthNarrow": 0.00509,
   "lipsFull": 0.00426,
   "lipsThin": 0.00213,
   "eyesBig": 0.00206,
-  "eyesSmall": 0.00247,
+  "eyesSmall": 0.00255,
   "eyesWide": 0.00378,
   "eyesClose": 0.0028,
   "earsBig": 0.00925,
   "earsSmall": 0.00898,
-  "browLow": 0.00362,
+  "browLow": 0.0037,
   "foreheadTall": 0.03507,
   "afr": 0.00921,
-  "asi": 0.00631,
+  "asi": 0.00638,
   "cau": 0.00973,
   "muscular": 0.01161,
   "lean": 0.02264,
@@ -187,7 +219,46 @@
   "younger": 0.00481
  },
  "targetEncoding": "int8/127",
- "skin": "#c5a28c",
+ "skin": "#e0a989",
+ "skins": {
+  "young_caucasian": {
+   "file": "skin-young_caucasian.webp",
+   "avg": "#e0a989",
+   "bytes": 83260
+  },
+  "young_african": {
+   "file": "skin-young_african.webp",
+   "avg": "#5e3c2b",
+   "bytes": 62346
+  },
+  "young_asian": {
+   "file": "skin-young_asian.webp",
+   "avg": "#c89b82",
+   "bytes": 78790
+  },
+  "middleage_caucasian": {
+   "file": "skin-middleage_caucasian.webp",
+   "avg": "#cea083",
+   "bytes": 86450
+  },
+  "middleage_african": {
+   "file": "skin-middleage_african.webp",
+   "avg": "#653e2c",
+   "bytes": 64716
+  },
+  "middleage_asian": {
+   "file": "skin-middleage_asian.webp",
+   "avg": "#d1a387",
+   "bytes": 91000
+  }
+ },
+ "eyes": [
+  "darkbrown",
+  "brownlight",
+  "blue",
+  "green"
+ ],
+ "restSpine": "game",
  "heightM": 1.698,
  "chest": {
   "front": 0.15,
@@ -196,57 +267,57 @@
  "hair": {
   "short01": {
    "file": "hair-short01.glb",
-   "bytes": 208880,
+   "bytes": 208892,
    "triangles": 3678
   },
   "short02": {
    "file": "hair-short02.glb",
-   "bytes": 132204,
+   "bytes": 132216,
    "triangles": 3344
   },
   "short03": {
    "file": "hair-short03.glb",
-   "bytes": 86276,
+   "bytes": 86288,
    "triangles": 1922
   },
   "short04": {
    "file": "hair-short04.glb",
-   "bytes": 101844,
+   "bytes": 101856,
    "triangles": 1050
   },
   "afro01": {
    "file": "hair-afro01.glb",
-   "bytes": 171304,
+   "bytes": 171316,
    "triangles": 2192
   },
   "long01": {
    "file": "hair-long01.glb",
-   "bytes": 144224,
+   "bytes": 144236,
    "triangles": 2874
   },
   "braid01": {
    "file": "hair-braid01.glb",
-   "bytes": 156764,
+   "bytes": 156780,
    "triangles": 3309
   },
   "ponytail01": {
    "file": "hair-ponytail01.glb",
-   "bytes": 170448,
+   "bytes": 170460,
    "triangles": 3210
   },
   "cornrows": {
    "file": "hair-cornrows.glb",
-   "bytes": 194220,
+   "bytes": 194232,
    "triangles": 5304
   },
   "mohawk": {
    "file": "hair-mohawk.glb",
-   "bytes": 120348,
+   "bytes": 120364,
    "triangles": 3008
   },
   "buzz": {
    "file": "hair-buzz.glb",
-   "bytes": 88636,
+   "bytes": 88648,
    "triangles": 2172
   }
  },

@@ -1,0 +1,1799 @@
+{
+ "voice": {
+  "blend": [
+   [
+    "bm_george",
+    0.6
+   ],
+   [
+    "bm_lewis",
+    0.4
+   ]
+  ],
+  "lang": "en-gb",
+  "speed": [
+   0.98,
+   1.04,
+   1.12
+  ],
+  "lift": [
+   1,
+   1,
+   1.045
+  ]
+ },
+ "lines": [
+  {
+   "id": "ko1",
+   "text": "And we're under way.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "ko2",
+   "text": "Here we go, then.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "ko3",
+   "text": "The referee gets us started.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "ko4",
+   "text": "Kick-off, and the game is under way.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "ko5",
+   "text": "And we're off and running.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "ko6",
+   "text": "Off we go. Plenty to play for today.",
+   "i": 1,
+   "kind": "kickoff"
+  },
+  {
+   "id": "kt1",
+   "text": "The second half is under way.",
+   "i": 1,
+   "kind": "kickoff2"
+  },
+  {
+   "id": "kt2",
+   "text": "And we're back under way for the second half.",
+   "i": 1,
+   "kind": "kickoff2"
+  },
+  {
+   "id": "kt3",
+   "text": "Here we go again. Forty-five minutes to play.",
+   "i": 1,
+   "kind": "kickoff2"
+  },
+  {
+   "id": "kt4",
+   "text": "The second half gets going.",
+   "i": 1,
+   "kind": "kickoff2"
+  },
+  {
+   "id": "bu1",
+   "text": "Takes his time on the ball.",
+   "i": 0,
+   "name": "player",
+   "kind": "build"
+  },
+  {
+   "id": "bu2",
+   "text": "Looks up, and picks his pass.",
+   "i": 0,
+   "name": "player",
+   "kind": "build"
+  },
+  {
+   "id": "bu3",
+   "text": "Happy to keep it for now.",
+   "i": 0,
+   "name": "player",
+   "kind": "build"
+  },
+  {
+   "id": "bu4",
+   "text": "Plays it simply.",
+   "i": 0,
+   "name": "player",
+   "kind": "build"
+  },
+  {
+   "id": "bu5",
+   "text": "Patient stuff, this.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "bu6",
+   "text": "They're knocking it about at the back.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "bu7",
+   "text": "Nice and composed in possession.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "bu8",
+   "text": "Just probing for an opening.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "bu9",
+   "text": "Plenty of the ball for them at the moment.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "bu10",
+   "text": "They're in no hurry.",
+   "i": 0,
+   "kind": "build"
+  },
+  {
+   "id": "at1",
+   "text": "Here they come.",
+   "i": 1,
+   "kind": "attack"
+  },
+  {
+   "id": "at2",
+   "text": "This looks promising.",
+   "i": 1,
+   "kind": "attack"
+  },
+  {
+   "id": "at3",
+   "text": "They've got numbers forward here.",
+   "i": 1,
+   "kind": "attack"
+  },
+  {
+   "id": "at4",
+   "text": "Could be dangerous, this.",
+   "i": 1,
+   "kind": "attack"
+  },
+  {
+   "id": "at5",
+   "text": "Good space to attack.",
+   "i": 1,
+   "kind": "attack"
+  },
+  {
+   "id": "at6",
+   "text": "He's got room here.",
+   "i": 1,
+   "name": "player",
+   "kind": "attack"
+  },
+  {
+   "id": "at7",
+   "text": "He's away.",
+   "i": 1,
+   "name": "player",
+   "kind": "attack"
+  },
+  {
+   "id": "at8",
+   "text": "Drives forward.",
+   "i": 1,
+   "name": "player",
+   "kind": "attack"
+  },
+  {
+   "id": "dr1",
+   "text": "Takes him on!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "dr2",
+   "text": "Skips past one!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "dr3",
+   "text": "Lovely feet!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "dr4",
+   "text": "Goes past him!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "dr5",
+   "text": "Beats his man!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "dr6",
+   "text": "Runs at the defence!",
+   "i": 1,
+   "name": "player",
+   "kind": "dribble"
+  },
+  {
+   "id": "cr1",
+   "text": "Whips it in!",
+   "i": 1,
+   "name": "player",
+   "kind": "cross"
+  },
+  {
+   "id": "cr2",
+   "text": "Here's the cross!",
+   "i": 1,
+   "name": "player",
+   "kind": "cross"
+  },
+  {
+   "id": "cr3",
+   "text": "Swings it in!",
+   "i": 1,
+   "name": "player",
+   "kind": "cross"
+  },
+  {
+   "id": "cr4",
+   "text": "Looking for a head in the middle!",
+   "i": 1,
+   "name": "player",
+   "kind": "cross"
+  },
+  {
+   "id": "cr5",
+   "text": "The cross comes in.",
+   "i": 1,
+   "kind": "cross"
+  },
+  {
+   "id": "th1",
+   "text": "Threads it through!",
+   "i": 1,
+   "name": "player",
+   "kind": "through"
+  },
+  {
+   "id": "th2",
+   "text": "Picks out the run!",
+   "i": 1,
+   "name": "player",
+   "kind": "through"
+  },
+  {
+   "id": "th3",
+   "text": "Lovely ball in behind!",
+   "i": 1,
+   "kind": "through"
+  },
+  {
+   "id": "th4",
+   "text": "That's a brilliant pass!",
+   "i": 1,
+   "kind": "through"
+  },
+  {
+   "id": "lb1",
+   "text": "Long ball forward.",
+   "i": 0,
+   "kind": "longball"
+  },
+  {
+   "id": "lb2",
+   "text": "Sent long, early.",
+   "i": 0,
+   "kind": "longball"
+  },
+  {
+   "id": "lb3",
+   "text": "Goes long.",
+   "i": 0,
+   "name": "player",
+   "kind": "longball"
+  },
+  {
+   "id": "kb1",
+   "text": "They're stringing the passes together now.",
+   "i": 0,
+   "kind": "keepball"
+  },
+  {
+   "id": "kb2",
+   "text": "Lovely possession, this.",
+   "i": 0,
+   "kind": "keepball"
+  },
+  {
+   "id": "kb3",
+   "text": "Keeping the ball beautifully.",
+   "i": 0,
+   "kind": "keepball"
+  },
+  {
+   "id": "kb4",
+   "text": "Pass after pass from them.",
+   "i": 0,
+   "kind": "keepball"
+  },
+  {
+   "id": "tk1",
+   "text": "Great tackle!",
+   "i": 1,
+   "kind": "tackle"
+  },
+  {
+   "id": "tk2",
+   "text": "Superb challenge!",
+   "i": 1,
+   "kind": "tackle"
+  },
+  {
+   "id": "tk3",
+   "text": "Won it cleanly.",
+   "i": 1,
+   "kind": "tackle"
+  },
+  {
+   "id": "tk4",
+   "text": "Wins it back!",
+   "i": 1,
+   "name": "player",
+   "kind": "tackle"
+  },
+  {
+   "id": "tk5",
+   "text": "What a tackle!",
+   "i": 1,
+   "name": "player",
+   "kind": "tackle"
+  },
+  {
+   "id": "ic1",
+   "text": "Cut out!",
+   "i": 1,
+   "kind": "interception"
+  },
+  {
+   "id": "ic2",
+   "text": "Intercepted!",
+   "i": 1,
+   "kind": "interception"
+  },
+  {
+   "id": "ic3",
+   "text": "Read that one well.",
+   "i": 0,
+   "kind": "interception"
+  },
+  {
+   "id": "ic4",
+   "text": "Reads it!",
+   "i": 1,
+   "name": "player",
+   "kind": "interception"
+  },
+  {
+   "id": "ic5",
+   "text": "Steps in and nicks it!",
+   "i": 1,
+   "name": "player",
+   "kind": "interception"
+  },
+  {
+   "id": "sh1",
+   "text": "Shoots!",
+   "i": 2,
+   "name": "player",
+   "kind": "shot"
+  },
+  {
+   "id": "sh2",
+   "text": "Has a go!",
+   "i": 2,
+   "name": "player",
+   "kind": "shot"
+  },
+  {
+   "id": "sh3",
+   "text": "Lets fly!",
+   "i": 2,
+   "name": "player",
+   "kind": "shot"
+  },
+  {
+   "id": "sh4",
+   "text": "Tries his luck!",
+   "i": 2,
+   "name": "player",
+   "kind": "shot"
+  },
+  {
+   "id": "sh5",
+   "text": "Here's the shot!",
+   "i": 2,
+   "kind": "shot"
+  },
+  {
+   "id": "sh6",
+   "text": "And the shot!",
+   "i": 2,
+   "kind": "shot"
+  },
+  {
+   "id": "gl1",
+   "text": "Goal!",
+   "i": 2,
+   "kind": "goal"
+  },
+  {
+   "id": "gl2",
+   "text": "It's in!",
+   "i": 2,
+   "kind": "goal"
+  },
+  {
+   "id": "gl3",
+   "text": "And it's there!",
+   "i": 2,
+   "kind": "goal"
+  },
+  {
+   "id": "gl4",
+   "text": "He's scored!",
+   "i": 2,
+   "kind": "goal"
+  },
+  {
+   "id": "gl5",
+   "text": "What a finish!",
+   "i": 2,
+   "kind": "goal"
+  },
+  {
+   "id": "gq1",
+   "text": "And they're level!",
+   "i": 2,
+   "kind": "goalLevel"
+  },
+  {
+   "id": "gq2",
+   "text": "That's the equaliser!",
+   "i": 2,
+   "kind": "goalLevel"
+  },
+  {
+   "id": "gq3",
+   "text": "All square again!",
+   "i": 2,
+   "kind": "goalLevel"
+  },
+  {
+   "id": "ga1",
+   "text": "And they're in front!",
+   "i": 2,
+   "kind": "goalAhead"
+  },
+  {
+   "id": "ga2",
+   "text": "That puts them ahead!",
+   "i": 2,
+   "kind": "goalAhead"
+  },
+  {
+   "id": "ga3",
+   "text": "They lead!",
+   "i": 2,
+   "kind": "goalAhead"
+  },
+  {
+   "id": "gm1",
+   "text": "They've doubled their advantage!",
+   "i": 2,
+   "kind": "goalMore"
+  },
+  {
+   "id": "gm2",
+   "text": "Now they're pulling away!",
+   "i": 2,
+   "kind": "goalMore"
+  },
+  {
+   "id": "gm3",
+   "text": "That's a big goal!",
+   "i": 2,
+   "kind": "goalMore"
+  },
+  {
+   "id": "gw1",
+   "text": "Surely that's the winner!",
+   "i": 2,
+   "kind": "goalLate"
+  },
+  {
+   "id": "gw2",
+   "text": "What a moment, at the death!",
+   "i": 2,
+   "kind": "goalLate"
+  },
+  {
+   "id": "gz1",
+   "text": "Late drama! They have the equaliser!",
+   "i": 2,
+   "kind": "goalLate2"
+  },
+  {
+   "id": "gc1",
+   "text": "A consolation, perhaps.",
+   "i": 1,
+   "kind": "goalConsolation"
+  },
+  {
+   "id": "gc2",
+   "text": "Is it too little, too late?",
+   "i": 1,
+   "kind": "goalConsolation"
+  },
+  {
+   "id": "gp1",
+   "text": "What a goal!",
+   "i": 2,
+   "kind": "goalPraise"
+  },
+  {
+   "id": "gp2",
+   "text": "Brilliantly taken!",
+   "i": 2,
+   "kind": "goalPraise"
+  },
+  {
+   "id": "gp3",
+   "text": "Superb finish!",
+   "i": 2,
+   "kind": "goalPraise"
+  },
+  {
+   "id": "gp4",
+   "text": "He made no mistake there!",
+   "i": 2,
+   "kind": "goalPraise"
+  },
+  {
+   "id": "sv1",
+   "text": "Great save!",
+   "i": 2,
+   "kind": "save"
+  },
+  {
+   "id": "sv2",
+   "text": "What a stop!",
+   "i": 2,
+   "kind": "save"
+  },
+  {
+   "id": "sv3",
+   "text": "Kept out!",
+   "i": 2,
+   "kind": "save"
+  },
+  {
+   "id": "sv4",
+   "text": "Denied!",
+   "i": 2,
+   "kind": "save"
+  },
+  {
+   "id": "sv5",
+   "text": "Superb from the goalkeeper!",
+   "i": 2,
+   "kind": "save"
+  },
+  {
+   "id": "sv6",
+   "text": "Gets down well!",
+   "i": 2,
+   "name": "keeper",
+   "kind": "save"
+  },
+  {
+   "id": "sv7",
+   "text": "Saves!",
+   "i": 2,
+   "name": "keeper",
+   "kind": "save"
+  },
+  {
+   "id": "sv8",
+   "text": "Turns it away!",
+   "i": 2,
+   "name": "keeper",
+   "kind": "save"
+  },
+  {
+   "id": "pu1",
+   "text": "Punched clear!",
+   "i": 1,
+   "kind": "punch"
+  },
+  {
+   "id": "pu2",
+   "text": "Fisted away!",
+   "i": 1,
+   "kind": "punch"
+  },
+  {
+   "id": "pu3",
+   "text": "Punches it away!",
+   "i": 1,
+   "name": "keeper",
+   "kind": "punch"
+  },
+  {
+   "id": "ms1",
+   "text": "Just wide!",
+   "i": 2,
+   "kind": "miss"
+  },
+  {
+   "id": "ms2",
+   "text": "Over the bar!",
+   "i": 2,
+   "kind": "miss"
+  },
+  {
+   "id": "ms3",
+   "text": "So close!",
+   "i": 2,
+   "kind": "miss"
+  },
+  {
+   "id": "ms4",
+   "text": "Off target.",
+   "i": 1,
+   "kind": "miss"
+  },
+  {
+   "id": "ms5",
+   "text": "He'll be disappointed with that.",
+   "i": 1,
+   "kind": "miss"
+  },
+  {
+   "id": "ms6",
+   "text": "Wide of the post.",
+   "i": 1,
+   "kind": "miss"
+  },
+  {
+   "id": "ms7",
+   "text": "Not far away.",
+   "i": 1,
+   "kind": "miss"
+  },
+  {
+   "id": "ww1",
+   "text": "Off the post!",
+   "i": 2,
+   "kind": "woodwork"
+  },
+  {
+   "id": "ww2",
+   "text": "It's hit the woodwork!",
+   "i": 2,
+   "kind": "woodwork"
+  },
+  {
+   "id": "ww3",
+   "text": "Off the bar!",
+   "i": 2,
+   "kind": "woodwork"
+  },
+  {
+   "id": "ww4",
+   "text": "Inches away!",
+   "i": 2,
+   "kind": "woodwork"
+  },
+  {
+   "id": "ww5",
+   "text": "Agonisingly close!",
+   "i": 2,
+   "kind": "woodwork"
+  },
+  {
+   "id": "yc1",
+   "text": "That's a booking.",
+   "i": 1,
+   "kind": "yellow"
+  },
+  {
+   "id": "yc2",
+   "text": "Yellow card.",
+   "i": 1,
+   "kind": "yellow"
+  },
+  {
+   "id": "yc3",
+   "text": "The referee shows yellow.",
+   "i": 1,
+   "kind": "yellow"
+  },
+  {
+   "id": "yc4",
+   "text": "Goes into the book.",
+   "i": 1,
+   "name": "player",
+   "kind": "yellow"
+  },
+  {
+   "id": "rc1",
+   "text": "Red card!",
+   "i": 2,
+   "kind": "red"
+  },
+  {
+   "id": "rc2",
+   "text": "He's been sent off!",
+   "i": 2,
+   "kind": "red"
+  },
+  {
+   "id": "rc3",
+   "text": "That's a straight red!",
+   "i": 2,
+   "kind": "red"
+  },
+  {
+   "id": "rc4",
+   "text": "Off he goes!",
+   "i": 2,
+   "kind": "red"
+  },
+  {
+   "id": "rc5",
+   "text": "Is sent off!",
+   "i": 2,
+   "name": "player",
+   "kind": "red"
+  },
+  {
+   "id": "in1",
+   "text": "He's down.",
+   "i": 0,
+   "kind": "injury"
+  },
+  {
+   "id": "in2",
+   "text": "A worry here.",
+   "i": 0,
+   "kind": "injury"
+  },
+  {
+   "id": "in3",
+   "text": "He needs treatment.",
+   "i": 0,
+   "kind": "injury"
+  },
+  {
+   "id": "in4",
+   "text": "Is down, and needs treatment.",
+   "i": 0,
+   "name": "player",
+   "kind": "injury"
+  },
+  {
+   "id": "sb1",
+   "text": "Comes on.",
+   "i": 0,
+   "name": "in",
+   "kind": "sub"
+  },
+  {
+   "id": "sb2",
+   "text": "Coming on to make a difference.",
+   "i": 0,
+   "name": "in",
+   "kind": "sub"
+  },
+  {
+   "id": "sb3",
+   "text": "Fresh legs for them.",
+   "i": 0,
+   "kind": "sub"
+  },
+  {
+   "id": "sb4",
+   "text": "A change being made.",
+   "i": 0,
+   "kind": "sub"
+  },
+  {
+   "id": "hf1",
+   "text": "That's half-time.",
+   "i": 1,
+   "kind": "half"
+  },
+  {
+   "id": "hf2",
+   "text": "The referee blows for half-time.",
+   "i": 1,
+   "kind": "half"
+  },
+  {
+   "id": "hf3",
+   "text": "And that's the end of the first half.",
+   "i": 1,
+   "kind": "half"
+  },
+  {
+   "id": "hn1",
+   "text": "Goalless at the break.",
+   "i": 0,
+   "kind": "halfNil"
+  },
+  {
+   "id": "hh1",
+   "text": "The home side lead at the break.",
+   "i": 0,
+   "kind": "halfHome"
+  },
+  {
+   "id": "ha1",
+   "text": "The visitors lead at the break.",
+   "i": 0,
+   "kind": "halfAway"
+  },
+  {
+   "id": "hl1",
+   "text": "All square at half-time.",
+   "i": 0,
+   "kind": "halfLevel"
+  },
+  {
+   "id": "fu1",
+   "text": "And that's full-time!",
+   "i": 2,
+   "kind": "full"
+  },
+  {
+   "id": "fu2",
+   "text": "The final whistle goes!",
+   "i": 2,
+   "kind": "full"
+  },
+  {
+   "id": "fu3",
+   "text": "It's all over!",
+   "i": 2,
+   "kind": "full"
+  },
+  {
+   "id": "fh1",
+   "text": "The home side take the points.",
+   "i": 1,
+   "kind": "fullHome"
+  },
+  {
+   "id": "fh2",
+   "text": "A win for the home side.",
+   "i": 1,
+   "kind": "fullHome"
+  },
+  {
+   "id": "fa1",
+   "text": "The visitors take the points.",
+   "i": 1,
+   "kind": "fullAway"
+  },
+  {
+   "id": "fa2",
+   "text": "An away win, then.",
+   "i": 1,
+   "kind": "fullAway"
+  },
+  {
+   "id": "fd1",
+   "text": "It ends level.",
+   "i": 1,
+   "kind": "fullDraw"
+  },
+  {
+   "id": "fd2",
+   "text": "The points are shared.",
+   "i": 1,
+   "kind": "fullDraw"
+  },
+  {
+   "id": "fn1",
+   "text": "A goalless draw.",
+   "i": 0,
+   "kind": "fullNil"
+  },
+  {
+   "id": "lt1",
+   "text": "We're into the final minutes.",
+   "i": 1,
+   "kind": "late"
+  },
+  {
+   "id": "lt2",
+   "text": "Not long to go now.",
+   "i": 1,
+   "kind": "late"
+  },
+  {
+   "id": "lt3",
+   "text": "Time is running out.",
+   "i": 1,
+   "kind": "late"
+  },
+  {
+   "id": "rp1",
+   "text": "Let's see that again.",
+   "i": 0,
+   "kind": "replay"
+  },
+  {
+   "id": "rp2",
+   "text": "Here's another look.",
+   "i": 0,
+   "kind": "replay"
+  },
+  {
+   "id": "rp3",
+   "text": "Have a look at this again.",
+   "i": 0,
+   "kind": "replay"
+  },
+  {
+   "id": "s10",
+   "text": "It's one-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s20",
+   "text": "It's two-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s21",
+   "text": "It's two-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s30",
+   "text": "It's three-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s31",
+   "text": "It's three-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s32",
+   "text": "It's three-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s40",
+   "text": "It's four-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s41",
+   "text": "It's four-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s42",
+   "text": "It's four-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s43",
+   "text": "It's four-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s50",
+   "text": "It's five-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s51",
+   "text": "It's five-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s52",
+   "text": "It's five-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s53",
+   "text": "It's five-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s54",
+   "text": "It's five-four.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s60",
+   "text": "It's six-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s61",
+   "text": "It's six-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s62",
+   "text": "It's six-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s63",
+   "text": "It's six-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s64",
+   "text": "It's six-four.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s65",
+   "text": "It's six-five.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s70",
+   "text": "It's seven-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s71",
+   "text": "It's seven-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s72",
+   "text": "It's seven-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s73",
+   "text": "It's seven-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s74",
+   "text": "It's seven-four.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s75",
+   "text": "It's seven-five.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s76",
+   "text": "It's seven-six.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s80",
+   "text": "It's eight-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s81",
+   "text": "It's eight-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s82",
+   "text": "It's eight-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s83",
+   "text": "It's eight-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s84",
+   "text": "It's eight-four.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s85",
+   "text": "It's eight-five.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s86",
+   "text": "It's eight-six.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s87",
+   "text": "It's eight-seven.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s90",
+   "text": "It's nine-nil.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s91",
+   "text": "It's nine-one.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s92",
+   "text": "It's nine-two.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s93",
+   "text": "It's nine-three.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s94",
+   "text": "It's nine-four.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s95",
+   "text": "It's nine-five.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s96",
+   "text": "It's nine-six.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s97",
+   "text": "It's nine-seven.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s98",
+   "text": "It's nine-eight.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s11",
+   "text": "It's one all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s22",
+   "text": "It's two all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s33",
+   "text": "It's three all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s44",
+   "text": "It's four all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s55",
+   "text": "It's five all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "s66",
+   "text": "It's six all.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "sideHome",
+   "text": "To the home side.",
+   "i": 1,
+   "kind": "score"
+  },
+  {
+   "id": "sideAway",
+   "text": "To the visitors.",
+   "i": 1,
+   "kind": "score"
+  }
+ ],
+ "names": [
+  "Abankwah",
+  "Abascal",
+  "Abdulai",
+  "Abernathy",
+  "Abernethy",
+  "Aboagye",
+  "Abreu",
+  "Abubakar",
+  "Achával",
+  "Acheampong",
+  "Ackermann",
+  "Adeleke",
+  "Adesanya",
+  "Adeyemi-Lang",
+  "Adeyinka",
+  "Adjei",
+  "Adomako",
+  "Afful",
+  "Agbaje",
+  "Aguilera",
+  "Aguirre",
+  "Agyapong",
+  "Agyei",
+  "Ainsworth",
+  "Ajayi",
+  "Akande",
+  "Akoto",
+  "Akpan",
+  "Albornoz",
+  "Albrecht",
+  "Albuquerque",
+  "Alcázar",
+  "Aluko",
+  "Alvarado",
+  "Amadi",
+  "Amankwah",
+  "Amaral",
+  "Ampofo",
+  "Amponsah",
+  "Anastasiou",
+  "Anjos",
+  "Annan",
+  "Ansah",
+  "Antwi",
+  "Anyanwu",
+  "Aoyama",
+  "Appleby",
+  "Aragão",
+  "Arakawa",
+  "Arce",
+  "Arriaga",
+  "Asante",
+  "Ashcroft",
+  "Asiedu",
+  "Atkinson",
+  "Aydemir",
+  "Ayensu",
+  "Babangida",
+  "Bachmann",
+  "Baffour",
+  "Balaguer",
+  "Balbuena",
+  "Ballantyne",
+  "Balogun",
+  "Banks",
+  "Barbosa",
+  "Barlow",
+  "Barrenechea",
+  "Barrios",
+  "Bassey-Cole",
+  "Baumgartner",
+  "Beaumont",
+  "Beckett",
+  "Beltrán",
+  "Benedetto",
+  "Bengoetxea",
+  "Bianchi",
+  "Bittencourt",
+  "Blackall",
+  "Blackwood",
+  "Boadu",
+  "Boateng-Price",
+  "Bonsu",
+  "Bradshaw",
+  "Bragança",
+  "Brandão",
+  "Brandstetter",
+  "Brannigan",
+  "Brennan",
+  "Bridges",
+  "Brückner",
+  "Bustos",
+  "Cabral",
+  "Cabrera",
+  "Calderón",
+  "Calhoun",
+  "Calloway",
+  "Cardoso",
+  "Cardozo",
+  "Carmichael",
+  "Carrasco",
+  "Cartwright",
+  "Caruso",
+  "Carvalho",
+  "Casals",
+  "Castañeda",
+  "Castellano",
+  "Cavalcanti",
+  "Cavallaro",
+  "Çelik",
+  "Chadwick",
+  "Chigoziri",
+  "Chukwudi",
+  "Cifuentes",
+  "Colby",
+  "Colombo",
+  "Coolibah",
+  "Coronel",
+  "Corrigan",
+  "Cortés",
+  "Coutinho",
+  "Crane",
+  "Dalgleish",
+  "Dalton",
+  "Damasceno",
+  "Danjuma",
+  "Danso",
+  "Dantas",
+  "Darko",
+  "Dawkins",
+  "Delaney",
+  "Delgado",
+  "Dempsey",
+  "Deng-Harris",
+  "Dietrich",
+  "Donnelly",
+  "Dorn",
+  "Dunstan",
+  "Durañona",
+  "Dwamena",
+  "Easton",
+  "Eastwood",
+  "Eberhardt",
+  "Ebong",
+  "Echeverri",
+  "Echeverría",
+  "Egbuna",
+  "Ekpo",
+  "Engel",
+  "Enomoto",
+  "Escobar",
+  "Eshun",
+  "Espíndola",
+  "Espinosa",
+  "Esposito",
+  "Everingham",
+  "Ezenwa",
+  "Fairbanks",
+  "Fairclough",
+  "Falade",
+  "Falcão",
+  "Falk",
+  "Fariña",
+  "Farrugia",
+  "Feldmann",
+  "Fenwick",
+  "Ferraro",
+  "Figueiredo",
+  "Figueroa",
+  "Fitzgerald",
+  "Fitzroy",
+  "Fonseca",
+  "Fosu-Mensah",
+  "Fuentes",
+  "Fujimoto",
+  "Fukuda",
+  "Furukawa",
+  "Gallagher",
+  "Gallardo",
+  "Galloway",
+  "Galván",
+  "Gambo",
+  "Garrison",
+  "Garside",
+  "Gebhardt",
+  "Giannopoulos",
+  "Giuliani",
+  "Godoy",
+  "Greaves",
+  "Grünewald",
+  "Guerrero",
+  "Guimarães",
+  "Gyamfi",
+  "Gyimah",
+  "Hadley",
+  "Halliwell",
+  "Halloran",
+  "Hamada",
+  "Hargreaves",
+  "Hartigan",
+  "Hartmann",
+  "Hasegawa",
+  "Hawthorne",
+  "Hayashi",
+  "Heidenreich",
+  "Hirano",
+  "Hoffmeister",
+  "Holloway",
+  "Hoshino",
+  "Huang",
+  "Ibáñez",
+  "Ibarra",
+  "Ibarrola",
+  "Ibbotson",
+  "Ibekwe",
+  "Iddrisu",
+  "Idowu",
+  "Igwe",
+  "Ihejirika",
+  "Ikeda",
+  "Ikemefuna",
+  "Imai",
+  "Inoue",
+  "Insaurralde",
+  "Ishikawa",
+  "Iwata",
+  "Jäger",
+  "Jankowski",
+  "Jefferson",
+  "Jovanovic",
+  "Kanayo",
+  "Kaneshiro",
+  "Kavanagh",
+  "Kawasaki",
+  "Kendrick",
+  "Kessler",
+  "Kikuchi",
+  "Kimura",
+  "Kingsford",
+  "Kirchner",
+  "Klostermann",
+  "Kondo",
+  "Kowalczyk",
+  "Kowalski",
+  "Krämer",
+  "Kurosawa",
+  "Kuwabara",
+  "Kyei",
+  "Lacerda",
+  "Lamberti",
+  "Landry",
+  "Langford",
+  "Larrañaga",
+  "Lartey",
+  "Lawal",
+  "Leite",
+  "Lezcano",
+  "Lindeman",
+  "Lindner",
+  "Lindqvist",
+  "Lockwood",
+  "Lombardi",
+  "Lorenz",
+  "Lozano",
+  "Ludueña",
+  "Macarthur",
+  "Macedo",
+  "Mackenzie",
+  "Maddox",
+  "Madrazo",
+  "Madu",
+  "Maeda",
+  "Maidana",
+  "Mansilla",
+  "Manzano",
+  "Marangoni",
+  "Maranhão",
+  "Marlow",
+  "Mata",
+  "Matsumoto",
+  "Mbeki-Hall",
+  "Mbemba-Krause",
+  "McTavish",
+  "Medeiros",
+  "Mendiondo",
+  "Mendizábal",
+  "Mendonça",
+  "Mercer",
+  "Mertens",
+  "Milanovic",
+  "Minagawa",
+  "Miyamoto",
+  "Monteiro",
+  "Montgomery",
+  "Montoya",
+  "Monzón",
+  "Morita",
+  "Mulvaney",
+  "Murakami",
+  "Nagai",
+  "Nakashima",
+  "Nardelli",
+  "Nascimento",
+  "Navarrete",
+  "Navarro",
+  "Nettleton",
+  "Nishimura",
+  "Nkansah",
+  "Nketia",
+  "Noguchi",
+  "Nogueira",
+  "Nolan",
+  "Nordhoff",
+  "Novak",
+  "Nwachukwu",
+  "Nwankwo",
+  "Nwaogu",
+  "Nwosu",
+  "Nyarko",
+  "Oakley",
+  "Obi",
+  "Odukoya",
+  "Oduro",
+  "Ofori",
+  "Ogawa",
+  "Ogbonna",
+  "Ogunleye",
+  "Ojeda",
+  "Okada",
+  "Okafor",
+  "Okafor-Reid",
+  "Okeke",
+  "Okonjo",
+  "Olaniyan",
+  "Olmedo",
+  "Oloyede",
+  "Onishi",
+  "Onuoha",
+  "Onwuzurike",
+  "Oppong",
+  "Ortega",
+  "Ostrowski",
+  "Otoo",
+  "Overbeck",
+  "Owusu-Ansah",
+  "Oyelaran",
+  "Öztürk",
+  "Pacheco",
+  "Paintsil",
+  "Paiva",
+  "Palacios",
+  "Papadopoulos",
+  "Paterson",
+  "Paula",
+  "Pedernera",
+  "Peixoto",
+  "Pellegrino",
+  "Pemberton",
+  "Peñalver",
+  "Pereyra",
+  "Petrosyan",
+  "Pfeiffer",
+  "Prescott",
+  "Pruitt",
+  "Puigdoménech",
+  "Quartey",
+  "Queiroz",
+  "Quigley",
+  "Quintana",
+  "Quiroga",
+  "Radcliffe",
+  "Rademacher",
+  "Rafferty",
+  "Rainford",
+  "Ramsey",
+  "Rangel",
+  "Rattalino",
+  "Rebouças",
+  "Redfern",
+  "Redmond",
+  "Reinhardt",
+  "Rezende",
+  "Rivas",
+  "Robledo",
+  "Rojas",
+  "Romagnoli",
+  "Rosales",
+  "Roselló",
+  "Rosenthal",
+  "Rourke",
+  "Ryder",
+  "Sakamoto",
+  "Sakurai",
+  "Salami",
+  "Salcedo",
+  "Sampaio",
+  "Sandford",
+  "Sandoval",
+  "Santamaría",
+  "Sanusi",
+  "Saravia",
+  "Sardinha",
+  "Sarmiento",
+  "Sarpong",
+  "Sattler",
+  "Scarpetta",
+  "Schreiber",
+  "Schwarzkopf",
+  "Segura",
+  "Seidel",
+  "Sharpe",
+  "Shibata",
+  "Shimizu",
+  "Siqueira",
+  "Soler",
+  "Sowah",
+  "Stanton",
+  "Steinbach",
+  "Sterling",
+  "Stojanovski",
+  "Stratton",
+  "Sugiyama",
+  "Tachibana",
+  "Tagliaferro",
+  "Talbot",
+  "Tandoh",
+  "Tanimoto",
+  "Tavares",
+  "Tavita",
+  "Tawiah",
+  "Teixeira",
+  "Tejada",
+  "Tetteh",
+  "Thackeray",
+  "Thalmann",
+  "Thibodeaux",
+  "Thornley",
+  "Tijani",
+  "Toledo",
+  "Toure",
+  "Tsukamoto",
+  "Uchenna",
+  "Uchida",
+  "Udoh",
+  "Ueda",
+  "Ugarte",
+  "Ullrich",
+  "Umeh",
+  "Underhill",
+  "Underwood",
+  "Urrutia",
+  "Usman",
+  "Valadares",
+  "Valdivia",
+  "Vale",
+  "Vallejos",
+  "Valverde",
+  "Varley",
+  "Vasconcelos",
+  "Velasco",
+  "Vella",
+  "Vera",
+  "Viana",
+  "Vidal-Serra",
+  "Villalba",
+  "Villanueva",
+  "Vogelsang",
+  "Wagenknecht",
+  "Wainwright",
+  "Wakabayashi",
+  "Warburton",
+  "Watanabe",
+  "Weidner",
+  "Wentworth",
+  "Westbrook",
+  "Whitaker",
+  "Whitlam",
+  "Whitlock",
+  "Winkler",
+  "Winstanley",
+  "Wiredu",
+  "Ximenes",
+  "Yamada",
+  "Yamaguchi",
+  "Yamoah",
+  "Yáñez",
+  "Yardley",
+  "Yiadom",
+  "Yilmaz",
+  "Yoon",
+  "Yoshida",
+  "Yusuf",
+  "Zabaleta",
+  "Zakaria",
+  "Zalazar",
+  "Zammit",
+  "Zamora",
+  "Zanetti",
+  "Zeigler",
+  "Zeller",
+  "Ziegler",
+  "Zoricich",
+  "Zubeldía"
+ ]
+}

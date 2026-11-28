@@ -57,6 +57,15 @@ const REPORT = opt('report', null);
 // two), so morph targets can be computed after the optimisation; the skin is stylised; the mouth
 // goes; quantising is left to the athlete build (after the morph targets are added).
 const ATHLETE = args.includes('--athlete');
+// --spine-rest (athlete builds): the pelvis, spine, neck and head keep the game skeleton's own rest
+// orientation instead of being turned onto the body's bone directions. The mannequin's spine bones
+// curve backwards inside its body; turning a straight torso's bones onto that curve made every clip
+// tip the athletes' chest about 12 degrees back. Limbs are still turned (T-pose against A-pose arms).
+const SPINE_REST = args.includes('--spine-rest');
+// The legs and feet too: the athlete stands at his bind pose as the mannequin stands at rest, so the
+// clips must turn his legs and feet exactly as they turn the mannequin's (turned onto the body's bone
+// directions, his feet were pitched toes-up whenever the mannequin's were flat).
+const SPINE = new Set(['pelvis', 'spine_01', 'spine_02', 'spine_03', 'neck_01', 'head', 'head_leaf', ...['thigh', 'calf', 'foot', 'ball', 'ball_leaf'].flatMap(b => [b + '_l', b + '_r'])]);
 const PROVENANCE_PARTS = new Set(['Skin', 'Eyes', 'Eyebrows', 'Eyelashes', 'Skin details']);
 const HEAD_JOINTS = /^(head|neck|neck1|headtop_end)$/i;
 
@@ -334,7 +343,7 @@ function hideCoveredSkin(prims) {
 // the Gaffer rest orientation turned onto the Ara bone's direction (as scripts/anim/retarget.js
 // does). Vertices keep their bind-pose positions, joint indices are remapped, and new inverse bind
 // matrices are written, so the mesh is unchanged at rest and follows the Gaffer skeleton in motion.
-async function rebindToGaffer(doc, mesh) {
+async function rebindToGaffer(doc, mesh, { spineRest = SPINE_REST } = {}) {
   const root = doc.getRoot();
   const skin = root.listSkins()[0];
   const araJoints = skin.listJoints();
@@ -358,6 +367,7 @@ async function rebindToGaffer(doc, mesh) {
   for (const n of order) {
     const a = toAra[n] && araWorld.get(toAra[n]);
     if (!a) { const par = gaf[n].parent; W[n] = par ? { p: W[par].p.clone().add(new THREE.Vector3().fromArray(gaf[n].t).applyQuaternion(W[par].q)), q: W[par].q.clone().multiply(new THREE.Quaternion().fromArray(gaf[n].r)) } : { p: T0P[n].clone(), q: T0W[n].clone() }; continue; }
+    if (spineRest && SPINE.has(n)) { W[n] = { p: a.p.clone().multiplyScalar(scale), q: T0W[n].clone(), A: new THREE.Quaternion() }; continue; }
     const nx = RT.NEXT[n], an = nx && toAra[nx] && araWorld.get(toAra[nx]);
     const A = new THREE.Quaternion();
     if (an) { const dt = T0P[nx].clone().sub(T0P[n]).normalize(), ds = an.p.clone().sub(a.p).normalize(); if (dt.lengthSq() > 0 && ds.lengthSq() > 0) A.setFromUnitVectors(dt, ds); }

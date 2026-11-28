@@ -37,9 +37,25 @@ const WORK = path.join(RAW, 'work');
 const LOD = process.argv.includes('--lod') ? process.argv[process.argv.indexOf('--lod') + 1] : 'full';
 if (!['full', 'match'].includes(LOD)) throw new Error('--lod full|match');
 const SUFFIX = LOD === 'match' ? '-match' : '';
-const OPT_ARGS = LOD === 'match'
+const OPT_ARGS = ['--spine-rest', ...(LOD === 'match'
   ? ['--kit-ratio', '0.2', '--boot-ratio', '0.25', '--head-ratio', '0.34', '--body-ratio', '0.14', '--eye-ratio', '0.3', '--head-error', '0.004', '--body-error', '0.015', '--part-error', '0.008', '--skin', '512']
-  : ['--kit-ratio', '0.4'];
+  : ['--kit-ratio', '0.4', '--head-ratio', '0.85', '--head-error', '0.0012', '--eye-ratio', '0.6'])];
+// Photographic MakeHuman skins (CC0) by heritage and age; each atlas also carries four eyes, one per
+// eye colour of the game's looks (dark brown, light brown, blue, green), side by side under the skin.
+const ARA_TEX = path.join(ROOT, 'FOOTBALL-RALISM-LAB', 'Ara3DGen', 'dist', 'assets', 'textures');
+const SKIN_GROUPS = ['young_caucasian', 'young_african', 'young_asian', 'middleage_caucasian', 'middleage_african', 'middleage_asian'];
+const EYE_CELLS = ['eyes_darkbrown.png', 'eyes_brownlight.png', 'eyes_blue.png', 'eyes_green.png'];
+const SKIN_PX = LOD === 'match' ? 512 : 1024;
+async function skinAtlas(group, S = SKIN_PX) {
+  const E = S / 4, skin = await sharp(path.join(ARA_TEX, `skin_${group}_male.jpg`)).resize(S, S).removeAlpha().toBuffer();
+  const eyes = await Promise.all(EYE_CELLS.map(f => sharp(path.join(ARA_TEX, f)).resize(E, E).removeAlpha().toBuffer()));
+  const png = await sharp({ create: { width: S, height: S + E, channels: 3, background: '#000' } }).composite([{ input: skin, left: 0, top: 0 }, ...eyes.map((e, i) => ({ input: e, left: i * E, top: S }))]).png().toBuffer();
+  // The skin's own average tone (the game tints each player from it to his exact tone).
+  const { data, info } = await sharp(skin).raw().toBuffer({ resolveWithObject: true });
+  let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < data.length; i += info.channels) { const l = (data[i] + data[i + 1] + data[i + 2]) / 3; if (l > 30 && l < 245) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; } }
+  const avg = '#' + [r, g, b].map(v => Math.round(v / Math.max(1, n)).toString(16).padStart(2, '0')).join('');
+  return { png, avg };
+}
 const HAIR_LOD = LOD === 'match' ? 0.42 : 1;            // share of each hairstyle's triangles kept
 const REPORT = path.join(ROOT, 'assets', 'characters', `athletes-report${SUFFIX}.json`);
 const log = (...a) => console.log('[athletes]', ...a);
@@ -338,6 +354,18 @@ async function finish(d, file) {
   await io.write(file, d);
   return stats(d, fs.statSync(file).size);
 }
+{
+  const sm = root.listMaterials().find(m => m.getName() === 'skin'), { png } = await skinAtlas('young_caucasian');
+  sm.getBaseColorTexture().setImage(new Uint8Array(png)).setMimeType('image/png');
+  sm.setRoughnessFactor(0.6);
+}
+const skinFiles = {};
+for (const g of SKIN_GROUPS) {
+  const { png, avg } = await skinAtlas(g), file = `skin-${g}${SUFFIX}.webp`;
+  fs.writeFileSync(path.join(OUT, file), await sharp(png).webp({ quality: LOD === 'match' ? 82 : 88, effort: 6 }).toBuffer());
+  skinFiles[g] = { file, avg, bytes: fs.statSync(path.join(OUT, file)).size };
+  log(`skin ${g}: ${file} ${(skinFiles[g].bytes / 1024).toFixed(0)} KB, average ${avg}`);
+}
 report.base = await finish(doc, path.join(OUT, `athlete${SUFFIX}.glb`));
 log('base written', JSON.stringify(report.base));
 
@@ -368,7 +396,7 @@ for (const [style] of HAIR) {
     if (ratio < 1) { weldPrimitive(p, { tolerance: 0.0001 }); await simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio, error: HAIR_LOD < 1 ? 0.008 : 0.004, lockBorder: false }); compactPrimitive(p); }
     pv.set(p, true);
   }
-  await rebindToGaffer(hd, hm);
+  await rebindToGaffer(hd, hm, { spineRest: true });
   // Grey hair textures (luminance, alpha kept) so the game tints them.
   for (const p of keepPrims) {
     const m = p.getMaterial(), t = m.getBaseColorTexture();
@@ -410,9 +438,9 @@ if (sm && sm.getBaseColorTexture()) {
 let minY = 9, maxY = -9; for (const p of fd.getRoot().listMeshes()[0].listPrimitives()) { const P = p.getAttribute('POSITION'); for (let i = 0; i < P.getCount(); i++) { const y = P.getElement(i, [0, 0, 0])[1]; minY = Math.min(minY, y); maxY = Math.max(maxY, y); } }
 const prevIndex = fs.existsSync(path.join(OUT, 'index.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'index.json'), 'utf8')) : null;
 const hairIndex = Object.fromEntries(Object.entries(report.hair).map(([k, v]) => [k, { file: `hair-${k}${SUFFIX}.glb`, bytes: v.bytes, triangles: v.triangles }]));
-const index = LOD === 'match' ? { ...prevIndex, lods: { ...(prevIndex && prevIndex.lods), match: { base: `athlete${SUFFIX}.glb`, bytes: report.base.bytes, triangles: report.base.triangles, targetScale, skin: skinHex, hair: hairIndex } } } : {
+const index = LOD === 'match' ? { ...prevIndex, lods: { ...(prevIndex && prevIndex.lods), match: { base: `athlete${SUFFIX}.glb`, bytes: report.base.bytes, triangles: report.base.triangles, targetScale, skin: skinHex, skins: skinFiles, hair: hairIndex } } } : {
   version: 2, lods: prevIndex && prevIndex.lods, note: 'The Gaffer athletes: one base with face, heritage, build and age targets, beard and glove shells, and one file per hairstyle (Ara 3D Gen and MakeHuman, CC0; built by tools/character-pipeline/athletes)',
-  base: 'athlete.glb', bytes: report.base.bytes, triangles: report.base.triangles, targets: targetNames, targetScale, targetEncoding: 'int8/127', skin: skinHex, heightM: +(maxY - minY).toFixed(3),
+  base: 'athlete.glb', bytes: report.base.bytes, triangles: report.base.triangles, targets: targetNames, targetScale, targetEncoding: 'int8/127', skin: skinHex, skins: skinFiles, eyes: ['darkbrown', 'brownlight', 'blue', 'green'], restSpine: 'game', heightM: +(maxY - minY).toFixed(3),
   chest: { front: 0.15, back: -0.05 },
   hair: hairIndex,
   beards: Object.keys(report.shells).filter(k => k.startsWith('beard-')).map(k => k.slice(6)),

@@ -1,6 +1,6 @@
 # Claude handover: The Gaffer
 
-*Updated 2026-11-28. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
+*Updated 2026-11-28 (milestone 15). Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
 through `.github/workflows/pages.yml`).*
 
 ## Architecture
@@ -34,11 +34,29 @@ through `.github/workflows/pages.yml`).*
 * **Player Studio:** `studio/` → `public/studio/`, `src/studio/*`, `public/appearance.js`.
 * **Character pipeline (build time):** `tools/character-pipeline/` (its own `npm install`). It turns
   Ara 3D Gen exports into the athletes (and the earlier close-up bodies); see its README.
-* **Sound:** `public/sound.js` (Web Audio synthesis) and `public/commentary.js` (device speech); no
-  audio files.
+* **Sound:**
+  * `public/sound.js` plays the recorded ground: CC0 recordings in `public/audio/stadium/`, built by
+    `tools/stadium-audio/`. The Web Audio synthesis is the fallback.
+  * `public/commentary.js` plays the recorded commentator from `public/audio/commentary/`, recorded
+    with Kokoro by `tools/commentary/`; device speech is an option.
+  * See `docs/AUDIO.md`.
+* **Portraits:** `public/portraits.js` with `renderPortrait` in `match3d.js`. Each player's own
+  athlete is rendered head and shoulders, cached in IndexedDB.
 
 ## Completed in this release
 See `docs/INTEGRATION_CHANGELOG.md`. In short:
+* **Realism milestone (2026-11-28, section 15; evidence in `docs/evidence/m15/`):**
+  * athletes stand upright (the rebind keeps the animation's rest), with photographic skins by
+    heritage and age, four eye colours, image-based light and fuller beards;
+  * portraits are rendered from each player's athlete; the server sends the renderer's look, so
+    Studio changes show everywhere;
+  * gaits are phase-locked and warped to footballers' strides and cadence, with trunk posture;
+  * the dribble rolls with friction, touches are planned at the foot, and the 3D stride lines up so
+    the boot meets the ball;
+  * a recorded British male commentator (Kokoro, offline) and a recorded CC0 ground with event
+    reactions;
+  * the service worker installs again (duplicate file list fixed); Install App button and per-browser
+    help; update notice.
 * **Athletes, dribbling, sound, Lineup and cards (2026-11-28, section 14):**
   * every footballer is an athlete: one base with 37 shape targets (face, heritage, build, age),
     11 modelled hairstyles, beards and keeper gloves; his look gives him a face and build of his own;
@@ -81,15 +99,20 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
 * About one header chance in six is still struck with the foot (it starts while the other side has
   the ball). Keepers now throw or roll the ball out after a catch.
 * **Athletes:**
-  * Stylised from MakeHuman (smoothed skin, real hair), not hand-sculpted stylised art; faces vary
-    within MakeHuman's range. Hairlines of the short styles are cut-outs (soft only with antialiasing).
-  * Eye colour is the same brown for everyone; no tattoos, headbands or sleeves.
+  * MakeHuman-based (photographic skins, modelled hair), not hand-sculpted; faces vary within
+    MakeHuman's range. Hairlines of the short styles are cut-outs (soft only with antialiasing).
+  * No tattoos, headbands or sleeves. Beards are shells (fuller now) rather than strands.
+  * The dribble's leg reach is an overlay on the run, not a dedicated dribbling clip.
+  * Portraits use the club's default home kit (a Studio-designed kit shows in matches, not yet in
+    portraits).
   * Only male athletes. Fingers differ from Ara's by about 15 mm (held poses).
   * The four close-up bodies (`public/models/bodies/`, 2.2 MB) are no longer loaded; deleting them is
     left to the owner.
 * Real-phone frame rate, first-half start on a real GPU, and sound on a real Android or iOS device
   (and as an installed app) are unmeasured. Headless Chrome on this machine renders in software;
-  sound was checked there with phone emulation.
+  sound was checked there with phone emulation. `docs/AUDIO.md` has a checklist for real phones.
+* The commentary library is about 7 MB. The installed app prefetches it for offline play; a
+  browser user streams what a match needs.
 * The soak test's 400 ms/week limit fails when the whole suite runs in parallel on this 4-core
   machine. Run alone it passes (341 ms/week).
 
@@ -112,11 +135,15 @@ cd tools/character-pipeline && node build-bodies.mjs [--export]   # the earlier 
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v28`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v29`).
+* **Audio builds** (Python 3.12 with kokoro-onnx, soundfile and numpy, in a venv outside git):
+  `tools/commentary/README.md` and `tools/stadium-audio/README.md`.
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and
   player identities compatible.
 * Assets: commercial-use licences only, registered before use. Nothing from SoccerDribble (no
   licence from its author). No real clubs' crests, kits or players.
-* `FOOTBALL-RALISM-LAB/`, `.vscode/` and the master prompt file stay out of git.
+* `FOOTBALL-RALISM-LAB/`, `.vscode/`, `public/image/` (the owner's DLS and real-player reference
+  pictures: reference only, never assets) and the master prompt file stay out of git.
+* No photographs of real players; generated faces are not anyone's likeness.

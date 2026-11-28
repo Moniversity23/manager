@@ -1,14 +1,14 @@
 {
- "built": "2026-11-28T03:03:59.543Z",
+ "built": "2026-11-28T06:52:19.739Z",
  "base": {
-  "bytes": 1167516,
+  "bytes": 1179312,
   "triangles": 12812,
   "vertices": 8368,
   "primitives": 10,
   "materials": 7,
   "morphTargets": 37,
   "textures": 7,
-  "textureBytes": 144964,
+  "textureBytes": 156746,
   "joints": 66,
   "animations": 0
  },
@@ -239,47 +239,47 @@
  "hair": {
   "short01": {
    "triangles": 1543,
-   "bytes": 140012
+   "bytes": 140024
   },
   "short02": {
    "triangles": 1403,
-   "bytes": 74184
+   "bytes": 74200
   },
   "short03": {
    "triangles": 807,
-   "bytes": 57220
+   "bytes": 57232
   },
   "short04": {
    "triangles": 682,
-   "bytes": 88876
+   "bytes": 88888
   },
   "afro01": {
    "triangles": 1230,
-   "bytes": 143780
+   "bytes": 143792
   },
   "long01": {
    "triangles": 1207,
-   "bytes": 87060
+   "bytes": 87072
   },
   "braid01": {
    "triangles": 1976,
-   "bytes": 110284
+   "bytes": 110296
   },
   "ponytail01": {
    "triangles": 1347,
-   "bytes": 111344
+   "bytes": 111356
   },
   "cornrows": {
    "triangles": 2318,
-   "bytes": 110676
+   "bytes": 110688
   },
   "mohawk": {
    "triangles": 1261,
-   "bytes": 73736
+   "bytes": 73752
   },
   "buzz": {
    "triangles": 912,
-   "bytes": 56588
+   "bytes": 56600
   }
  },
  "shells": {

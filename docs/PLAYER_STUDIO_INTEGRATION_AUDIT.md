@@ -317,3 +317,63 @@ triangles. Frame rate on a real phone is not measured.
 * The short hairstyles' hairlines are texture cut-outs; they are soft only with antialiasing (on except
   at Low quality).
 * Everyone has brown eyes; there are no tattoos, headbands or sleeves; only male athletes ship.
+
+## Milestone 15: more human athletes, portraits from the athletes (2026-11-28)
+
+**What changed for the Studio.** A player's look is the same everywhere: the server now sends the
+renderer's look in every player summary (`look: mergeForRenderer(player)` in `src/models.js`). That
+is his permanent look, his face seed, his heritage hint and any Player Studio changes. The cards, the
+Lineup, the match, the close-ups and the portraits all draw that one look, so a Studio change shows on
+his portrait as soon as the squad is shown again. A new look gives a new portrait key, so the old
+portrait is not reused.
+
+**Skin, eyes, light**
+* Photographic MakeHuman skins (CC0) in six groups:
+  * young and middle-aged (31 and over);
+  * European, African and East Asian.
+* Each skin is tinted from its own average to the player's tone (`athleteSkinTint`).
+* The bottom of each skin atlas holds four eyes: dark brown, light brown, blue and green. A player's
+  `eyes` picks one in the shader, untinted and glossy.
+* Close-ups use image-based light (a PMREM of three.js's `RoomEnvironment`); matches use a procedural
+  stadium sky. Skin roughness is 0.6, so it is not plastic.
+* Before this, everyone had one stylised skin and brown eyes.
+
+**Posture.** Built with `--spine-rest`: spine, neck, head, legs and feet keep the animation's rest
+orientation. The backward lean (trunk −3.6°) and toes lifted off the grass are gone; measured with the
+lab's `posture()`.
+
+**Beards.** Beards keep their soft edge and are 20% fuller in the middle, so pale skin no longer shows
+through in patches. A black beard is lifted towards a dark brown so its strands catch the light
+instead of reading as a black mask. Grey in a beard is the look's `grey` (salt and pepper with age),
+as intended.
+
+**Portraits** (`public/portraits.js`, `renderPortrait` in `public/match3d.js`)
+* Head and shoulders of his own athlete (full detail):
+  * in his club's home shirt (the club's default kit; goalkeepers in theirs);
+  * from a three-quarter angle, at a 24° field of view;
+  * with a warm key light, a cool fill, a rim light and the room's soft light;
+  * against a dark backdrop tinted by the club's colour.
+* 224 px WebP (PNG on Safari).
+* Rendered one at a time when the browser is idle, by one renderer whose GPU memory is released after
+  45 s without portraits. Each figure's geometry and materials are disposed after its portrait.
+* Kept in memory and in IndexedDB (up to 800), keyed by a hash of the look, the kit and the goalkeeper
+  flag.
+* The drawn portrait shows at once and the render fades in over it.
+* Off with Settings → "Close-ups and portraits" set to classic figures, without WebGL, or with the
+  classic match figures; the drawn portrait then stays.
+* No photographs of anyone are used. The faces are generated from the look; none is a real person's
+  likeness.
+
+**Alternatives evaluated for the characters (desk review of licences and formats; none adopted)**
+
+| Option | Appearance and faces | Animation fit | Phone cost | Licence and access | Effort | Verdict |
+|---|---|---|---|---|---|---|
+| **MakeHuman base through Ara 3D Gen, shape targets, modular hair (current)** | Human proportions; faces vary with 37 targets; photographic skins; hair is cards | On our skeleton already (one rebind) | 1.2 MB match, 2.2 MB close-up, baked once per player | CC0 data, MIT code; no account | Low (scripted, reproducible) | **Kept and improved** |
+| Custom base mesh sculpted in Blender, rigged with Rigify | Best possible: footballer anatomy, hand-made faces | Needs retargeting to our skeleton; Rigify has a different bone layout | Depends on the sculpt; would need the same LOD work | Blender and Rigify are GPL tools; what they make is ours | Very high: weeks of skilled modelling per base and face set | Not possible without an artist |
+| Mixamo characters and animations | Generic, game-ready; not footballers; faces fixed per character | Good mocap, but its own skeleton; retarget needed | Moderate | Free with an Adobe account; may be used in games, not redistributed as raw assets; needs a login, so not scriptable here | Medium | Rejected: account and terms |
+| Rokoko (Studio, Video mocap, asset store) | Animation, not characters | Good for custom clips (e.g. dribbling) | — | Free account; per-asset store terms | Medium; recording needs suits or video | Considered for future dribbling clips; needs the owner's account |
+| Microsoft Rocketbox avatars | Realistic adults with face blendshapes, casual clothes | Own skeleton; retarget and new kit needed | Heavy (tens of thousands of triangles, several textures) | MIT, on GitHub | High (kit, hair and LOD rebuilt) | A candidate for a future close-up base; too heavy for 22 on a phone |
+| Modular heads, bodies and hair as separate meshes | As good as the parts | One skeleton | More draw calls per player | Depends on the parts | Medium | What the current pipeline already does with one base, targets and hair files |
+
+DLS was used as a quality reference only (in `public/image/`, kept out of git). None of its models,
+textures or code were used.

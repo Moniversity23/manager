@@ -41,7 +41,8 @@ function run({ path, secs = 6, fps = 60, speed = 1, hand = null }) {
     ctx.simDribble(v, s, dt);
     const bx = v.ball.x * M[0], by = v.ball.y * M[1], vx = (x1 - x) * 60, vy = (y1 - y) * 60, sp = Math.hypot(vx, vy);
     const along = sp > 0.3 ? ((bx - x) * vx + (by - y) * vy) / sp : null;
-    out.push({ t, bx, by, x, y, sp, along, dist: Math.hypot(bx - x, by - y), jump: prev ? Math.hypot(bx - prev[0], by - prev[1]) / dt : 0, touch: s.touch ? s.touch.t0 : null, owner: s.drib ? `${s.drib.side}:${s.drib.idx}` : null });
+    const across = sp > 0.3 ? (-(bx - x) * vy + (by - y) * vx) / sp : null;
+    out.push({ t, bx, by, x, y, sp, along, across, dist: Math.hypot(bx - x, by - y), jump: prev ? Math.hypot(bx - prev[0], by - prev[1]) / dt : 0, touch: s.touch ? s.touch.t0 : null, foot: s.touch ? s.touch.foot : null, next: s.drib ? s.drib.next : null, owner: s.drib ? `${s.drib.side}:${s.drib.idx}` : null });
     prev = [bx, by];
   }
   return out;
@@ -105,5 +106,43 @@ describe('dribbling in the match view', () => {
     const rows = run({ path: rec, secs: 3 });
     expect(rows[1].jump).toBeLessThan(30);
     expect(share(rows.filter(r => r.t > 1.4 && r.along != null), r => r.along > 0)).toBeGreaterThan(0.95);
+  });
+
+  it('every touch is made at his feet, when he gets to the ball, about when it was planned', () => {
+    for (const mps of [1, 2.5, 4.5, 7.5]) {
+      const rows = run({ path: straight(mps), secs: 8 });
+      const at = rows.filter((r, i) => i > 0 && r.touch != null && r.touch !== rows[i - 1].touch && r.t > 0.6);
+      expect(at.length, `${mps} m/s touches`).toBeGreaterThan(3);
+      // The ball as he plays it: just ahead of his body (within his reach, 0.5 m; at most 0.2 m past it),
+      // a little to one side, never behind him.
+      for (const r of at) {
+        const prev = rows[rows.indexOf(r) - 1];
+        expect(prev.along, `${mps} m/s at ${r.t.toFixed(2)}`).toBeGreaterThan(-0.1);
+        expect(prev.along, `${mps} m/s at ${r.t.toFixed(2)}`).toBeLessThan(0.72);
+        expect(Math.abs(prev.across), `${mps} m/s at ${r.t.toFixed(2)}`).toBeLessThan(0.45);
+      }
+      // Planned: each touch comes within a tenth of a second of when the last one aimed it to.
+      for (let i = 1; i < at.length; i++) { const plan = rows[rows.indexOf(at[i]) - 1].next; expect(Math.abs(at[i].t - plan), `${mps} m/s plan`).toBeLessThan(0.12); }
+    }
+  });
+
+  it('between touches the ball rolls and only slows down (friction on the grass); a touch speeds it up again', () => {
+    const rows = run({ path: straight(4.5), secs: 6 }), s = rows.filter(r => r.t > 0.6);
+    let rises = 0, n = 0;
+    for (let i = 2; i < s.length; i++) {
+      if (s[i].touch !== s[i - 1].touch || s[i - 1].touch !== s[i - 2].touch) continue;   // a touch in between
+      n++; if (s[i].jump > s[i - 1].jump + 0.05) rises++;
+    }
+    expect(n).toBeGreaterThan(200);
+    expect(rises / n).toBeLessThan(0.01);
+  });
+
+  it('close control alternates the feet; running with it he mostly uses his stronger foot', () => {
+    const feet = mps => { const rows = run({ path: straight(mps), secs: 8 }); return rows.filter((r, i) => i > 0 && r.touch != null && r.touch !== rows[i - 1].touch && r.t > 0.6).map(r => r.foot); };
+    const slow = feet(1.5), fast = feet(7);
+    const alt = slow.slice(1).filter((f, i) => f !== slow[i]).length / (slow.length - 1);
+    expect(alt).toBeGreaterThan(0.8);
+    const main = Math.max(fast.filter(f => f === 1).length, fast.filter(f => f === -1).length) / fast.length;
+    expect(main).toBeGreaterThan(0.7);
   });
 });

@@ -11,6 +11,9 @@ const PERSONALITY = ['Professional', 'Ambitious', 'Lazy', 'Leader', 'Temperament
 // Names come from the player's nation (src/names.js).
 const { poolFor } = require('./names');
 const LOOK = require('./look');
+// The look the renderers draw (his permanent look, his face seed, and any Player Studio changes), so
+// his portrait, his close-ups and his figure on the pitch are the same man.
+const { mergeForRenderer } = require('./studio/appearanceService');
 
 const POS_BOOSTS = {
   GK: ['strength', 'defending', 'vision'],
@@ -150,7 +153,7 @@ class Player {
       hiddenPotential: this.hiddenPotential, currentAbility: ovr, attributes: attrs,
       history: this.history, seasonStats: this.seasonStats, region: this.region,
       hint: this.hint(), marketValue: value ?? null,
-      ovr, pot: this.hiddenPotential, fit: Math.round(this.fitness), mor: Math.round(this.morale), look: LOOK.describe(this.look ?? LOOK.makeLook(this.id, this.nation, this.position), this.age),
+      ovr, pot: this.hiddenPotential, fit: Math.round(this.fitness), mor: Math.round(this.morale), look: mergeForRenderer(this),
       pers: this.personality, attrs,
       form: this.ratings && this.ratings.length ? Math.round(this.ratings.reduce((a, b) => a + b, 0) / this.ratings.length * 10) / 10 : null,
       progress: this.seasonStartAbility != null ? ovr - this.seasonStartAbility : null,

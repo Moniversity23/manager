@@ -1,131 +1,186 @@
 {
- "note": "Every athlete file that ships (public/models/athletes), with its size and SHA-256. Built by tools/character-pipeline/athletes/build-athletes.mjs (full) and the same with --lod match; see assets/characters/athletes-report.json and athletes-report-match.json.",
+ "note": "Every athlete file that ships (public/models/athletes), with its size and SHA-256. Built by tools/character-pipeline/athletes/build-athletes.mjs (full) and the same with --lod match; see assets/characters/athletes-report.json and athletes-report-match.json. Skin atlases (skin-<heritage and age>[-match].webp) since milestone 15.",
  "built": "2026-11-28",
  "files": [
   {
    "file": "athlete-match.glb",
-   "bytes": 1167516,
-   "sha256": "fec81906619230f2be2db99914b0de22eb8ec2b69945ceadb2be867fe437a0cd"
+   "bytes": 1179312,
+   "sha256": "af2735d16e70a7393cfae9d285d1101628571145a3a7d2f8e31519fc047ecc0b"
   },
   {
    "file": "athlete.glb",
-   "bytes": 1826540,
-   "sha256": "005302a913b254eda6465a0024e755370542f386bd91320d33b74b02b8783f32"
+   "bytes": 2190312,
+   "sha256": "b569ef2c647fca2d33cb0bfa71926ef089bdc95b820cc6d86dd9c0ab48a9c598"
   },
   {
    "file": "hair-afro01-match.glb",
-   "bytes": 143780,
-   "sha256": "cda4b37e7f92c24187bd8089e379b276d8b2ff5877b6abb69ad4c9b0c00dec85"
+   "bytes": 143792,
+   "sha256": "4bcca399b96da6bb31d56764d636f349536b6c7ed38ab04e4faebe1e8012d8df"
   },
   {
    "file": "hair-afro01.glb",
-   "bytes": 171304,
-   "sha256": "92c980213552376a8e929c25106bf74ce1127e6e1b8794e34ae6a42ebe0b51ae"
+   "bytes": 171316,
+   "sha256": "415ce5ca6fbf48876ae61943189e133ceb10dde59c897156848b09d118701b06"
   },
   {
    "file": "hair-braid01-match.glb",
-   "bytes": 110284,
-   "sha256": "3fbc8d9d582bc5eb93b06eff3ec59b580c5150423de8063b49dbdc2a97d61d2a"
+   "bytes": 110296,
+   "sha256": "1cdbfe0452fe1fc5f22c2657f963548af7e923792fed1b3e77b1229f29293416"
   },
   {
    "file": "hair-braid01.glb",
-   "bytes": 156764,
-   "sha256": "09985736811057c328f326186b474a80d0d5dd86eab1770a9e121043a07a9e8a"
+   "bytes": 156780,
+   "sha256": "8429af40ae91fc0fb259c7ddb5e7983d5a3a97e2ef01de31a418016191ff5f30"
   },
   {
    "file": "hair-buzz-match.glb",
-   "bytes": 56588,
-   "sha256": "69c66ac83157958af635e92ce6c1ba67f9c479be1ead00f1b9faf598ef2357dd"
+   "bytes": 56600,
+   "sha256": "a5e88ae2065c6e76fd2c265bbd999108ba54df89b353b7f8d3824ccc1ab671fb"
   },
   {
    "file": "hair-buzz.glb",
-   "bytes": 88636,
-   "sha256": "47718f4fe938e7f774c87bec5dc4ad26a6264b15cdb332fe025860299798345a"
+   "bytes": 88648,
+   "sha256": "fdbda2005576f1ba1f66bfbf02a4101d9fb2bf276cf496f5beefa04b7207af9e"
   },
   {
    "file": "hair-cornrows-match.glb",
-   "bytes": 110676,
-   "sha256": "9a14a2f1b92f6de991dac10350d421c93306a6f86a769d78a121718af611ef61"
+   "bytes": 110688,
+   "sha256": "f85d91a57d3fc6ab81d092d94f7e406b2b107d9bb74727246d972774de082bbe"
   },
   {
    "file": "hair-cornrows.glb",
-   "bytes": 194220,
-   "sha256": "3a6c2d696474553d976e2758e90aaac64e598883a604f1230b27b8a305c737f2"
+   "bytes": 194232,
+   "sha256": "12f06db96ad890115234cb9b8c28192ea9c5c47813077adcba453c03764bd01f"
   },
   {
    "file": "hair-long01-match.glb",
-   "bytes": 87060,
-   "sha256": "dc49f8780732d4214c475a01cb7c6086de33de803100dad938519950aa5a02d3"
+   "bytes": 87072,
+   "sha256": "55026e95801111b652210bafb101485b4cdb1d920edc0755343ccf97b28d5080"
   },
   {
    "file": "hair-long01.glb",
-   "bytes": 144224,
-   "sha256": "f4f89fcb746e798d76a5e6da0b8d03c58ea29223228fa62a73aff40c4485412c"
+   "bytes": 144236,
+   "sha256": "cb98e1d3677dd7075f580805a40358e8d1dfd114b41c17f52e8297ed95821a91"
   },
   {
    "file": "hair-mohawk-match.glb",
-   "bytes": 73736,
-   "sha256": "f779772b4afe5de3f1206ca51bf8b41b327fa3ff97c1f1b39abcfaf5a44e6166"
+   "bytes": 73752,
+   "sha256": "7d994335f599d1b86de2c091d4aa679afebe90f12a32cca17219b20107f94601"
   },
   {
    "file": "hair-mohawk.glb",
-   "bytes": 120348,
-   "sha256": "76b98684a5adc4d4b452213251a77453f0350bf8b5a49a9f721de575294bfd9c"
+   "bytes": 120364,
+   "sha256": "53b9bbb135fe09e0f2d99e95e5e37efd68abcf35edb07ec0003f251e3a71c9a3"
   },
   {
    "file": "hair-ponytail01-match.glb",
-   "bytes": 111344,
-   "sha256": "038785dff60eef066d0e297ee991c84f6608db601725e19f0feed4c226ea6b19"
+   "bytes": 111356,
+   "sha256": "58c9cbc9e55d2e2e364249c1d60cc213104c103cc8412bbfd68eff6f90408a1d"
   },
   {
    "file": "hair-ponytail01.glb",
-   "bytes": 170448,
-   "sha256": "3de21ec9711569294638d233b7657d961cafe83a3cbe972ac7d6528ff19a8d1e"
+   "bytes": 170460,
+   "sha256": "58c737a1f746776581f752022a45bb36cd7cf756187cff932fc2c405f4ad1087"
   },
   {
    "file": "hair-short01-match.glb",
-   "bytes": 140012,
-   "sha256": "8cb997d0b0517eff5544fd11e1e61f74398db5b7218e4a9bd041a7f53fcb81bb"
+   "bytes": 140024,
+   "sha256": "b47406706b0f2ca1d5429f70bc3edda9b5c146eecaf8af580eae8759bd8b9736"
   },
   {
    "file": "hair-short01.glb",
-   "bytes": 208880,
-   "sha256": "8f81f2c083871e38690b331e1f7bb85e8639bd331f511ed9eb9b739b36d3e4bc"
+   "bytes": 208892,
+   "sha256": "f377a4fff505aee1f5255dc699c2ff65f24c0e1cc2e1f8f80d8c9955d3c52d93"
   },
   {
    "file": "hair-short02-match.glb",
-   "bytes": 74184,
-   "sha256": "1f3e6313f05c03c08874be1b95a68b833131454924c1ce7888077db3cca73029"
+   "bytes": 74200,
+   "sha256": "b3599048007d8b3234dea484ce9ea920f7b9f8506bdb971896c54244cdcdf1d3"
   },
   {
    "file": "hair-short02.glb",
-   "bytes": 132204,
-   "sha256": "8224b8e52b1413831ccde978776ee6971b8de96b983d6a391f18962cd67c196f"
+   "bytes": 132216,
+   "sha256": "95699788c5e1d3753af7b5cb710b44e8aa8ad4b257389f6468a161643cdd3d07"
   },
   {
    "file": "hair-short03-match.glb",
-   "bytes": 57220,
-   "sha256": "3c526c6bf2898ef843edf1dbff5e07c38975314219a6c4aab08cbe29487166d5"
+   "bytes": 57232,
+   "sha256": "bc439c66c23ca254dff2affbb6dcff70fe188d6a58af3f380fa98144343a8963"
   },
   {
    "file": "hair-short03.glb",
-   "bytes": 86276,
-   "sha256": "e9dc4e78add0dc4e2489d0d5b1f0ca37505427ca84a1b51aa06b23932651ae5e"
+   "bytes": 86288,
+   "sha256": "b921a49d3255e0abe7c9e8d50eb3e3273c7a380d4b4f19a954928010368b9586"
   },
   {
    "file": "hair-short04-match.glb",
-   "bytes": 88876,
-   "sha256": "d6d9944aeda093a667735bb927abac05a5cd04dce33e69863c3eeb87f1e3d170"
+   "bytes": 88888,
+   "sha256": "6ad55cafd40ab794b6be24448710edadd32c7b1536a94fd021601640f96acd65"
   },
   {
    "file": "hair-short04.glb",
-   "bytes": 101844,
-   "sha256": "df8a697f2c4acd2885f8d3a21342c1ed60a9ada72b676e4c0f30c72c9d5d7cfe"
+   "bytes": 101856,
+   "sha256": "8fbbc3fe73cd81e1697913a08bc11a61a0c35f7e745c6e00c02f29cfd480362a"
   },
   {
-   "file": "index.json",
-   "bytes": 5143,
-   "sha256": "6759b7f073e36812eab719903fcaff3824fef5b82c0728651f7b6b5a0c3f1681"
+   "file": "skin-middleage_african-match.webp",
+   "bytes": 14720,
+   "sha256": "ab970839b3b8261ea7c294b7dd2c5ae527fbea15c13ddd146738f78c23de7180"
+  },
+  {
+   "file": "skin-middleage_african.webp",
+   "bytes": 64716,
+   "sha256": "1eb27e97b8750cf948b8107d70d583a00f8d43115a78d5f3ad4274e85961f30c"
+  },
+  {
+   "file": "skin-middleage_asian-match.webp",
+   "bytes": 18366,
+   "sha256": "e53f114818d5f52bd828443b9f490225357a9e308af16d853e623a3e34705550"
+  },
+  {
+   "file": "skin-middleage_asian.webp",
+   "bytes": 91000,
+   "sha256": "4a9f27c26d1b70bdaee4792e824a171c596c7549415064948d53ce1a7d0db147"
+  },
+  {
+   "file": "skin-middleage_caucasian-match.webp",
+   "bytes": 17692,
+   "sha256": "4cfec3c99c35ceec97b535688bd895d3e10f85d2dabeb72aa655687afdf7c195"
+  },
+  {
+   "file": "skin-middleage_caucasian.webp",
+   "bytes": 86450,
+   "sha256": "8315529b6f87fd1c852cd28394a9d59b4b7838d17719461efeaf5c1e9acc68cf"
+  },
+  {
+   "file": "skin-young_african-match.webp",
+   "bytes": 15850,
+   "sha256": "e458c8f2921053a91ca6ebc76a02174d6a748ebc745a66585d47e95c5ec506d6"
+  },
+  {
+   "file": "skin-young_african.webp",
+   "bytes": 62346,
+   "sha256": "ea0bbdf2eb641e9dd56f535ea2b21df53007d8118fdc8402b5a313976fbe127c"
+  },
+  {
+   "file": "skin-young_asian-match.webp",
+   "bytes": 17498,
+   "sha256": "d92f48bb6856e26b69179d1e1b4ab9916df6c27bc1e973aa172ee4a3d928113c"
+  },
+  {
+   "file": "skin-young_asian.webp",
+   "bytes": 78790,
+   "sha256": "19b14d5faf04df01fee788e04e7933d838393c626df7e85a2b38659fca5383d8"
+  },
+  {
+   "file": "skin-young_caucasian-match.webp",
+   "bytes": 18178,
+   "sha256": "ff2b81e03e2d64e7892ae13ef857daa1797f49ade5eb08b2a4e6cff9244b3503"
+  },
+  {
+   "file": "skin-young_caucasian.webp",
+   "bytes": 83260,
+   "sha256": "be86ea460b898303ab92bf2a8e04d77ee685d582a08c486f74234174dce4efb7"
   }
  ]
 }

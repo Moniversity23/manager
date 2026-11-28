@@ -764,16 +764,117 @@ async function fetchFootballer(base = new URL('./models/', import.meta.url).href
   const [gltf, anims] = await Promise.all([new GLTFLoader().loadAsync(base + 'footballer.glb'), fetch(base + 'footballer-anims.json').then(r => { if (!r.ok) throw new Error('animations ' + r.status); return r.json(); })]);
   const clips = {};
   for (const [k, c] of Object.entries(anims.clips)) clips[k] = { clip: THREE.AnimationClip.parse({ name: k, duration: c.duration, tracks: c.tracks, uuid: THREE.MathUtils.generateUUID() }), loop: c.loop, contact: c.contact, foot: c.foot };
+  for (const [k, [src, amt]] of Object.entries(STRIDE_WARP)) if (clips[src]) clips[k] = { clip: warpClip(clips[src].clip, k, amt), loop: true };
   // Model height (bind pose) for scaling players to their real heights.
   const box = new THREE.Box3().setFromObject(gltf.scene);
   FOOTBALLER = { scene: gltf.scene, clips, height: box.max.y - box.min.y || 1.83, clone: SU.clone };
   return FOOTBALLER;
 }
 
-const LOCO = ['idle', 'walk', 'jog', 'sprint', 'back', 'strafeL', 'strafeR', 'ready', 'gkReady', 'tired', 'injuredWalk'];
+const LOCO = ['idle', 'walk', 'jogShort', 'run', 'jog', 'sprintRun', 'sprintFull', 'sprint', 'back', 'strafeL', 'strafeR', 'ready', 'gkReady', 'tired', 'injuredWalk'];
+// ── Football locomotion ──
+// The motion-captured jog and sprint have long, bounding strides (about 3 m a step at their natural
+// pace). At a footballer's usual 2-4 m/s they either slid over the grass or played in slow motion at
+// under 60 steps a minute. Shorter-striding gaits are made from them by bringing each limb's swing
+// towards its mean pose (the share of the swing kept is the second number), so a jog takes the
+// quick, short steps of a real one and a sprint the fast ones of a footballer at full speed.
+// Chosen so each gait's stride per cycle matches real footballers at its speed: about 1.9 m jogging
+// at 2.5 m/s (160 steps a minute), 2.9 m running at 4, 3.6 m at 5.5 and 4.3 m sprinting at 7.5 (210).
+// The athletes' legs are a little shorter for their height than the mannequin's (MakeHuman
+// proportions), so their versions keep more of the swing (the A clips, used under the same names).
+const STRIDE_WARP = { jogShort: ['jog', 0.32], run: ['jog', 0.42], sprintRun: ['sprint', 0.66], sprintFull: ['sprint', 0.74],
+  jogShortA: ['jog', 0.38], runA: ['jog', 0.49], sprintRunA: ['sprint', 0.69], sprintFullA: ['sprint', 0.79] };
+const WARP_BONES = /^(thigh|calf|foot|ball|upperarm|lowerarm|hand|clavicle)_[lr]$/;
+function warpClip(src, name, k) {
+  const tracks = src.tracks.map(tr => {
+    const bone = tr.name.split('.')[0];
+    if (tr.name.endsWith('.quaternion') && (WARP_BONES.test(bone) || bone === 'pelvis')) {
+      const v = tr.values, n = v.length / 4, kk = bone === 'pelvis' ? (1 + k) / 2 : k;
+      const m = new THREE.Quaternion(0, 0, 0, 0), q = new THREE.Quaternion(), q0 = new THREE.Quaternion().fromArray(v, 0);
+      for (let i = 0; i < n; i++) { q.fromArray(v, i * 4); if (q.dot(q0) < 0) q.set(-q.x, -q.y, -q.z, -q.w); m.x += q.x; m.y += q.y; m.z += q.z; m.w += q.w; }
+      m.normalize();
+      const out = new Float32Array(v.length);
+      for (let i = 0; i < n; i++) { q.fromArray(v, i * 4); if (q.dot(m) < 0) q.set(-q.x, -q.y, -q.z, -q.w); m.clone().slerp(q, kk).toArray(out, i * 4); }
+      return new THREE.QuaternionKeyframeTrack(tr.name, Array.from(tr.times), Array.from(out));
+    }
+    if (bone === 'pelvis' && tr.name.endsWith('.position')) {
+      // The bounce of the hips (their height, the axis with the largest mean) shrinks with the stride.
+      const v = tr.values, n = v.length / 3, mean = [0, 0, 0];
+      for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) mean[c] += v[i * 3 + c] / n;
+      const up = mean.map(Math.abs).indexOf(Math.max(...mean.map(Math.abs))), out = Array.from(v);
+      for (let i = 0; i < n; i++) out[i * 3 + up] = mean[up] + (v[i * 3 + up] - mean[up]) * k;
+      return new THREE.VectorKeyframeTrack(tr.name, Array.from(tr.times), out);
+    }
+    return tr.clone();
+  });
+  return new THREE.AnimationClip(name, src.duration, tracks);
+}
+// The forward gaits, slowest first, each with the speed (m/s per unit of the player's height scale)
+// at which it is used alone; between two, both are blended.
+const GAIT_STEPS = [['walk', 1.3], ['jogShort', 2.5], ['run', 4.0], ['sprintRun', 5.5], ['sprintFull', 7.5]];
+// Each gait's natural speed (its planted foot does not slide over the grass) and where in its cycle
+// the left foot lands, measured on the figures in the athlete lab (gait2). One shared phase drives
+// every forward gait, so blended gaits put their feet down together.
+const GAIT_DATA = {
+  athlete: { walk: [0.83, 0.076], jogShort: [1.78, 0.891], run: [2.5, 0.891], sprintRun: [3.8, 0.896], sprintFull: [5.47, 0.896] },
+  mannequin: { walk: [0.915, 0.092], jogShort: [1.6, 0.876], run: [2.5, 0.883], sprintRun: [4.52, 0.89], sprintFull: [5.49, 0.891] },
+};
+// How far the trunk is brought back towards a footballer's lean in each gait (radians; the clips lean
+// 13-42 degrees, real players about 4 walking, 9-11 jogging and running and 15-18 sprinting).
+const LEAN_BACK = {
+  athlete: { walk: 0.16, jogShort: 0.45, run: 0.42, sprintRun: 0.6, sprintFull: 0.55 },
+  mannequin: { walk: 0.07, jogShort: 0.32, run: 0.3, sprintRun: 0.48, sprintFull: 0.43 },
+};
+function trunkPosture(u, dt) {
+  const B = u.bones; if (!B) return;
+  const L = LEAN_BACK[u.athlete ? 'athlete' : 'mannequin'];
+  let back = 0; for (const k in L) back += (u.w[k] || 0) * L[k];
+  // Accelerating, a player leans into it; slowing down, he straightens (smoothed over ~0.3 s).
+  const acc = u.prevSpd == null ? 0 : (u.spd - u.prevSpd) / Math.max(1e-3, dt); u.prevSpd = u.spd;
+  u.accLean = (u.accLean || 0) + (Math.max(-0.1, Math.min(0.22, acc * 0.045)) - (u.accLean || 0)) * Math.min(1, dt * 3.5);
+  const ang = back - u.accLean;
+  if (Math.abs(ang) < 0.003) return;
+  const f = u.face; _side.set(Math.sin(f), 0, Math.cos(f));
+  turnBone(B.s1, _side, ang * 0.4); turnBone(B.s2, _side, ang * 0.3); turnBone(B.s3, _side, ang * 0.3);
+}
+// A dribbling touch: the leg that plays the ball reaches forward to it, from 0.2 s before contact
+// (in view seconds) to just after, on top of the running stride (hip forward, knee straightening, toes
+// down: the laces or the inside of the boot on the ball). The view then closes the last few
+// centimetres between that boot and the ball at contact (dribbleContact).
+const DRIB_EARLY = 0.06, DRIB_IN = 0.2, DRIB_OUT = 0.14;
+function dribbleWeight(u, D) {
+  // The foot: the one his stride lined up, or (walking or standing, with no stride to line up) the
+  // one the dribble planned.
+  const due = u.dribFoot || D.foot;
+  if (D.t0 !== u.dribT0) { if (u.dribT0 != null) u.touchFoot = u.lastDue || D.lastFoot; u.dribT0 = D.t0; }   // a touch has just been made
+  if (D.eta != null && D.eta >= 0 && D.eta < DRIB_IN) { u.lastDue = due; return { w: 1 - (D.eta / DRIB_IN) ** 2, foot: due }; }
+  if (D.since != null && D.since >= 0 && D.since < DRIB_OUT) return { w: 1 - (D.since / DRIB_OUT) ** 2, foot: u.touchFoot || D.lastFoot || due };
+  return null;
+}
+function dribbleReach(u, D) {
+  const r = dribbleWeight(u, D), B = u.bones; if (!r || !r.foot || r.w <= 0) return;
+  u.reach = r;
+  const f = u.face; _side.set(Math.sin(f), 0, Math.cos(f));
+  const L = r.foot < 0;
+  turnBone(L ? B.thl : B.thr, _side, 0.18 * r.w);
+  turnBone(L ? B.cal : B.car, _side, 0.14 * r.w);
+  turnBone(L ? B.ftl : B.ftr, _side, -0.1 * r.w);
+}
+// Where the dribbler's boot meets the ball now, and how much of the ball's place it should take
+// (null outside a touch): just ahead of the toe joint of whichever boot is nearer the ball (the
+// touching foot, or the other when the stride and the touch disagree), on the grass.
+function dribbleContact(u, D, bx, bz) {
+  const r = D && dribbleWeight(u, D), B = u.bones; if (!r || !r.foot || !B || !B.toel || !B.toer) return null;
+  const f = u.face, at = b => { const p = b.getWorldPosition(new THREE.Vector3()); return [p.x + Math.cos(f) * BALL_R, p.z - Math.sin(f) * BALL_R]; };
+  const L = at(B.toel), R = at(B.toer), d = q => Math.hypot(q[0] - bx, q[1] - bz), q = d(L) < d(R) ? L : R;
+  return { x: q[0], z: q[1], w: Math.min(1, r.w * 1.25), f };
+}
 const CEL = ['celFist', 'celVictory', 'celJump', 'celFlip', 'celDab'];
 // Ground speed (m/s at our figure scale) at which each locomotion clip's feet don't slide.
-const STRIDE = { walk: 1.7, jog: 3.9, sprint: 7.2, back: 1.5, strafeL: 1.6, strafeR: 1.6, injuredWalk: 1.0 };
+// Taller players take longer strides: the clips play a little slower for them (from the packed height,
+// 0 = 165 cm, or the height in centimetres).
+const gaitOf = lk => 1 + (((lk && (lk.height ?? (lk.heightCm ? lk.heightCm - 165 : null))) ?? 20) - 20) * 0.004;
+const STRIDE = { back: 1.16, strafeL: 1.4, strafeR: 1.4, injuredWalk: 0.9 };
 
 // Keeps an object upright in the figure's frame while it rides on a bone (head, shirt number…).
 // worldOffset is in the figure's frame (+X forward, +Y up); worldScale is the size the object should
@@ -847,7 +948,8 @@ function makeFootballer(F, geo, m) {
   });
   const bone = name => model.getObjectByName(name);
   const headBone = bone('head'), spine = bone('spine_03'), handR = bone('hand_r');
-  const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
+  const bones = { s1: bone('spine_01'), s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01'),
+    thl: bone('thigh_l'), thr: bone('thigh_r'), cal: bone('calf_l'), car: bone('calf_r'), ftl: bone('foot_l'), ftr: bone('foot_r'), toel: bone('ball_l'), toer: bone('ball_r') };
   shapeBody(model, bone, lk);
   // His own head: face, ears, nose, hair and beard from his permanent look.
   const head = buildHead(geo, m, lk);
@@ -880,7 +982,7 @@ function makeFootballer(F, geo, m) {
   }
   for (const k of LOCO) if (act[k]) { act[k].enabled = true; act[k].setEffectiveWeight(k === 'idle' ? 1 : 0); act[k].time = Math.random() * act[k].getClip().duration; act[k].play(); }
   g.userData = { mixer, act, model, holder, head, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F, bones: bones.s2 && bones.s3 ? bones : null,
-    armR: { hand: handR || head }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(k => [k, k === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004 };
+    armR: { hand: handR || head }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(k => [k, k === 'idle' ? 1 : 0])), gait: gaitOf(lk) };
   return g;
 }
 
@@ -968,7 +1070,7 @@ function athleteBase(lod = 'full') {
     head.divideScalar(Math.max(1, n));
     let headR = 0; for (let i = 0; i < sp.length; i += 3) if (sp[i + 1] > 1.52) headR = Math.max(headR, Math.hypot(sp[i] - head.x, sp[i + 1] - head.y, sp[i + 2] - head.z));
     const sk = parts.skin.skeleton;
-    return { lod, index, scene: gltf.scene, parts, clone: SU.clone, height: index.heightM || 1.7, skin: index.skin || '#c5a28c', chest: index.chest || { front: 0.15, back: -0.05 }, head, headR,
+    return { lod, index, skins: index.skins || {}, skinTex: {}, scene: gltf.scene, parts, clone: SU.clone, height: index.heightM || 1.7, skin: index.skin || '#c5a28c', chest: index.chest || { front: 0.15, back: -0.05 }, head, headR,
       bones: sk.bones.map(b => b.name), inv: sk.boneInverses, bytes: index.bytes, triangles: index.triangles, loadMs: Math.round(performance.now() - t0) };
   })().catch(e => { delete ATH_P[lod]; throw e; });
   return ATH_P[lod];
@@ -1056,22 +1158,92 @@ function bakeAthlete(gm, w) {
   for (let o = 0; o < nrm.length; o += 3) { const l = Math.hypot(nrm[o], nrm[o + 1], nrm[o + 2]) || 1; nrm[o] /= l; nrm[o + 1] /= l; nrm[o + 2] /= l; }
   return { pos, geo: sharedGeometry(gm, pos, nrm) };
 }
-// Skin: the base's light, neutral texture multiplied to his exact tone (in linear light, so any tone
-// from very light to very dark), except the eyes, which share the texture (its bottom strip).
-function athleteSkinTint(A, skinIndex) {
-  const want = new THREE.Color(ATH_SKIN[skinIndex] || ATH_SKIN[2]), have = new THREE.Color(A.skin);
-  const r = (a, b) => Math.max(0.03, Math.min(1.8, a / Math.max(0.01, b)));
+// Skin: a photographic MakeHuman skin of his heritage and age (European, African or East Asian;
+// young, or middle-aged from 31), multiplied from that skin's own average to his exact tone. The
+// eyes share the texture (its bottom strip holds four, one per eye colour of the looks).
+function athleteSkinGroup(lk) {
+  const sk = lk && lk.skin != null ? lk.skin : 2;
+  const her = lk && (lk.heritage === 'east-asian' || lk.baseBody === 'm-asian') ? 'asian' : sk >= 4 ? 'african' : 'caucasian';
+  return `${lk && lk.age >= 31 ? 'middleage' : 'young'}_${her}`;
+}
+const ATH_SKINS = new Map();
+function athleteSkinTexture(A, group) {
+  const e = A.skins[group]; if (!e) return Promise.resolve(null);
+  const key = A.lod + ':' + group;
+  if (!ATH_SKINS.has(key)) ATH_SKINS.set(key, new THREE.TextureLoader().loadAsync(ATH_URL + e.file).then(t => { t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; A.skinTex[group] = t; return t; })
+    .catch(err => { ATH_SKINS.delete(key); console.warn('Skin unavailable:', group, err && err.message); return null; }));
+  return ATH_SKINS.get(key);
+}
+function athleteSkinTint(A, skinIndex, group) {
+  const want = new THREE.Color(ATH_SKIN[skinIndex] || ATH_SKIN[2]), have = new THREE.Color((group && A.skins[group] && A.skinTex[group] && A.skins[group].avg) || A.skin);
+  const r = (a, b) => Math.max(0.12, Math.min(3, a / Math.max(0.005, b)));
   return new THREE.Color(r(want.r, have.r), r(want.g, have.g), r(want.b, have.b));
 }
-function athleteSkinMaterial(src, tint) {
+// The skin shader: the eye strip picks his eye colour's cell, is not tinted, and is glossy (wet
+// eyes catch the light); the skin itself is a little rough, never plastic.
+function athleteSkinMaterial(src, tint, map, eyeCell = 0) {
   const mat = src.clone();
-  mat.color.copy(tint);
-  mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\nif (vMapUv.y > 0.8) diffuseColor.rgb = sampledDiffuseColor.rgb;\n#endif'); };
-  mat.customProgramCacheKey = () => 'athlete-skin';
+  if (map) mat.map = map;
+  mat.color.copy(tint); mat.roughness = 0.62; mat.metalness = 0;
+  const eye = { value: eyeCell * 0.25 };
+  mat.userData.eye = eye;
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uEyeCell = eye;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uEyeCell;')
+      .replace('#include <map_fragment>', `#ifdef USE_MAP
+        vec2 athUv = vMapUv; bool athEye = athUv.y > 0.8;
+        if (athEye) athUv.x += uEyeCell;
+        vec4 sampledDiffuseColor = texture2D( map, athUv );
+        diffuseColor *= sampledDiffuseColor;
+        if (athEye) diffuseColor.rgb = sampledDiffuseColor.rgb;
+      #endif`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n#ifdef USE_MAP\nif (vMapUv.y > 0.8) roughnessFactor = 0.1;\n#endif');
+  };
+  mat.customProgramCacheKey = () => 'athlete-skin2';
   return mat;
+}
+// Image-based light: what the players' skin, hair and kit reflect besides the direct lights. A
+// stadium under an open sky for matches (bright above, grass below), a studio room for close-ups.
+const ENV_CACHE = new WeakMap();
+async function environmentFor(renderer, kind) {
+  let byKind = ENV_CACHE.get(renderer); if (!byKind) ENV_CACHE.set(renderer, byKind = {});
+  if (byKind[kind]) return byKind[kind];
+  const pm = new THREE.PMREMGenerator(renderer);
+  let tex;
+  if (kind === 'room') { const { RoomEnvironment } = await import('./vendor/jsm/environments/RoomEnvironment.js'); const room = new RoomEnvironment(); tex = pm.fromScene(room, 0.04).texture; }
+  else {
+    const sc = new THREE.Scene(), g = new THREE.SphereGeometry(50, 32, 16), c = new Float32Array(g.attributes.position.count * 3);
+    for (let i = 0; i < g.attributes.position.count; i++) {
+      const y = g.attributes.position.getY(i) / 50, col = y > 0.25 ? new THREE.Color(0x9cc4ec).lerp(new THREE.Color(0x4f86c6), (y - 0.25) / 0.75) : y > -0.05 ? new THREE.Color(0xd8dde2).lerp(new THREE.Color(0x9cc4ec), (y + 0.05) / 0.3) : new THREE.Color(0x3f6a35).lerp(new THREE.Color(0x2d4f27), Math.min(1, -y));
+      c.set([col.r, col.g, col.b], i * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    sc.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+    tex = pm.fromScene(sc, 0.02).texture;
+    g.dispose();
+  }
+  pm.dispose();
+  return (byKind[kind] = tex);
 }
 const ATH_MATS = new Map();
 function athleteFlat(key, make) { if (!ATH_MATS.has(key)) ATH_MATS.set(key, make()); return ATH_MATS.get(key); }
+// A beard: a little fuller in the middle than built, so pale skin does not show through it in
+// patches, still fading at its edges (the vertex alpha); a black beard is lifted a little towards a
+// dark brown so its strands catch the light instead of reading as a flat black mask. Shared by
+// every player with the same beard colour. Stubble stays as built.
+function athleteBeardMaterial(src, col, stubble) {
+  const key = `beard:${col.getHexString()}:${stubble ? 1 : 0}`;
+  return athleteFlat(key, () => {
+    const m = src.clone(), c = col.clone(), hsl = {}; c.getHSL(hsl);
+    if (hsl.l < 0.12) c.lerp(new THREE.Color('#3b2f27'), 0.45);
+    m.color.copy(c); m.depthWrite = false; m.roughness = 0.82; m.envMapIntensity = 0.7;
+    const k = stubble ? 1 : 1.2;
+    m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>\n  diffuseColor.a = min(1.0, diffuseColor.a * ${k.toFixed(2)});`); };
+    m.customProgramCacheKey = () => 'athlete-beard-' + k;
+    return m;
+  });
+}
 
 function makeAthlete(F, A, hairSet, geo, m) {
   const g = new THREE.Group();
@@ -1085,7 +1257,7 @@ function makeAthlete(F, A, hairSet, geo, m) {
   holder.add(model);
   const kc = m.kitColours || { shirt: '#c62828', second: '#ffffff', shorts: '#ffffff', socks: '#c62828', pattern: 0 };
   const hairCol = new THREE.Color(HAIR_PAL[lk ? lk.hairCol : 0] || HAIR_PAL[0]).lerp(new THREE.Color('#b8b4ae'), lk ? lk.grey || 0 : 0);
-  const tint = athleteSkinTint(A, lk ? lk.skin : 2);
+  const group = athleteSkinGroup(lk), tint = athleteSkinTint(A, lk ? lk.skin : 2, group), eyeCell = lk ? Math.max(0, Math.min(3, lk.eyes || 0)) : 0;
   const meshes = []; model.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
   let skel = null, skinMesh = null, skinPos = null, kitMat = null;
   for (const o of meshes) {
@@ -1095,8 +1267,14 @@ function makeAthlete(F, A, hairSet, geo, m) {
     const src = A.parts[part].geometry, baked = bakeAthlete(src, w);
     o.geometry = baked ? baked.geo : src.userData.plain;
     o.frustumCulled = false; o.castShadow = true;
-    if (part === 'skin') { skinMesh = o; skinPos = baked ? baked.pos : null; o.material = athleteSkinMaterial(o.material, tint); }
-    else if (part === 'hair' || part.startsWith('beard-')) { o.material = o.material.clone(); o.material.color.copy(hairCol); if (o.material.transparent) { o.material.depthWrite = false; o.renderOrder = 2; o.castShadow = false; } }
+    if (part === 'skin') {
+      skinMesh = o; skinPos = baked ? baked.pos : null;
+      o.material = athleteSkinMaterial(o.material, tint, A.skinTex[group], eyeCell);
+      // His own skin, as soon as it has loaded (the base's own skin is used until then).
+      if (!A.skinTex[group] && A.skins[group]) { const mat = o.material; athleteSkinTexture(A, group).then(t => { if (!t) return; mat.map = t; mat.color.copy(athleteSkinTint(A, lk ? lk.skin : 2, group)); }); }
+    }
+    else if (part.startsWith('beard-')) { o.material = athleteBeardMaterial(o.material, hairCol, part === 'beard-stubble'); o.renderOrder = 2; o.castShadow = false; }
+    else if (part === 'hair') { o.material = o.material.clone(); o.material.color.copy(hairCol); if (o.material.transparent) { o.material.depthWrite = false; o.renderOrder = 2; o.castShadow = false; } }
     else if (part === 'kit') o.material = kitMat || (kitMat = bodyKitMaterial(o.material, kc, A.height));
     else if (part === 'gloves') o.material = athleteFlat('gloves:' + (m.gloveColour || '#f2f2f2'), () => new THREE.MeshStandardMaterial({ color: m.gloveColour || '#f2f2f2', roughness: 0.75 }));
     else if (part === 'boots' && m.bootColour) { const c = m.bootColour, src2 = o.material; o.material = athleteFlat('boots:' + c, () => { const b = src2.clone(); b.color.set(c); return b; }); }
@@ -1130,7 +1308,8 @@ function makeAthlete(F, A, hairSet, geo, m) {
   };
   const bone = name => model.getObjectByName(name);
   const spine = bone('spine_03'), handR = bone('hand_r');
-  const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
+  const bones = { s1: bone('spine_01'), s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01'),
+    thl: bone('thigh_l'), thr: bone('thigh_r'), cal: bone('calf_l'), car: bone('calf_r'), ftl: bone('foot_l'), ftr: bone('foot_r'), toel: bone('ball_l'), toer: bone('ball_r') };
   // Limb lengths from his body (muscle is in his shape already, so the bones thicken him less).
   const bd = bodyOf(lk);
   shapeBody(model, bone, lk ? { ...lk, body: { ...bd, muscle: 0.5 + (bd.muscle - 0.5) * 0.35 } } : lk);
@@ -1159,9 +1338,10 @@ function makeAthlete(F, A, hairSet, geo, m) {
     if (c.loop) { a.setLoop(THREE.LoopRepeat, Infinity); } else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
     a.enabled = false; act[key] = a;
   }
+  for (const key of ['jogShort', 'run', 'sprintRun', 'sprintFull']) if (act[key + 'A']) act[key] = act[key + 'A'];   // his own stride lengths
   for (const key of LOCO) if (act[key]) { act[key].enabled = true; act[key].setEffectiveWeight(key === 'idle' ? 1 : 0); act[key].time = Math.random() * act[key].getClip().duration; act[key].play(); }
   g.userData = { mixer, act, model, holder, head: null, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F, body: 'athlete', athlete: rec, bones: bones.s2 && bones.s3 ? bones : null, bakeKit: () => bakeBodyKit(model, kc, A.height),
-    armR: { hand: handR }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(key => [key, key === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004, hairStyle: null };
+    armR: { hand: handR }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(key => [key, key === 'idle' ? 1 : 0])), gait: gaitOf(lk), hairStyle: null };
   // The hairstyle now if it is loaded, otherwise as soon as it arrives.
   if (rec.hair) {
     const H = hairSet && hairSet[rec.hair];
@@ -1177,7 +1357,8 @@ export async function loadAthleteSet(looks = [], timeoutMs = 15000, lod = 'full'
     const run = (async () => {
       const A = await athleteBase(lod);
       const styles = [...new Set(looks.map(lk => athleteRecipe(lk).hair).filter(Boolean))];
-      const got = await Promise.allSettled(styles.map(s => athleteHair(A, s)));
+      const groups = [...new Set((looks.length ? looks : [null]).map(athleteSkinGroup))];
+      const [got] = await Promise.all([Promise.allSettled(styles.map(s => athleteHair(A, s))), Promise.allSettled(groups.map(g => athleteSkinTexture(A, g)))]);
       const hair = {}; for (const r of got) if (r.status === 'fulfilled') hair[r.value.style] = r.value;
       return { A, hair };
     })();
@@ -1383,25 +1564,47 @@ function animateFootballer(u, a, dt, t, simRate) {
   // ── locomotion blend by speed and direction ──
   const active = u.one ? 0 : 1;
   const sad = a.cel === 'sad', fwd = Math.cos(a.rel || 0), side = Math.sin(a.rel || 0);
-  const w = { idle: 0, walk: 0, jog: 0, sprint: 0, back: 0, strafeL: 0, strafeR: 0, ready: 0, gkReady: 0, tired: 0, injuredWalk: 0 };
+  const w = { idle: 0, walk: 0, jogShort: 0, run: 0, jog: 0, sprintRun: 0, sprintFull: 0, sprint: 0, back: 0, strafeL: 0, strafeR: 0, ready: 0, gkReady: 0, tired: 0, injuredWalk: 0 };
   if (sad && sp < 1) w.tired = 1;
   else if (a.ready && sp < 2) { if (u.gk && u.act.gkReady) w.gkReady = 1; else w.ready = 1; }
   else if (sp < 0.35) w.idle = 1;
   else if (fwd < -0.35 && sp < 4.5) { w.back = 1; }
   else if (Math.abs(side) > 0.7 && sp < 4) { w[side > 0 ? 'strafeL' : 'strafeR'] = 1; }
-  else if (sp < 1.9) { const x = (sp - 0.35) / 1.55; w.idle = 1 - x; w.walk = x; }
-  else if (sp < 4.4) { const x = (sp - 1.9) / 2.5; w.walk = 1 - x; w.jog = x; }
-  else { const x = Math.min(1, (sp - 4.4) / 2.6); w.jog = 1 - x; w.sprint = x; }
+  else if (sp < GAIT_STEPS[0][1]) { const x = (sp - 0.35) / (GAIT_STEPS[0][1] - 0.35); w.idle = 1 - x; w.walk = x; }
+  else { let i = 0; while (i < GAIT_STEPS.length - 2 && sp > GAIT_STEPS[i + 1][1]) i++; const [a0, v0] = GAIT_STEPS[i], [a1, v1] = GAIT_STEPS[i + 1], x = Math.max(0, Math.min(1, (sp - v0) / (v1 - v0))); if (u.act[a0] && u.act[a1]) { w[a0] = 1 - x; w[a1] = x; } else w.walk = 1; }
+  const G = GAIT_DATA[u.athlete ? 'athlete' : 'mannequin'];
+  let cyc = 0, gw = 0;
   for (const key of LOCO) {
     const ac = u.act[key]; if (!ac) continue;
     u.w[key] += ((w[key] || 0) * active - u.w[key]) * Math.min(1, dt * 7);
     const wt = u.w[key];
     ac.enabled = wt > 0.003;
     ac.setEffectiveWeight(wt);
-    if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
+    if (G[key]) { cyc += wt * G[key][0] * ac.getClip().duration; gw += wt; }
+    else if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
   }
+  // One phase for every forward gait: it advances by the ground covered over the blended gaits'
+  // stride per cycle, so the planted foot stays put; each clip is placed at that phase.
+  u.dribFoot = null;
+  if (gw > 0.01) {
+    let rate = Math.max(0, sp) / (cyc / gw) / u.gait;                      // stride cycles a second
+    // Dribbling: his stride is lined up with the next touch so a foot swings through just as he
+    // gets to the ball (the left foot lands at phase 0, the right at 0.5; the touch comes just
+    // before). The foot that needs the smaller change is used, and the cadence changes by 15% at most.
+    const D = a.drib;
+    if (D && D.eta > 0.05 && D.eta < 2.5 && rate > 0.3) {
+      const at = (u.phase || 0) + rate * D.eta, err = c => { let e = (c - at) % 1; if (e > 0.5) e -= 1; if (e < -0.5) e += 1; return e; };
+      const eL = err(1 - DRIB_EARLY), eR = err(0.5 - DRIB_EARLY);
+      u.dribFoot = Math.abs(eL) <= Math.abs(eR) ? -1 : 1;
+      rate = Math.max(rate * 0.85, Math.min(rate * 1.15, rate + (u.dribFoot < 0 ? eL : eR) / D.eta));
+    }
+    u.phase = ((u.phase || 0) + dt * rate) % 1;
+  }
+  for (const key in G) { const ac = u.act[key]; if (ac && ac.enabled) { ac.timeScale = 0; ac.time = (((u.phase || 0) + G[key][1]) % 1) * ac.getClip().duration; } }
   u.mixer.update(dt);
+  trunkPosture(u, dt);
   if (u.bones) layerPose(u, u.one && u.one.key === 'chestCtl' ? { ...a, chest: null } : a, dt);
+  if (u.bones && a.drib && !u.one) dribbleReach(u, a.drib);
   { const L = globalThis.__animLog; if (L) { if (a.shield) L.shield = (L.shield || 0) + 1; if (a.chest != null) L.chest = (L.chest || 0) + 1; } }   // test hook
   // Test hook: how far the kicking foot is from its contact frame when the ball leaves.
   if (globalThis.__animLog && a.strike != null && u.one && /^(kick|shoot|pass)/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
@@ -1487,6 +1690,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
   container.prepend(renderer.domElement);
 
   const scene = new THREE.Scene();
+  if (quality !== 'low') { try { scene.environment = await environmentFor(renderer, 'stadium'); scene.environmentIntensity = night ? 0.18 : 0.42; } catch (e) { /* the direct lights alone */ } }
   const rain = weather === 'rain', snow = weather === 'snow', windy = weather === 'wind';
   const fogCol = night ? (snow ? 0x2a3546 : 0x16243b) : rain ? 0x9aa7b4 : snow ? 0xd9e0e8 : 0xbfe0fb;
   scene.background = new THREE.Color(fogCol);
@@ -1710,6 +1914,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       const cel = sim.phase === 'celebrate' ? sim.celebrate : null;
       const bx = (v.ball.x - 0.5) * L, bz = (v.ball.y - 0.5) * W, by = BALL_R + (v.ball.z || 0) * 6;
       const strikeAge = sim.strike ? sim.t - sim.strike.t0 : 9, tackleAge = sim.tackle ? sim.t - sim.tackle.t0 : 9;
+      let ballFix = null;
       const threat = !!sim.attack && sim.phase === 'play';
 
       for (const side of ['home', 'away']) {
@@ -1756,6 +1961,12 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
           // else keeps his body towards the ball and back-pedals or side-steps (as real players do).
           const moveAng = Math.atan2(-mvz, mvx), ballAng = Math.atan2(-(bz - pz), bx - px), ballDist = Math.hypot(bx - px, bz - pz);
           const dribble = isHolder && sim.phase === 'play' && !sim.pass;
+          // The dribble's timing in view seconds: until the next touch, and since the last one.
+          // Only real touches count (not the moment he takes over the ball), and only with the ball at his feet.
+          if (dribble && sim.drib && sim.drib.side === side && sim.drib.idx === i && ballNear < 2.5) {
+            const tc = sim.touch && sim.touch.side === side && sim.touch.idx === i && !sim.touch.chest ? sim.touch : null;
+            a.drib = { eta: (sim.drib.next - sim.t) / simRate, since: tc ? (sim.t - tc.t0) / simRate : null, t0: tc ? tc.t0 : null, foot: sim.drib.nextFoot || 1, lastFoot: tc ? tc.foot : null };
+          }
           const jockey = !dribble && !cel && speed < 3.6 && ballDist > 1.5;
           let want = speed < 0.9 || jockey || a.dive || a.ready || a.hold ? ballAng : moveAng;
           if (a.strike != null && sim.strike.dir) want = Math.atan2(-sim.strike.dir[1] * W, sim.strike.dir[0] * L);
@@ -1780,6 +1991,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
           if (!a.header) u.hd = 0;
           if (sim.card && sim.t - sim.card.t0 < 2.5 && sim.card.side === side && i !== sim.card.idx && !cel) { const bk = (v.dots[side] || [])[sim.card.idx]; if (bk && Math.hypot(bk.x - d.x, (bk.y - d.y) * 0.65) < 0.08) a.appeal = true; }
           if (u.mocap) animateFootballer(u, a, dt, t, simRate); else pose(u, a, dt, t, i);
+          if (a.drib && u.mocap) { const c = dribbleContact(u, a.drib, bx, bz); if (c) ballFix = c; const st = globalThis.__dribStat; if (st) { st.drib = (st.drib || 0) + 1; if (c) st.reach = (st.reach || 0) + 1; } }   // (a test hook counts)
         });
       }
 
@@ -1818,8 +2030,17 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
         if (fourth.userData.mocap) animateFootballer(fourth.userData, fA, dt, t, simRate); else pose(fourth.userData, fA, dt, t, 50);
       }
 
-      // Ball: position, spin from its movement, shadow, trail
-      ball.position.set(bx, by, bz);
+      // Ball: position, spin from its movement, shadow, trail. At a dribbling touch the ball is drawn
+      // at the boot that plays it (a correction of at most 45 cm, faded in and out over the 0.3 s
+      // around the contact), so the foot is seen to meet it.
+      let rbx = bx, rbz = bz;
+      if (ballFix && by < BALL_R + 0.3) {
+        const dx = ballFix.x - bx, dz = ballFix.z - bz, dd = Math.hypot(dx, dz);
+        if (dd < 0.8) { const k = ballFix.w * Math.min(1, 0.45 / Math.max(1e-6, dd)); rbx += dx * k; rbz += dz * k; }
+        const D = globalThis.__dribLog; if (D && ballFix.w > 0.7) D.push([+dd.toFixed(3), +ballFix.w.toFixed(2), +(-(dx * Math.cos(ballFix.f) - dz * Math.sin(ballFix.f))).toFixed(3), +(-(dx * Math.sin(ballFix.f) + dz * Math.cos(ballFix.f))).toFixed(3)]);    // test hook: the boot-to-ball gap near contact (before the correction), how near, and the ball's offset from the boot: ahead (+) and to his right (+)
+      }
+      ballFix = null;
+      ball.position.set(rbx, by, rbz);
       tmp.copy(ball.position).sub(prevBall); prevBall.copy(ball.position);
       const moved = tmp.length(), ballSpeed = moved / dt;
       // Spin: on the ground it rolls with its movement; a lofted pass carries backspin, a curling
@@ -1831,10 +2052,10 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
         const curl = (sp && sp.curl) || (pl && pl.curl) || 0;
         if (air || sp) ball.rotation.y += Math.sign(curl) * Math.min(1, Math.abs(curl) / 3) * dt * 14;
       }
-      ballBlob.position.x = bx; ballBlob.position.z = bz;
+      ballBlob.position.x = rbx; ballBlob.position.z = rbz;
       const bh = Math.min(1, (by - BALL_R) / 6);
       ballBlob.scale.setScalar(0.5 + bh * 0.9); ballBlob.material.opacity = 0.9 - bh * 0.6;
-      if (!frozen) { hist.unshift([bx, by, bz]); if (hist.length > TRAIL + 1) hist.pop(); }
+      if (!frozen) { hist.unshift([rbx, by, rbz]); if (hist.length > TRAIL + 1) hist.pop(); }
       const fast = !frozen && ((ballSpeed > 17 && ballSpeed < 200) || sim.phase === 'shot');
       trail.forEach((tm, i) => {
         const h = hist[i + 1];
@@ -1961,7 +2182,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       }
       camera.lookAt(look);
       if (sim.net && v.introT == null) { const age = sim.t - sim.net.t0; if (age < 0.55) { const k = (1 - age / 0.55) * 0.3; camera.position.y += Math.sin(age * 46) * k; camera.position.x += Math.cos(age * 39) * k * 0.6; } }
-      renderer.render(scene, camera);
+      if (!globalThis.__noDraw) renderer.render(scene, camera);           // (a test hook skips the drawing, keeping everything else)
     },
     // Builds the players and compiles every shader before the first frame is shown.
     async prepare(v, { textures = true } = {}) {
@@ -2081,6 +2302,8 @@ export async function athleteLab(container, { view = 'front', classic = false, c
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8fb4d8);
+  try { scene.environment = await environmentFor(renderer, 'stadium'); scene.environmentIntensity = 0.42; } catch (e) { /* direct lights only */ }
+  if (globalThis.__m3dDebug !== false) globalThis.__labScene = scene;          // for checks from the DevTools protocol
   scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x3a5a2a, 1.2));
   const sun = new THREE.DirectionalLight(0xfff1e0, 2.2); sun.position.set(8, 16, 12); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14 }); scene.add(sun);
@@ -2116,7 +2339,7 @@ export async function athleteLab(container, { view = 'front', classic = false, c
     view = v;
     figs.forEach(({ f }, i) => {
       if (v === 'match') { const r = Math.floor(i / 5), c = i % 5; f.position.set((c - 2) * 5 + (r % 2) * 2.5, 0, (r - 1) * 5); f.rotation.y = -Math.PI / 2 + (i % 3 - 1) * 0.5; }
-      else { f.position.set(i * gap - cx, 0, 0); f.rotation.y = v === 'side' ? 0 : -Math.PI / 2; }
+      else { f.position.set(i * gap - cx, 0, 0); f.rotation.y = v === 'side' ? 0 : v === 'three' ? -Math.PI / 2 + 0.62 : -Math.PI / 2; }
     });
     if (v === 'match') { camera.fov = 24; camera.position.set(0, 13, 30); camera.lookAt(0, 0.5, 0); }
     else { camera.fov = 22; camera.position.set(0, 1.35, cx * 2.6 + 6); camera.lookAt(0, 1.15, 0); }
@@ -2128,7 +2351,7 @@ export async function athleteLab(container, { view = 'front', classic = false, c
   resize(); addEventListener('resize', resize);
   const faceCam = new THREE.PerspectiveCamera(24, 1, 0.05, 50);
   // The faces view: one small viewport per player, the camera in front of his head (or at his side).
-  function drawFaces(side) {
+  function drawFaces(side, three) {
     const w = renderer.domElement.width / renderer.getPixelRatio(), h = renderer.domElement.height / renderer.getPixelRatio();
     const cols = Math.ceil(Math.sqrt(n * w / h)), rows = Math.ceil(n / cols), cw = w / cols, chh = h / rows;
     renderer.setScissorTest(true);
@@ -2137,20 +2360,130 @@ export async function athleteLab(container, { view = 'front', classic = false, c
       const x = (i % cols) * cw, y = h - (Math.floor(i / cols) + 1) * chh;
       renderer.setViewport(x, y, cw, chh); renderer.setScissor(x, y, cw, chh);
       faceCam.aspect = cw / chh; faceCam.updateProjectionMatrix();
-      const fwd = new THREE.Vector3(side ? -1 : 0, 0, side ? 0 : 1);          // in front of him, or at his right
+      const fwd = three ? new THREE.Vector3(-Math.sin(0.62), 0, Math.cos(0.62)) : new THREE.Vector3(side ? -1 : 0, 0, side ? 0 : 1);   // in front, at his right, or three-quarter
       faceCam.position.copy(p).addScaledVector(fwd, 0.95).add(new THREE.Vector3(0, 0.08, 0)); faceCam.lookAt(p.x, p.y + 0.06, p.z);
       renderer.render(scene, faceCam);
     });
     renderer.setScissorTest(false); const sz = new THREE.Vector2(); renderer.getSize(sz); renderer.setViewport(0, 0, sz.x, sz.y);
   }
-  const draw = () => { if (view === 'faces' || view === 'faces-side') { figs.forEach(({ f }, i) => { f.position.set(i * gap * 3 - cx * 3, 0, 0); f.rotation.y = -Math.PI / 2; }); drawFaces(view === 'faces-side'); } else renderer.render(scene, camera); };
+  const draw = () => { if (view === 'faces' || view === 'faces-side' || view === 'faces-three') { figs.forEach(({ f }, i) => { f.position.set(i * gap * 3 - cx * 3, 0, 0); f.rotation.y = -Math.PI / 2; }); drawFaces(view === 'faces-side', view === 'faces-three'); } else renderer.render(scene, camera); };
   let last = performance.now(), running = true, frozen = null;
   const loop = now => { if (!running) return; const dt = Math.min(0.05, (now - last) / 1000); last = now; if (frozen == null) for (const { f } of figs) f.userData.mixer.update(dt); draw(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
   let tris = 0, calls = 0;
   return {
     figs: figs.map(x => ({ name: x.name, gk: x.gk, recipe: x.f.userData.athlete || null, hair: x.f.userData.hairStyle || null })),
-    setView(v) { if (v !== 'faces' && v !== 'faces-side') place(v); else view = v; draw(); },
+    setView(v) { if (!/^faces/.test(v)) place(v); else view = v; draw(); },
+    setClip(k) { for (const { f } of figs) { const u = f.userData, a2 = u.act[k] || u.act.idle; for (const x of Object.values(u.act)) { x.stop(); x.enabled = false; } a2.enabled = true; a2.reset(); a2.setLoop(THREE.LoopRepeat, Infinity); a2.setEffectiveWeight(1); a2.play(); } draw(); },
+    // Every player in his bind pose (no animation), to tell the model from the clips.
+    restPose() { for (const { f } of figs) { const u = f.userData; for (const x of Object.values(u.act)) { x.stop(); x.enabled = false; } f.traverse(o => { if (o.isSkinnedMesh) o.skeleton.pose(); }); } draw(); },
+    // A clip's gait, measured on the figures in place: how fast the planted foot moves back under the
+    // body (the speed at which the clip does not slide, per unit of his height scale), when each foot
+    // lands (as a share of the cycle), and how much of the cycle each foot is planted.
+    gait(k) {
+      const out = [];
+      for (const { f } of figs) {
+        const u = f.userData, ac = u.act[k]; if (!ac) continue;
+        const T = ac.getClip().duration, N = 72, dt = T / N, hs = u.sy / S;
+        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(f.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+        const at = n => { const b = u.model.getObjectByName(n), v = new THREE.Vector3(); b.getWorldPosition(v); return v; };
+        const L = [], R = [];
+        for (let i = 0; i <= N; i++) { this.setTimeOne(f, k, i * dt); const pel = at('pelvis'); for (const [arr, n] of [[L, 'ball_l'], [R, 'ball_r']]) { const v = at(n); arr.push({ x: v.clone().sub(pel).dot(fwd), y: v.y }); } }
+        const stance = arr => { const lo = Math.min(...arr.map(q => q.y)); const on = arr.map(q => q.y < lo + 0.025); let back = 0, n = 0; for (let i = 0; i < N; i++) if (on[i] && on[i + 1]) { back += (arr[i].x - arr[i + 1].x) / dt; n++; } const land = on.findIndex((x, i) => x && !on[(i + N - 1) % N]); return { v: n ? back / n / hs : 0, land: land < 0 ? 0 : land / N, duty: on.slice(0, N).filter(Boolean).length / N }; };
+        const l = stance(L), r = stance(R);
+        out.push({ v: (l.v + r.v) / 2, landL: l.land, landR: r.land, duty: (l.duty + r.duty) / 2, T });
+      }
+      const m = key => +(out.reduce((a2, o) => a2 + o[key], 0) / Math.max(1, out.length)).toFixed(3);
+      return { clip: k, naturalSpeed: m('v'), landL: m('landL'), landR: m('landR'), duty: m('duty'), cycle: m('T') };
+    },
+    // A cleaner measure: the lower foot is the planted one; its backward speed under the pelvis while
+    // it is within 2 cm of the lowest point gives the clip's natural speed. Also its stride length
+    // and the phase (0..1) at which the left foot becomes the planted one.
+    gait2(k) {
+      const out = [];
+      for (const { f } of figs) {
+        const u = f.userData, ac = u.act[k]; if (!ac) continue;
+        const T = ac.getClip().duration, N = 120, dt = T / N, hs = u.sy / S;
+        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(f.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+        const at = n => { const b = u.model.getObjectByName(n), v = new THREE.Vector3(); b.getWorldPosition(v); return v; };
+        const fr = [];
+        for (let i = 0; i <= N; i++) { this.setTimeOne(f, k, i * dt); const pel = at('pelvis'), l = at('ball_l'), r = at('ball_r'); fr.push({ l: { x: l.clone().sub(pel).dot(fwd), y: l.y }, r: { x: r.clone().sub(pel).dot(fwd), y: r.y } }); }
+        const lo = Math.min(...fr.map(q => Math.min(q.l.y, q.r.y)));
+        let v = 0, n = 0, landL = null;
+        for (let i = 0; i < N; i++) { const side = fr[i].l.y <= fr[i].r.y ? 'l' : 'r', q = fr[i][side]; if (q.y < lo + 0.02) { v += (q.x - fr[i + 1][side].x) / dt; n++; } if (landL == null && i > 0 && side === 'l' && (fr[i - 1].l.y > fr[i - 1].r.y)) landL = i / N; }
+        out.push({ v: n ? v / n / hs : 0, share: n / N, landL: landL ?? 0, T });
+      }
+      const m = key => +(out.reduce((a2, o) => a2 + o[key], 0) / Math.max(1, out.length)).toFixed(3);
+      return { clip: k, naturalSpeed: m('v'), plantedShare: m('share'), landL: m('landL'), cycle: m('T') };
+    },
+    // A stride-scaled version of a clip, made now and measured (for tuning STRIDE_WARP).
+    tryWarp(src, k) { const name = 'tmp_' + src + '_' + k; for (const { f } of figs) { const u = f.userData; if (!u.act[name]) { const c = warpClip(u.F.clips[src].clip, name, k); const a2 = u.mixer.clipAction(c); a2.setLoop(THREE.LoopRepeat, Infinity); u.act[name] = a2; } } const g = this.gait2(name); g.D = +(g.naturalSpeed * g.cycle).toFixed(3); return g; },
+    setTimeOne(f, k, sec) { const u = f.userData; for (const a2 of Object.values(u.act)) { if (a2 !== u.act[k]) { a2.enabled = false; continue; } a2.enabled = true; a2.setEffectiveWeight(1); a2.play(); a2.time = sec % a2.getClip().duration; } u.mixer.update(0); f.updateMatrixWorld(true); },
+    // Runs every player forward at a steady speed (m/s) through the game's own animation driver and
+    // measures foot sliding: the speed of the planted foot over the grass (the lower foot, while it is
+    // within 3 cm of the ground), the steps per minute, and the trunk's lean.
+    runTest(speed, secs = 4, dt = 1 / 60) {
+      // A foot is planted when its toe joint is within 2.5 cm of the lowest it gets over the run (the
+      // grass); its speed over the ground then is the slide. Steps: changes of the lower foot.
+      const rows = [];
+      for (const { f, name } of figs) {
+        const u = f.userData; u.one = null; f.position.set(0, 0, 0); f.rotation.y = 0; u.face = 0; u.spd = speed; u.prevSpd = speed;
+        for (const a2 of Object.values(u.act)) a2.stop();
+        for (const k of LOCO) if (u.act[k]) { u.act[k].enabled = true; u.act[k].play(); u.w[k] = 0; }
+        const at = n => { const b = u.model.getObjectByName(n), v = new THREE.Vector3(); b.getWorldPosition(v); return v; };
+        const fr = []; let lean = 0, ln = 0;
+        for (let i = 0; i < secs / dt; i++) {
+          f.position.x += speed * dt; f.rotation.y = 0; u.face = 0;
+          animateFootballer(u, { speed, rel: 0, turn: 0, look: 0 }, dt, i * dt, 1);
+          f.updateMatrixWorld(true);
+          if (i * dt > 1) { const l = at('ball_l'), r = at('ball_r'); fr.push({ l: [l.x, l.y, l.z], r: [r.x, r.y, r.z] }); const pel = at('pelvis'), neck = at('neck_01'); lean += Math.atan2(neck.x - pel.x, neck.y - pel.y) * 180 / Math.PI; ln++; }
+        }
+        const floor = Math.min(...fr.map(q => Math.min(q.l[1], q.r[1])));
+        let slide = 0, back = 0, n = 0, steps = 0, planted = 0;
+        for (let i = 1; i < fr.length; i++) {
+          const low = fr[i].l[1] <= fr[i].r[1] ? 'l' : 'r', lowPrev = fr[i - 1].l[1] <= fr[i - 1].r[1] ? 'l' : 'r';
+          if (low !== lowPrev) steps++;
+          for (const side of ['l', 'r']) { const q = fr[i][side], o = fr[i - 1][side]; if (q[1] < floor + 0.025 && o[1] < floor + 0.025) { slide += Math.hypot(q[0] - o[0], q[2] - o[2]) / dt; back += (q[0] - o[0]) / dt; n++; planted++; } }
+        }
+        rows.push({ name, slide: slide / Math.max(1, n), drift: back / Math.max(1, n), planted: planted / fr.length, cadence: steps / (secs - 1) * 60, lean: lean / Math.max(1, ln) });
+      }
+      const m = k => +(rows.reduce((a2, r) => a2 + r[k], 0) / rows.length).toFixed(2);
+      return { speed, slideMs: m('slide'), driftMs: m('drift'), plantedShare: m('planted'), stepsPerMin: m('cadence'), leanDeg: m('lean') };
+    },
+    // The match's own locomotion (blended gaits, phase-locked strides, the trunk's posture), run in
+    // place for a while at a speed in m/s and then held: what a player looks like walking, jogging or
+    // sprinting in a match, for screenshots. Each player stops at the same share of his stride.
+    locomote(speed, secs = 2, share = null, dt = 1 / 60) {
+      frozen = -1;
+      for (const { f } of figs) {
+        const u = f.userData, p0 = f.position.clone(), r0 = f.rotation.y;
+        u.one = null; u.spd = speed; u.prevSpd = speed; u.phase = 0;
+        for (const a2 of Object.values(u.act)) a2.stop();
+        for (const k of LOCO) if (u.act[k]) { u.act[k].enabled = true; u.act[k].play(); u.w[k] = 0; }
+        for (let i = 0; i < secs / dt; i++) animateFootballer(u, { speed, rel: 0, turn: 0, look: 0 }, dt, i * dt, 1);
+        if (share != null && u.phase != null) { let n = 0; while (Math.abs(((u.phase % 1) + 1) % 1 - share) > dt * 1.5 && n++ < 400) animateFootballer(u, { speed, rel: 0, turn: 0, look: 0 }, dt / 2, secs, 1); }
+        f.position.copy(p0); f.rotation.y = r0; f.updateMatrixWorld(true);
+      }
+      draw(); return true;
+    },
+    clipLength(k) { const a2 = figs[0].f.userData.act[k]; return a2 ? a2.getClip().duration : 0; },
+    // Posture of each player now: the trunk's lean (pelvis to neck, degrees forward of vertical, in
+    // his facing direction), the head over the feet (metres, + forward), and how far each foot is
+    // above the grass (centimetres, its lowest point: the toe or heel joint).
+    posture() {
+      return figs.map(({ f, name }) => {
+        f.updateMatrixWorld(true);
+        const at = n => { const b = f.userData.model.getObjectByName(n), v = new THREE.Vector3(); if (b) b.getWorldPosition(v); return v; };
+        const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(f.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+        const pel = at('pelvis'), neck = at('neck_01'), head = at('head'), s3 = at('spine_03'), fl = at('foot_l'), fr = at('foot_r'), bl = at('ball_l'), br = at('ball_r');
+        const ang = (a, b) => { const d = b.clone().sub(a); return +(Math.atan2(d.dot(fwd), d.y) * 180 / Math.PI).toFixed(1); };
+        const feet = fl.clone().add(fr).multiplyScalar(0.5);
+        // The lowest point of his boots (skinned vertices, sampled): on the grass it is about 0.
+        let sole = 9; const v = new THREE.Vector3();
+        f.traverse(o => { if (!o.isSkinnedMesh || !o.visible) return; const P = o.geometry.attributes.position; for (let i = 0; i < P.count; i += 3) { o.getVertexPosition(i, v); v.applyMatrix4(o.matrixWorld); if (v.y < sole) sole = v.y; } });
+        return { name, trunk: ang(pel, neck), upper: ang(s3, head), headOverFeet: +head.clone().sub(feet).dot(fwd).toFixed(3), feetCm: [Math.min(fl.y, bl.y), Math.min(fr.y, br.y)].map(y => +(y * 100).toFixed(1)), soleCm: +(sole * 100).toFixed(1) };
+      });
+    },
     // Holds every player at one moment of his clip (for screenshots that match from run to run).
     setTime(sec) { frozen = sec; for (const { f } of figs) { const u = f.userData; for (const a of Object.values(u.act)) if (a.enabled) a.time = sec % a.getClip().duration; u.mixer.update(0); } draw(); },
     project(i) { camera.updateMatrixWorld(); const v = new THREE.Vector3(); figs[i].f.getWorldPosition(v); v.y = 2.45; v.project(camera); return [(v.x + 1) / 2, (1 - v.y) / 2]; },
@@ -2174,6 +2507,7 @@ export async function createStudioView(container, { quality = 'high', bodies = t
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.prepend(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x101722);
+  environmentFor(renderer, 'room').then(t => { scene.environment = t; scene.environmentIntensity = 0.5; }).catch(() => {});
   scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x2a3442, 1.35));
   const key = new THREE.DirectionalLight(0xfff1e0, 1.9); key.position.set(3, 6, 4); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); scene.add(key);
   const rim = new THREE.DirectionalLight(0xbcd7ff, 1.1); rim.position.set(-4, 3, -3); scene.add(rim);
@@ -2291,6 +2625,7 @@ export async function createAwardView(container, { look = null, kit = {}, gk = f
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
   container.prepend(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b1220);
+  environmentFor(renderer, 'room').then(t => { scene.environment = t; scene.environmentIntensity = 0.4; }).catch(() => {});
   scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x1a1f2a, 1.0));
   const spot = new THREE.SpotLight(0xfff2d8, 90, 30, 0.42, 0.55, 1.3); spot.position.set(0.5, 9, 4.5); spot.target.position.set(0, 1.2, 0); scene.add(spot, spot.target);
   const rim = new THREE.DirectionalLight(0x9ec5ff, 1.3); rim.position.set(-3, 3, -4); scene.add(rim);
@@ -2348,4 +2683,89 @@ export async function createAwardView(container, { look = null, kit = {}, gk = f
   };
   requestAnimationFrame(loop);
   return { dispose() { running = false; removeEventListener('resize', resize); renderer.dispose(); renderer.domElement.remove(); } };
+}
+
+// ── Portraits: the player himself, head and shoulders ──
+// His athlete (the face, skin, eyes, hair and beard he has on the pitch and in the Player Studio) in
+// his club's shirt, from a three-quarter angle in soft studio light against a quiet backdrop tinted
+// by his club, rendered once into a small image (public/portraits.js caches it by look and kit). One
+// renderer serves every portrait and lets its GPU memory go when portraits have not been needed for
+// a while. Resolves null when the athletes cannot be had (the drawn portrait stays).
+let PSTAGE = null, PSTAGE_IDLE = 0;
+async function portraitStage() {
+  if (PSTAGE) return PSTAGE;
+  const canvas = document.createElement('canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x18202a);
+  try { scene.environment = await environmentFor(renderer, 'room'); scene.environmentIntensity = 0.5; } catch (e) { /* direct lights only */ }
+  scene.add(new THREE.HemisphereLight(0xe4ecff, 0x2a2622, 0.55));
+  const key = new THREE.DirectionalLight(0xfff0de, 2.3), fill = new THREE.DirectionalLight(0xd6e4ff, 0.7), rim = new THREE.DirectionalLight(0xcfe0ff, 1.6);
+  scene.add(key, key.target, fill, fill.target, rim, rim.target);
+  // The backdrop: a soft radial gradient, a little of his club's colour in a dark studio grey.
+  const bc = document.createElement('canvas'); bc.width = bc.height = 128;
+  const backTex = new THREE.CanvasTexture(bc); backTex.colorSpace = THREE.SRGBColorSpace;
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: backTex, toneMapped: false, depthWrite: false }));
+  scene.add(back);
+  const camera = new THREE.PerspectiveCamera(24, 1, 0.05, 20);
+  const F = await loadFootballer();
+  PSTAGE = { renderer, scene, camera, key, fill, rim, back, bc, backTex, F, looks: lookKit(true), canvas };
+  return PSTAGE;
+}
+function releasePortraitStage() {
+  const P = PSTAGE; PSTAGE = null; if (!P) return;
+  try { P.renderer.dispose(); P.renderer.forceContextLoss(); } catch (e) { /* gone already */ }
+}
+export async function renderPortrait(look, { kit = {}, gk = false, size = 224, type = 'image/webp', yaw = -0.42 } = {}) {
+  if (!look || look.baseBody === 'classic' || look.baseBody === 'procedural') return null;
+  const AS = await athleteFor(look); if (!AS) return null;
+  const P = await portraitStage(), { renderer, scene, camera, F, looks } = P;
+  clearTimeout(PSTAGE_IDLE);
+  const lam = c => new THREE.MeshLambertMaterial({ color: c });
+  const shirt = new THREE.Color(gk ? (kit.gk || '#f2d21f') : (kit.shirt || '#c62828'));
+  const m = { ...looks.matsFor(look), look, detail: true, boot: lam(0x15181d), blob: new THREE.MeshBasicMaterial({ visible: false }),
+    sleeve: lam(shirt), shirt3d: kitShirtMaterial(shirt, gk ? 0 : (KIT_PATTERN[kit.pattern] ?? 0), new THREE.Color(kit.second || '#ffffff'), F.height),
+    shorts: lam(new THREE.Color('#f4f4f4')), sock: lam(shirt), glove: null, sponsor: null, crest: null, number: null,
+    kitColours: { shirt: '#' + shirt.getHexString(), second: kit.second || '#ffffff', shorts: gk ? '#20242c' : (kit.shorts || '#f4f4f4'), socks: '#' + shirt.getHexString(), pattern: gk ? 0 : (KIT_PATTERN[kit.pattern] ?? 0) } };
+  const fig = makeAthlete(F, AS.A, AS.hair, looks.geo, { ...m, gk, gloveColour: null });
+  fig.rotation.y = -Math.PI / 2;                              // facing the camera's side (+Z), as on the podium
+  scene.add(fig);
+  try {
+    // A relaxed standing pose, the same frame for everyone.
+    const u = fig.userData, idle = u.act.idle;
+    for (const a of Object.values(u.act)) { a.stop(); a.enabled = false; }
+    if (idle) { idle.enabled = true; idle.reset(); idle.setEffectiveWeight(1); idle.play(); idle.time = 0.6; }
+    u.mixer.update(0); fig.updateMatrixWorld(true);
+    const at = n => { const b = u.model.getObjectByName(n); return b ? b.getWorldPosition(new THREE.Vector3()) : null; };
+    const head = at('head'), top = at('head_leaf') || head.clone().add(new THREE.Vector3(0, 0.2, 0)), neck = at('neck_01') || head;
+    const hh = Math.max(0.12, top.y - neck.y);                // neck to the crown: his head's size in the scene
+    const yTop = top.y + hh * 0.16, yLow = neck.y - hh * 0.62, cy = (yTop + yLow) / 2, H = yTop - yLow;   // crown to the top of his chest
+    const dir = new THREE.Vector3(Math.sin(yaw), 0.05, Math.cos(yaw)).normalize();
+    const dist = (H / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const aim = new THREE.Vector3(head.x, cy, head.z);
+    camera.position.copy(aim).addScaledVector(dir, dist); camera.lookAt(aim);
+    camera.aspect = 1; camera.updateProjectionMatrix();
+    // Light from the camera's left and above, a cool fill from the right, a rim from behind.
+    const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    P.key.position.copy(aim).addScaledVector(dir, 2).addScaledVector(side, 1.6).add(new THREE.Vector3(0, 1.7, 0)); P.key.target.position.copy(aim);
+    P.fill.position.copy(aim).addScaledVector(dir, 2).addScaledVector(side, -2.2).add(new THREE.Vector3(0, 0.3, 0)); P.fill.target.position.copy(aim);
+    P.rim.position.copy(aim).addScaledVector(dir, -2).addScaledVector(side, -1).add(new THREE.Vector3(0, 1.2, 0)); P.rim.target.position.copy(aim);
+    // The backdrop behind him, filling the frame.
+    const g = P.bc.getContext('2d'), c1 = new THREE.Color(0x26303c).lerp(shirt, 0.16), c0 = c1.clone().multiplyScalar(1.45), c2 = c1.clone().multiplyScalar(0.55);
+    const grad = g.createRadialGradient(54, 44, 6, 64, 64, 92);
+    grad.addColorStop(0, '#' + c0.getHexString()); grad.addColorStop(0.6, '#' + c1.getHexString()); grad.addColorStop(1, '#' + c2.getHexString());
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128); P.backTex.needsUpdate = true;
+    P.back.position.copy(aim).addScaledVector(dir, -0.9); P.back.lookAt(camera.position);
+    const span = 2 * (dist + 0.9) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.15; P.back.scale.set(span, span, 1);
+    renderer.setSize(size, size, false);
+    renderer.render(scene, camera);
+    if (globalThis.__m3dDebug !== false) globalThis.__portraitDebug = { head: head.toArray(), top: top.toArray(), neck: neck.toArray(), aim: aim.toArray(), cam: camera.position.toArray(), H, fig: fig.position.toArray(), face: new THREE.Vector3(0, 0, 1).applyQuaternion(fig.getWorldQuaternion(new THREE.Quaternion())).toArray() };
+    return await new Promise(res => { try { P.canvas.toBlob(b => res(b), type, 0.86); } catch (e) { res(null); } });
+  } finally {
+    scene.remove(fig);
+    fig.traverse(o => { if (o.isMesh) { if (o.geometry) o.geometry.dispose(); const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const x of ms) if (x && ![...ATH_MATS.values()].includes(x)) x.dispose(); } });
+    for (const x of [m.boot, m.sleeve, m.shorts, m.sock, m.shirt3d, m.blob]) try { x.dispose(); } catch (e) { /* shared */ }
+    PSTAGE_IDLE = setTimeout(releasePortraitStage, 45000);   // the GPU memory goes back when portraits are not being made
+  }
 }

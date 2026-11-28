@@ -39,7 +39,7 @@ const prims = g => g.json.meshes[0].primitives.map(p => { const mat = g.json.mat
 describe('athletes: what ships', () => {
   it('a close-up and a match level of detail, each small enough to load once on a phone', () => {
     const full = fs.statSync(path.join(DIR, INDEX.base)).size, match = fs.statSync(path.join(DIR, MATCH.base)).size;
-    expect(full).toBeLessThan(2_100_000);
+    expect(full).toBeLessThan(2_300_000);                               // the close-up head is finer (faces and portraits): 2.19 MB in milestone 15
     expect(match).toBeLessThan(1_400_000);
     expect(MATCH.triangles).toBeLessThan(INDEX.triangles * 0.65);       // the pitch athlete is much lighter
     expect(MATCH.triangles).toBeLessThan(14_000);

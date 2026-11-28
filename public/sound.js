@@ -1,14 +1,21 @@
-// The Gaffer sound: a football ground synthesised with WebAudio (no audio files, works offline).
-// This is the original crowd-and-whistle engine (restored: it has the football feel). The match
-// sends key events through GafferSound.event(): kick-off, passes and shots as the ball leaves the
-// boot, goals (home and away crowds react differently), saves, misses, cards, injuries, half-time
-// and full-time. Minor events are ignored on purpose so the sound stays clean and in time with play.
-// Crowd, referee and ball sounds have their own volume (Settings → Match audio mixer).
-//  • Crowd: a murmur of filtered noise plus a bed of "voices" (detuned tones through vowel filters),
-//    a low rumble, and chants with clapping and a drum every so often.
-//  • The crowd follows the game: excite(0..1) raises volume and pitch as a chance builds.
-//  • Referee's pea whistle, ball kicks and passes, the net, "ooh"s for saves and misses, boos for
-//    cards, and a goal roar with an air horn.
+// The Gaffer sound: a football ground in Web Audio.
+// Real stadium recordings play the crowd, the referee and the ball: CC0 recordings from freesound.org,
+// cut and levelled by tools/stadium-audio/build-stadium.py, with every source, author and licence in
+// public/audio/stadium/index.json and docs/ASSET_LICENCES.md (registered before use).
+//  • A match murmur loops under the play and a fuller crowd swells in as an attack builds
+//    (excite(0..1) crossfades the two), as a real ground does.
+//  • Each key event gets its real reaction: a goal roar (three different ones; a goal for the visitors
+//    is a distant away end and groans nearby), a gasp and applause for a save, "ooh"s and groans for
+//    misses, boos or jeers for cards, applause for substitutions, the referee's whistle (one long blast
+//    for kick-off, two for half-time, three for full-time), passes, dribbling touches and shots.
+//  • The recordings are fetched when the first match starts (the service worker keeps them for offline
+//    play) and decoded in the background. Until they are ready, or if one cannot load, the original
+//    synthesised ground plays that sound instead (filtered-noise "voices", a pea whistle, kicks, chants
+//    with claps and a drum), so a match is never silent.
+// The match sends its events through GafferSound.event(); passes and shots as the ball leaves the boot.
+// Crowd, referee and ball sounds have their own volume (Settings → Match audio mixer). The recorded
+// commentary (public/commentary.js) plays through voice() into the same output, and the crowd dips
+// under it (duck()).
 // Browsers only allow audio after a user gesture: the first tap, click or key anywhere creates the
 // audio context and plays a silent sound inside that gesture (what iOS and Android require), and any
 // later gesture wakes it again if the system suspended or interrupted it (a call, another app, the
@@ -17,7 +24,7 @@
 // Phones: small speakers cannot play the low end, which would still drive the compressor and make
 // everything quieter, so on touch devices the output is high-passed and the presence range lifted.
 (function () {
-  let ctx = null, master = null, noiseBuf = null, crowdNodes = null, volume = 0.6, chantTimer = null, level = 0;
+  let ctx = null, master = null, noiseBuf = null, crowdNodes = null, volume = 0.6, chantTimer = null, level = 0, voiceOut = null;
   const bus = {}, mix = { crowd: 0.85, ref: 0.85, ball: 0.8 };
   let cur = null, duckGain = null, appPaused = false, hidden = typeof document !== 'undefined' && document.hidden === true, unlocked = false, meter = null;
   const phone = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -35,14 +42,17 @@
     comp.threshold.value = -14; comp.ratio.value = 5;
     master = ctx.createGain();
     master.gain.value = volume;
-    let out = master;
+    let out = master, post = comp;
     if (phone) {
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 140; hp.Q.value = 0.7;
       const pres = ctx.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 2400; pres.Q.value = 0.9; pres.gain.value = 4;
-      master.connect(hp); hp.connect(pres); out = pres;
+      master.connect(hp); hp.connect(pres); out = pres; post = hp;
     }
     out.connect(comp); comp.connect(ctx.destination);
     master.comp = comp;
+    // The commentator's voice: after the master volume (commentary.js sets its own level) but through
+    // the same speaker EQ and compressor as the ground.
+    voiceOut = ctx.createGain(); voiceOut.gain.value = 1; voiceOut.connect(post);
     duckGain = ctx.createGain(); duckGain.gain.value = 1; duckGain.connect(master);
     for (const c of Object.keys(mix)) { bus[c] = ctx.createGain(); bus[c].gain.value = mix[c]; bus[c].connect(c === 'crowd' ? duckGain : master); }
     ctx.onstatechange = () => { if (ctx.state !== 'running' && !appPaused && !hidden) wake(); };
@@ -107,6 +117,14 @@
     o.connect(g); out.connect(OUT());
     o.start(t); o.stop(t + dur + 0.02);
   }
+  // A struck, ringing tone that dies away (a ball on the post, the PA chime).
+  function ping(freq, dur, gain, delay = 0) {
+    const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(freq, t);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(OUT()); o.start(t); o.stop(t + dur + 0.02);
+  }
 
   const whistle = (dur, delay = 0) => { tone(2150, dur, { gain: 0.1, delay, tremolo: 27 }); tone(2380, dur, { gain: 0.07, delay, tremolo: 27 }); noise(dur, { freq: 4200, q: 2, gain: 0.02, delay }); };
   const thud = (g, f = 150) => { tone(f, 0.13, { gain: g, slideTo: 48 }); tone(f * 2.3, 0.06, { gain: g * 0.32, slideTo: f }); noise(0.04, { freq: 1800, q: 0.7, gain: g * 0.35 }); noise(0.022, { freq: 950, q: 1.3, gain: g * 0.32, attack: 0.002, release: 0.018 }); };
@@ -122,6 +140,8 @@
     pass: () => thud(0.1, 120),
     kick: () => thud(0.38, 170),
     net: () => noise(0.35, { freq: 3200, q: 0.6, type: 'highpass', gain: 0.12, attack: 0.01, release: 0.3 }),
+    post: () => { ping(820, 0.55, 0.12); ping(1330, 0.4, 0.06); ping(2140, 0.22, 0.03); thud(0.2, 130); },
+    chime: () => { ping(784, 1.2, 0.07); ping(1568, 0.5, 0.012); ping(659, 1.6, 0.07, 0.42); ping(1318, 0.6, 0.012, 0.42); },
     goal: () => {
       SOUNDS.net();
       // The roar: three waves of "yeaaah", rising, then cheering and an air horn.
@@ -139,7 +159,7 @@
     levelup: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, { gain: 0.1, delay: i * 0.1, type: 'triangle' })); },
   };
 
-  const CAT = { whistle: 'ref', whistle2: 'ref', whistleEnd: 'ref', restart: 'ref', card: 'ref', pass: 'ball', kick: 'ball', net: 'ball', click: 'ball', deal: 'ball', levelup: 'ball', goal: 'crowd', goalAway: 'crowd', save: 'crowd', miss: 'crowd' };
+  const CAT = { whistle: 'ref', whistle2: 'ref', whistleEnd: 'ref', restart: 'ref', card: 'ref', chime: 'ref', pass: 'ball', kick: 'ball', net: 'ball', post: 'ball', click: 'ball', deal: 'ball', levelup: 'ball', goal: 'crowd', goalAway: 'crowd', save: 'crowd', miss: 'crowd' };
   function play(name, vol) {
     if (!init()) return;
     if (ctx.state !== 'running' && !appPaused && !hidden) wake();
@@ -148,31 +168,156 @@
     if (fn) using(CAT[name] || 'ball', fn);
   }
 
-  // Key match events → sounds. Anything not listed (touches, bounces, shouts …) is silent.
+  // ── The recorded ground ──
+  const REC_BASE = 'audio/stadium/';
+  const rec = { files: null, buf: {}, loading: null, ready: false, beds: null, live: new Set(), last: {}, goal: Math.floor(Math.random() * 3) };
+  // Bed levels (calm murmur, fuller crowd) and how far the synthesised murmur steps back under them.
+  const BED = { calm: 0.65, lively: 0.72, under: 0.12 };
+  function decode(ab) {
+    return new Promise(res => {
+      try { const p = ctx.decodeAudioData(ab, b => res(b), () => res(null)); if (p && p.then) p.then(res, () => res(null)); } catch (e) { res(null); }
+    });
+  }
+  // Fetches and decodes the recordings once: the two beds first (the crowd is waiting for them), then
+  // the reactions a few at a time. A file that fails stays synthesised; a failed index is tried again
+  // at the next match.
+  function loadStadium() {
+    if (rec.loading || !init() || typeof fetch !== 'function') return rec.loading;
+    rec.loading = (async () => {
+      try {
+        const r = await fetch(REC_BASE + 'index.json'); if (!r.ok) throw new Error('index ' + r.status);
+        rec.files = (await r.json()).files || {};
+        const one = async n => { try { const f = await fetch(REC_BASE + rec.files[n].file); if (!f.ok) return; const b = await decode(await f.arrayBuffer()); if (b) rec.buf[n] = b; } catch (e) { /* this sound stays synthesised */ } };
+        const names = Object.keys(rec.files), beds = names.filter(n => n.startsWith('bed-')), rest = names.filter(n => !n.startsWith('bed-'));
+        await Promise.all(beds.map(one));
+        if (crowdNodes) startBeds();
+        for (let i = 0; i < rest.length; i += 4) await Promise.all(rest.slice(i, i + 4).map(one));
+        rec.ready = true;
+        return true;
+      } catch (e) { rec.files = null; rec.loading = null; return false; }
+    })();
+    return rec.loading;
+  }
+  // Where a decoded recording's sound starts and ends: MP3 decoding pads both ends with a little
+  // silence, which would be a gap every time a bed loops.
+  function span(b) {
+    const d = b.getChannelData(0), thr = 1e-4; let i = 0, j = d.length - 1;
+    while (i < j && Math.abs(d[i]) < thr) i++;
+    while (j > i && Math.abs(d[j]) < thr) j--;
+    return [i / b.sampleRate, (j + 1) / b.sampleRate];
+  }
+  function startBeds() {
+    if (rec.beds || !crowdNodes || !rec.buf['bed-calm']) return;
+    const t = ctx.currentTime;
+    const loop = name => {
+      const b = rec.buf[name]; if (!b) return null;
+      const s = ctx.createBufferSource(); s.buffer = b; s.loop = true;
+      const [a, z] = span(b); if (z - a > 2) { s.loopStart = a; s.loopEnd = z; }
+      const g = ctx.createGain(); g.gain.value = 0.0001; s.connect(g); g.connect(bus.crowd || master);
+      s.start(t, a + Math.random() * Math.max(0, z - a) * 0.7);
+      return { s, g };
+    };
+    rec.beds = { calm: loop('bed-calm'), lively: loop('bed-lively') };
+    bedLevel(1.2);
+    crowdNodes.syn.gain.setTargetAtTime(BED.under, t, 1.2);
+  }
+  // An equal-power crossfade from the murmur to the fuller crowd as the danger rises (a little of the
+  // fuller crowd is always there, for depth).
+  function bedLevel(tc = 0.6) {
+    const b = rec.beds; if (!b || !ctx) return;
+    const t = ctx.currentTime, x = level;
+    if (b.calm) b.calm.g.gain.setTargetAtTime(Math.max(0.0001, BED.calm * Math.cos(x * Math.PI * 0.4)), t, tc);
+    if (b.lively) b.lively.g.gain.setTargetAtTime(Math.max(0.0001, BED.lively * (0.12 + 0.88 * Math.sin(x * Math.PI / 2))), t, tc);
+  }
+  function stopBeds() {
+    const b = rec.beds; rec.beds = null; if (!b || !ctx) return;
+    const t = ctx.currentTime, parts = [b.calm, b.lively].filter(Boolean);
+    for (const p of parts) { p.g.gain.cancelScheduledValues(t); p.g.gain.setTargetAtTime(0.0001, t, 0.5); }
+    setTimeout(() => { for (const p of parts) try { p.s.stop(); } catch (e) { /* already stopped */ } }, 2500);
+  }
+  // One recording, once: on a category's volume, optionally later, faster or slower, left or right.
+  function shot(name, cat, gain = 1, { delay = 0, rate = 1, pan = 0 } = {}) {
+    const b = name && rec.buf[name]; if (!b || !ctx) return false;
+    const s = ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+    const g = ctx.createGain(); g.gain.value = gain; s.connect(g);
+    let out = g;
+    if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); out = p; }
+    out.connect(bus[cat] || master);
+    rec.live.add(s); s.onended = () => rec.live.delete(s);
+    s.start(ctx.currentTime + delay);
+    return true;
+  }
+  // One of several takes, never the same one twice running.
+  function any(names) {
+    const ok = names.filter(n => rec.buf[n]); if (!ok.length) return null;
+    let n = ok[Math.floor(Math.random() * ok.length)];
+    if (ok.length > 1 && n === rec.last[names[0]]) n = ok[(ok.indexOf(n) + 1) % ok.length];
+    rec.last[names[0]] = n; return n;
+  }
+  const PAN = d => (d && d.x != null && isFinite(d.x) ? (Number(d.x) - 0.5) * 0.7 : 0);   // the broadcast camera's view: the home side attacks to the right
+  const TOUCHES = ['touch-1', 'touch-2', 'touch-3', 'touch-4', 'touch-5', 'touch-6'], KICKS = ['kick-1', 'kick-2', 'kick-3'], GOALS = ['goal-1', 'goal-2', 'goal-3'];
+  // Each event as the recordings play it; false when a recording is missing (the synthesised sound plays).
+  const RECORDED = {
+    // Levels balanced on a phone (headless Chrome, phone emulation): the commentator about 10 dB
+    // over the murmur, a goal roar above both, the whistle clear but not over the voice.
+    KICK_OFF: () => shot('whistle-long', 'ref', 0.58),
+    RESTART: () => shot('whistle-short', 'ref', 0.5),
+    INJURY: () => shot('whistle-short', 'ref', 0.5),
+    HALF_TIME: d => shot('whistle-long', 'ref', 0.58) && (shot('whistle-long', 'ref', 0.58, { delay: 1.15 }), d.losing === 'home' ? shot('boo', 'crowd', 0.45, { delay: 2.1 }) : shot('applause', 'crowd', 0.7, { delay: 2.1 }), true),
+    FULL_TIME: d => shot('whistle-short', 'ref', 0.55) && (shot('whistle-short', 'ref', 0.55, { delay: 0.5 }), shot('whistle-long', 'ref', 0.62, { delay: 1 }),
+      d.winner === 'away' ? shot('boo', 'crowd', 0.75, { delay: 2 }) : (shot('cheer', 'crowd', 0.85, { delay: 1.9 }), shot('applause', 'crowd', 0.6, { delay: 3.4 })), true),
+    PASS: d => shot(any(TOUCHES), 'ball', 0.32 + 0.4 * Math.min(1, d.power ?? 0.5), { rate: d.long ? 0.82 : 0.94 + Math.random() * 0.12, pan: PAN(d) }),
+    DRIBBLE: d => shot(any(TOUCHES), 'ball', 0.15 + Math.random() * 0.06, { rate: 1.08 + Math.random() * 0.16, pan: PAN(d) }),
+    TOUCH: d => shot(any(TOUCHES), 'ball', 0.3, { rate: 0.86 + Math.random() * 0.1, pan: PAN(d) }),      // a first touch, a deflection
+    BOUNCE: d => shot(any(TOUCHES), 'ball', 0.26, { rate: 0.72, pan: PAN(d) }),                         // a lofted pass landing
+    HEADER: d => shot(any(TOUCHES), 'ball', 0.4, { rate: 0.66, pan: PAN(d) }),
+    TACKLE: d => shot(any(TOUCHES), 'ball', d.slide ? 0.55 : 0.38, { rate: 0.78, pan: PAN(d) }) && (d.slide && Math.random() < 0.4 && shot('ooh', 'crowd', 0.3, { delay: 0.15 }), true),
+    SHOOT: d => shot(any(KICKS), 'ball', 0.6 + 0.4 * Math.min(1, d.power ?? 1), { pan: PAN(d) }),
+    SAVE: () => shot('save-gasp', 'crowd', 0.9) && (shot('applause', 'crowd', 0.55, { delay: 1.1 }), true),
+    MISS: d => shot(d.close ? any(['nearmiss-2', 'ooh', 'gasp']) : any(['groan', 'ooh']), 'crowd', d.close ? 0.95 : 0.8),
+    WOODWORK: () => shot(any(['ooh', 'nearmiss-2']), 'crowd', 1, { delay: 0.05 }) && (using('ball', SOUNDS.post), true),
+    GOAL: d => (d.side === 'away' ? shot('goal-away', 'crowd', 1.2, { pan: -0.25 }) : shot(any([GOALS[rec.goal++ % 3]]) || any(GOALS), 'crowd', 1.5)) && (using('ball', SOUNDS.net), true),
+    CARD: d => shot('whistle-short', 'ref', 0.5) && (shot(d.side === 'home' ? 'boo' : 'applause', 'crowd', d.color === 'red' ? 0.85 : 0.55, { delay: 0.45 }), true),
+    SUB: () => shot('applause', 'crowd', 0.45),
+  };
+
+  // Key match events → sounds. Synthesised fallbacks for the big moments; small touches are only heard
+  // from the recordings (synthesised, they cluttered the sound).
   const EVENTS = { KICK_OFF: 'whistle', RESTART: 'restart', INJURY: 'restart', PASS: 'pass', SHOOT: 'kick', SAVE: 'save', MISS: 'miss', WOODWORK: 'miss', CARD: 'card', HALF_TIME: 'whistle2', FULL_TIME: 'whistleEnd' };
+  const MIN_GAP = { DRIBBLE: 230, TOUCH: 120, BOUNCE: 120, HEADER: 200, TACKLE: 300 };     // ms: a burst of touches is not a machine gun
   function event(type, d = {}) {
     if (appPaused || hidden) return;
-    const name = type === 'GOAL' ? (d.side === 'away' ? 'goalAway' : 'goal') : EVENTS[type];
-    if (!name) return;
-    log.push([Math.round(performance.now()), type, d.side || '']); if (log.length > 300) log.shift();
-    play(name);
+    const name = type === 'GOAL' ? (d.side === 'away' ? 'goalAway' : 'goal') : EVENTS[type], recorded = RECORDED[type];
+    if (!name && !recorded) return;
+    const now = performance.now();
+    if (MIN_GAP[type]) { if (now - (rec.last['@' + type] || -1e9) < MIN_GAP[type]) return; rec.last['@' + type] = now; }
+    log.push([Math.round(now), type, d.side || '']); if (log.length > 300) log.shift();
+    if (!init()) return;
+    if (ctx.state !== 'running' && !appPaused && !hidden) wake();
+    let done = false;
+    if (recorded && rec.files) { try { done = !!recorded(d || {}); } catch (e) { done = false; } }
+    if (!done && name) play(name);
   }
 
-  // A terrace chant: drum and claps in a football rhythm, with a sung line underneath.
+  // A terrace chant: drum and claps in a football rhythm, with a sung line underneath (the sung line
+  // only without the recordings, which carry the voices).
   function chant() {
     if (!crowdNodes || !ctx || appPaused || hidden) return;
     using('crowd', chantNow);
   }
   function chantNow() {
+    const k = rec.beds ? 0.6 : 1;
     const pattern = Math.random() < 0.5 ? [0, 0.5, 1, 1.25, 1.5, 2.5, 3, 3.5, 3.75, 4] : [0, 0.4, 0.8, 1.6, 2, 2.4, 3.2, 3.6, 4];
-    pattern.forEach(t => { clap(t, 0.07 + level * 0.04); if (Math.abs(t - Math.round(t)) < 0.01) drum(t, 0.16); });
-    voiceNoise(4.4, Math.random() < 0.5 ? 'o' : 'e', { gain: 0.1 + level * 0.06, attack: 0.5, release: 1.2 });
+    pattern.forEach(t => { clap(t, (0.07 + level * 0.04) * k); if (Math.abs(t - Math.round(t)) < 0.01) drum(t, 0.16 * k); });
+    if (!rec.beds) voiceNoise(4.4, Math.random() < 0.5 ? 'o' : 'e', { gain: 0.1 + level * 0.06, attack: 0.5, release: 1.2 });
   }
 
-  // Looping crowd bed.
+  // Looping crowd bed: the recorded murmur when it is ready, over a synthesised one that steps back
+  // under it (and carries the crowd alone until then, or without the recordings).
   function crowd(on, vol) {
     if (!on) {
       if (chantTimer) { clearInterval(chantTimer); chantTimer = null; }
+      stopBeds();
       if (crowdNodes && ctx) {
         const t = ctx.currentTime, n = crowdNodes;
         n.g.gain.cancelScheduledValues(t); n.g.gain.setTargetAtTime(0.0001, t, 0.4);
@@ -184,7 +329,8 @@
     if (!init() || crowdNodes) return;
     if (ctx.state !== 'running' && !appPaused && !hidden) wake();
     if (vol != null) setVolume(vol);
-    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(bus.crowd || master);
+    const syn = ctx.createGain(); syn.gain.value = 1; syn.connect(bus.crowd || master);
+    const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(syn);
     g.gain.setTargetAtTime(0.085, ctx.currentTime, 0.8);
     const stop = [];
     // murmur
@@ -210,10 +356,11 @@
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11;
     const lgn = ctx.createGain(); lgn.gain.value = 0.02;
     lfo.connect(lgn); lgn.connect(g.gain); lfo.start(); stop.push(lfo);
-    crowdNodes = { g, band, vg, stop };
+    crowdNodes = { g, band, vg, syn, stop };
     level = 0;
-    chantTimer = setInterval(() => { if (Math.random() < 0.55) chant(); }, 9000);
+    chantTimer = setInterval(() => { if (Math.random() < (rec.beds ? 0.35 : 0.55)) chant(); }, 9000);
     setTimeout(chant, 2500);
+    if (rec.buf['bed-calm']) startBeds(); else loadStadium();
   }
 
   // 0 = quiet midfield, 1 = a goal is coming / being celebrated.
@@ -224,6 +371,7 @@
     crowdNodes.g.gain.setTargetAtTime(0.085 + level * 0.16, t, 0.35);
     crowdNodes.band.frequency.setTargetAtTime(700 + level * 520, t, 0.4);
     crowdNodes.vg.gain.setTargetAtTime(0.05 + level * 0.12, t, 0.4);
+    bedLevel();
   }
 
   function setVolume(v) { volume = Math.max(0, Math.min(1, Number(v) || 0)); if (master) master.gain.value = volume; }
@@ -235,7 +383,7 @@
   function apply() { if (!ctx) return; if (appPaused || hidden) { if (ctx.state === 'running') ctx.suspend(); } else wake(); }
   function suspend() { appPaused = true; apply(); }
   function resume() { appPaused = false; apply(); }
-  function stopAll() { crowd(false); duck(0); }
+  function stopAll() { crowd(false); duck(0); for (const s of rec.live) { try { s.stop(); } catch (e) { /* already ended */ } } rec.live.clear(); }
   // A gesture: create the context (first time), play one silent sample inside the gesture, wake it.
   function unlock() {
     if (!init()) return;
@@ -248,8 +396,19 @@
     window.addEventListener('pageshow', () => { hidden = document.hidden; apply(); });
     window.addEventListener('pagehide', () => { hidden = true; apply(); });
   }
+  // The commentary's way in: the audio context and the voice output (created on demand, like play()).
+  function voice() { return init() ? { ctx, out: voiceOut, running: ctx.state === 'running' } : null; }
+  // Fetches the recordings without decoding them, so the service worker has them for offline play.
+  async function prefetch() {
+    if (typeof fetch !== 'function') return 0;
+    try {
+      const files = (await (await fetch(REC_BASE + 'index.json')).json()).files || {};
+      let n = 0; for (const f of Object.values(files)) { try { if ((await fetch(REC_BASE + f.file)).ok) n++; } catch (e) { /* next time */ } }
+      return n;
+    } catch (e) { return 0; }
+  }
   // For checks: the state of the audio, and the level at the output (RMS, 0..1) over the last frame.
-  function state() { return { context: ctx ? ctx.state : 'none', unlocked, appPaused, hidden, crowd: !!crowdNodes, volume, mix: { ...mix }, phone, sampleRate: ctx ? ctx.sampleRate : null }; }
+  function state() { return { context: ctx ? ctx.state : 'none', unlocked, appPaused, hidden, crowd: !!crowdNodes, volume, mix: { ...mix }, phone, sampleRate: ctx ? ctx.sampleRate : null, recorded: { ready: rec.ready, loaded: Object.keys(rec.buf).length, beds: !!rec.beds, playing: rec.live.size } }; }
   function outputLevel() {
     if (!ctx || !master) return 0;
     if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.comp.connect(meter); }
@@ -258,5 +417,5 @@
     return Math.sqrt(sum / a.length);
   }
 
-  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, unlock, state, level: outputLevel, mix, log };
+  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, unlock, state, level: outputLevel, mix, log, voice, preload: loadStadium, prefetch, recordings: () => Object.keys(rec.buf) };
 })();

@@ -420,6 +420,204 @@ See `AUDIO.md`. Fixed:
 * Tests: `athletes.test.js` (10), `dribble.test.js` (6), `formation-layout.test.js` (5) and
   `sound.test.js` (5), all new.
 
+## 15. Realism milestone: human footballers, football movement, a recorded commentator and ground, installing the app (2026-11-28)
+
+The milestone report is below. The evidence is in `docs/evidence/m15/` (before/after
+screenshots, each labelled, with an index). The other documents were updated too:
+* `AUDIO.md`, with the phone-testing checklist;
+* `PLAYER_STUDIO_INTEGRATION_AUDIT.md`, with the alternatives evaluated for the characters;
+* `MATCH_REALISM_UPGRADE_PLAN.md` and `CLAUDE_HANDOVER.md`;
+* the asset register;
+* `tools/commentary/README.md` and `tools/stadium-audio/README.md`.
+
+### A. Characters
+
+* **Audit first.** The live site (v28) was inspected in its athlete lab: front, side, faces, the match
+  camera and walk/jog/sprint, at 1600 × 900. Found:
+  * every athlete leaned back (trunk −3.6°, upper body −1.6°), with the toes lifted off the grass;
+  * the heads tilted down;
+  * everyone had brown eyes and one stylised skin;
+  * beards were patchy.
+
+  The installed app's service worker had never installed (see D).
+* **Posture.** The athletes were bound with the Ara bind pose, which left the spine, neck, head, legs
+  and feet a few degrees off the animation's own rest. The rebind now keeps the animation's rest
+  there (`--spine-rest`, `tools/character-pipeline/optimise.mjs`).
+  * Standing: trunk 2.0°, upper body 11° forward.
+  * Running (the match's own locomotion, measured on the match athlete): 6°, 12°, 16° and 18°
+    forward at 1.3, 3.2, 5.5 and 7.2 m/s.
+* **Skin, eyes, light.**
+  * Photographic MakeHuman skins (CC0, registered) in six groups (young or 31+; European, African or
+    East Asian), tinted to each player's exact tone.
+  * A four-eye strip under each skin gives dark brown, light brown, blue and green eyes from the look.
+  * Image-based light: three.js `RoomEnvironment` for close-ups and portraits, a procedural stadium
+    sky in matches.
+  * Skin roughness 0.6: not plastic.
+* **Beards.** They are 20% fuller in the middle, still soft at the edges, and black beards are lifted
+  towards dark brown so they read as hair.
+  * Tried and reverted: a matte material. It turned black beards into masks in the portraits.
+  * Grey beards come from the look's `grey` (age), by design.
+* **Portraits** replace the drawn faces on every card, in the Lineup, lists and the market (see the
+  integration audit).
+  * His own athlete, head and shoulders, three-quarter, in studio light and his club's home shirt.
+  * Cached by look and kit (memory and IndexedDB), with the drawn face shown until the render is
+    ready.
+  * The server now sends the renderer's look (with Studio changes) in every player summary, so the
+    portrait, the Studio, the Lineup and the match show the same man. A Studio change gives a new
+    portrait.
+  * Cards keep their size (15% smaller since section 14), the three-across phone layout and OVR
+    apart from suitability.
+* **Sizes:**
+  * Close-up athlete: 2.19 MB (finer head for faces and portraits; 1.83 MB before).
+  * Match athlete: 1.17 MB.
+  * Skin atlases: 6 × 62–91 KB close-up, 6 × about 20–30 KB in matches.
+* **Alternatives** (Blender/Rigify custom base, Mixamo, Rokoko, Rocketbox, modular parts) were
+  evaluated on appearance, animation, phone cost, licence, access and effort. Details are in the
+  integration audit. The MakeHuman/Ara base with shape targets was kept and improved: CC0, scripted
+  and phone-sized. Mixamo and Rokoko need accounts and have their own terms; a sculpted base needs an
+  artist.
+
+### B. Movement and ball
+
+* **Gaits.**
+  * One stride phase drives every forward gait. It advances by the ground covered over the blended
+    gaits' stride, so the planted foot stays put.
+  * Each forward clip is placed at that phase (the left foot lands at 0, the right at 0.5).
+  * The mocap jog and sprint strides were too long: the legs had to slide or the cadence collapse.
+    They are shortened per gait by warping each limb towards its mean pose (`warpClip`).
+  * The trunk straightens per gait (the mocap sprint leans like a start) and leans into acceleration.
+  * Measured on the match athlete:
+    * steps per minute: 111, 152, 205 and 208 at 1.3, 3.2, 5.5 and 7.2 m/s (89–151 before);
+    * planted foot drifting along the run: 0.13, 0.20, 0.62 and −0.31 m/s;
+    * total slip in any direction: 0.25, 0.97, 1.89 and 1.61 m/s. Before, the old gaits slipped at
+      0.9–4.9 m/s, half to three-quarters of the running speed.
+* **Dribbling** is physics now (`simDribble`, `public/index.html`).
+  * The ball rolls and slows with grass friction (2.6 m/s²).
+  * Each touch aims it at where he will be a stride or a few later, at his foot. The time to the next
+    touch (T) depends on his pace and the play:
+
+    | Pace or play | T |
+    |---|---|
+    | Close control | 0.55 s |
+    | Jog | 0.62–0.9 s |
+    | Running with it | up to 1.6 s, the ball 1–2 m ahead |
+    | A turn | 0.45 s, round his side on a curve |
+    | A ball behind him | a 0.32 s recovery prod |
+  * He plays it when he gets to it: sooner if he would run past it, at most 0.4 s late.
+  * At close control the feet alternate; running with it he uses his stronger foot (about one player
+    in four is left-footed).
+  * Tests: touches within 0.12 s of their plan, the ball at his feet at each touch (never behind him,
+    within 0.45 m to the side), the ball only slowing between touches, and the feet as described. Plus
+    the earlier six tests (ahead at a walk and a sprint, through a U-turn, at 4×, after a tackle, after
+    a pass).
+* **The foot on the ball.** The 3D view (`public/match3d.js`) does three things:
+  * Lines his stride up with the next touch. The foot that needs the smaller change swings through
+    just before it lands, and the cadence changes by 15% at most.
+  * Reaches that leg forward from 0.2 s before contact to just after (hip, knee, toes).
+  * At contact, draws the ball at that boot: a correction of a few centimetres, never more than 35,
+    faded in and out.
+
+  Measured in a 3D match: the contacts were sampled over two match runs in headless Chrome, with drawing switched off by a
+  test hook so that the match ran at full rate. 11 contacts were caught at the moment of touch:
+  * 8 had the boot within 0.18–0.30 m of the ball before the view's correction (median 0.21 m in the
+    second run, in line along the run), which the view closes, so the boot is drawn on the ball;
+  * 3 were touches forced 0.4 s late, after the player had slowed, with the ball 1.2–1.4 m ahead. They
+    are drawn without contact (a known gap; capping the lead to his run's target broke the sprint
+    tests, so it was reverted).
+
+  The animation of a whole 3D match costs 7 ms a frame here (median; 19 ms at the 90th percentile)
+  without drawing..
+* **Ball.** Passes, shots, bounces, spin and woodwork are unchanged from section 13 (`ball.test.js`).
+  The dribble's roll is new.
+* **The engine decides everything, as before.** The view and the dribble never change possession or
+  an outcome. The new sound and the commentary follow the engine's events.
+
+### C. Audio
+
+* **Commentary.** A recorded, mature British male broadcast voice replaces the device's speech
+  synthesis (which was often female or robotic). See `AUDIO.md` and `tools/commentary/README.md`.
+  * Recorded once with Kokoro-82M (Apache-2.0, run offline on the CPU): a 60/40 blend of the British
+    male styles `bm_george` and `bm_lewis`, faster and lifted for excited lines.
+  * 205 original lines (`tools/commentary/lines.mjs`) and 503 surnames (every surname in the name
+    pools), each calm and called out: lines 1.68 MB, calm names 2.85 MB, called names 2.57 MB, index 60 KB: 7.1 MB in all. A match fetches
+    its lines and both teams' names, about 2.5 MB, mostly from the service worker's cache.
+  * Calls are put together from what happened: the name, the line, the situation after a goal, the
+    score read the British way, and half- and full-time results.
+  * Names are matched with accents forgiven. A renamed player gets a line without a name.
+  * The voice is mixed through the same chain as the ground, and the crowd ducks under it.
+  * Silence when play is quiet (cooldowns, priorities, stale lines dropped).
+  * No service, no connection, no cost per match.
+  * The device voice remains a choice. The stadium announcer is a chime and a caption with the
+    recorded voice.
+* **The ground.** 25 cuts from 20 CC0 Freesound recordings, each registered with its URL, author,
+  licence and checksum: 1.4 MB.
+  * Two crowd beds crossfading with the danger.
+  * Three goal roars and an away end; gasps, "ooh"s, groans, applause, boos and cheers.
+  * Real whistles: one blast for kick-off, two for half-time, three for full-time.
+  * Ball touches (each dribbling touch too) and kicks.
+  * The synthesised ground stays as the fallback per sound.
+* **Mixing and controls.** Separate sliders for the crowd, referee, ball and boots, commentary and
+  the announcer, under the master volume, plus a voice choice with a test button.
+* **Measured** in headless Chrome with phone emulation: with a 390 × 844 touch screen, coarse pointer, one real touch and master
+  volume 0.6, all 25 stadium recordings decoded.
+
+  | Check | Result |
+  |---|---|
+  | Crowd bed (RMS) | 0.022–0.027 |
+  | Commentator's goal call | 0.073 mean, 0.17 peak: about 10 dB over the bed; three recordings: call, name, situation |
+  | Goal roar peak | 0.096 |
+  | Whistle peak | 0.19 (0.25 before rebalancing, louder than the voice) |
+  | Shot peak | 0.033 |
+  | Crowd slider at 0 | 0 |
+  | Master at 0 | 0 |
+  | Pause / resume | suspended / running |.
+
+### D. Installation (PWA)
+
+* **The service worker never installed on the live site.** Its file list named the same file twice,
+  and `Cache.addAll` rejects duplicates, so the install failed every time. There was no offline
+  cache and no installed-app behaviour.
+  * Now the list is de-duplicated and each file is cached on its own: a missing optional file no
+    longer fails the install, a missing core file does.
+  * Each update reaches the open app, which says so ("The Gaffer has been updated").
+  * Settings → "The app" shows how it is running (browser or installed app), whether it plays
+    offline, and the version, with **Check for updates**.
+* **Install button.** It sits in the sidebar and in Settings and is shown whenever the app is not
+  already installed.
+  * Where the browser offers installation (`beforeinstallprompt`: Chrome, Edge, Samsung Internet), it
+    opens the browser's own prompt.
+  * Elsewhere it opens a help panel for that browser: iOS Safari (Share → Add to Home Screen), iOS in
+    another browser (open in Safari), in-app browsers (open in the real browser), Firefox (menu →
+    Install, or Add to Home screen), and desktop.
+  * The panel explains that an installed app opens in its own window and plays offline, while a
+    shortcut only opens the site.
+  * It never promises an APK.
+* **Paths.** The manifest uses relative `id`, `start_url` (`./?source=pwa`) and `scope` (`./`), so it
+  installs under `/manager/` on GitHub Pages. Checked locally and on the live site: 
+  * **Locally**, in Chrome with phone emulation: no manifest errors, no installability errors, the
+    service worker active and controlling the page, and both Install buttons present.
+  * **Live**: see F..
+
+### E. Testing
+
+| Check | Result |
+|---|---|
+| Build (`scripts/build-web.js`) and ESLint | **Passed** (one existing warning, in `tactics-extra.test.js`) |
+| Vitest, full run (`npm test`) | **187 of 188 passed.** The one failure is the soak's speed limit under parallel load (517 ms/week against 400), as in sections 12–14 |
+| `soak.test.js` alone | **Passed:** median 338 ms/week, mean 369 (limit 400). Sections 12–14 measured 336–354 alone, so this is machine contention, not a regression |
+| New and changed tests: `commentary.test.js` (8, new), `sound.test.js` (10, five new), `dribble.test.js` (9, three new), `athletes.test.js` (size limit 2.3 MB for the finer close-up head) | **Passed** |
+| Browser, athlete lab, before (live v28) and after: front, side, three-quarter, faces from the front, three-quarter and side, the match camera, walk, jog and sprint (`LAB.locomote`) | Done: `docs/evidence/m15/` |
+| Browser, measurements in the lab (`posture`, `runTest`, match athlete) | Standing trunk 2.0°; lean 6/12/16/18°; 111/152/205/208 steps a minute; drift 0.13/0.20/0.62/−0.31 m/s at 1.3/3.2/5.5/7.2 m/s |
+| Browser, portraits in a new career: squad (20 players) and Lineup | **Passed:** 20 of 20 rendered, none failed, drawn faces first |
+| Browser, 3D match: recorded commentary captions, athletes, dribble contacts | **Passed**; contact measurements in B |
+| Browser, sound with phone emulation | **Passed** (levels in C) |
+| Browser, installability (phone emulation) | **Passed:** no manifest or installability errors; service worker active and controlling |
+| Real phone, real GPU, installed app, real audio hardware | **Not tested** (no device here). Use the checklist in `AUDIO.md` |
+
+### F. Deployment
+
+[DEPLOY]
+
 ## Test results for section 14 (2026-11-28, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -480,7 +678,10 @@ See `AUDIO.md`. Fixed:
 ## Remaining issues
 * About one header chance in five or six is still struck with the foot. This happens when there is
   no way to get a cross in, such as a turnover right before the shot.
-* Athletes: MakeHuman made smoother rather than hand-sculpted stylised art; brown eyes for everyone;
-  short-hair hairlines are cut-outs; only male athletes (see the integration audit).
+* Athletes: MakeHuman-based rather than hand-sculpted; short-hair hairlines are cut-outs; beards are
+  shells; only male athletes (see the integration audit).
+* Dribbling: a touch forced late, after the carrier slowed with the ball rolling on, is not drawn
+  touching. The dribble's leg reach is an overlay on the run, not a dribbling clip.
+* Portraits show the club's default home kit, not a kit designed in the Studio.
 * Sound was not checked on a real Android or iOS device, nor as an installed app.
 * Real-phone frame rate and first-half start on a real GPU were not measured.

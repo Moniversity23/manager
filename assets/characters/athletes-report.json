@@ -1,14 +1,14 @@
 {
- "built": "2026-11-28T03:02:47.914Z",
+ "built": "2026-11-28T06:51:43.753Z",
  "base": {
-  "bytes": 1826540,
-  "triangles": 23322,
-  "vertices": 14173,
+  "bytes": 2190312,
+  "triangles": 27917,
+  "vertices": 16592,
   "primitives": 10,
   "materials": 7,
   "morphTargets": 37,
   "textures": 7,
-  "textureBytes": 164994,
+  "textureBytes": 208022,
   "joints": 66,
   "animations": 0
  },
@@ -107,7 +107,7 @@
    "id": "noseHump",
    "region": "face",
    "rawVerticesMoved": 394,
-   "scaleMm": 3.4
+   "scaleMm": 4.1
   },
   {
    "id": "mouthWide",
@@ -143,7 +143,7 @@
    "id": "eyesSmall",
    "region": "face",
    "rawVerticesMoved": 1222,
-   "scaleMm": 2.5
+   "scaleMm": 2.6
   },
   {
    "id": "eyesWide",
@@ -173,7 +173,7 @@
    "id": "browLow",
    "region": "face",
    "rawVerticesMoved": 187,
-   "scaleMm": 3.6
+   "scaleMm": 3.7
   },
   {
    "id": "foreheadTall",
@@ -191,7 +191,7 @@
    "id": "asi",
    "region": "head",
    "rawVerticesMoved": 6470,
-   "scaleMm": 6.3
+   "scaleMm": 6.4
   },
   {
    "id": "cau",
@@ -239,55 +239,55 @@
  "hair": {
   "short01": {
    "triangles": 3678,
-   "bytes": 208880
+   "bytes": 208892
   },
   "short02": {
    "triangles": 3344,
-   "bytes": 132204
+   "bytes": 132216
   },
   "short03": {
    "triangles": 1922,
-   "bytes": 86276
+   "bytes": 86288
   },
   "short04": {
    "triangles": 1050,
-   "bytes": 101844
+   "bytes": 101856
   },
   "afro01": {
    "triangles": 2192,
-   "bytes": 171304
+   "bytes": 171316
   },
   "long01": {
    "triangles": 2874,
-   "bytes": 144224
+   "bytes": 144236
   },
   "braid01": {
    "triangles": 3309,
-   "bytes": 156764
+   "bytes": 156780
   },
   "ponytail01": {
    "triangles": 3210,
-   "bytes": 170448
+   "bytes": 170460
   },
   "cornrows": {
    "triangles": 5304,
-   "bytes": 194220
+   "bytes": 194232
   },
   "mohawk": {
    "triangles": 3008,
-   "bytes": 120348
+   "bytes": 120364
   },
   "buzz": {
    "triangles": 2172,
-   "bytes": 88636
+   "bytes": 88648
   }
  },
  "shells": {
   "gloves": 1252,
-  "beard-goatee": 754,
-  "beard-short": 1537,
-  "beard-stubble": 1537,
-  "beard-full": 1545,
-  "beard-mustache": 569
+  "beard-goatee": 1163,
+  "beard-short": 2173,
+  "beard-stubble": 2173,
+  "beard-full": 2183,
+  "beard-mustache": 955
  }
 }

@@ -32,13 +32,13 @@ if (fs.existsSync(three)) {
 // The glTF loader and skeleton tools for the motion-captured players (three.js add-ons). Their
 // "from 'three'" imports are pointed at the vendored build so no import map is needed.
 const jsm = path.join(root, 'node_modules', 'three', 'examples', 'jsm');
-for (const rel of ['loaders/GLTFLoader.js', 'utils/SkeletonUtils.js', 'utils/BufferGeometryUtils.js', 'exporters/GLTFExporter.js']) {
+for (const rel of ['loaders/GLTFLoader.js', 'utils/SkeletonUtils.js', 'utils/BufferGeometryUtils.js', 'exporters/GLTFExporter.js', 'environments/RoomEnvironment.js']) {
   const src = path.join(jsm, rel), dst = path.join(root, 'public', 'vendor', 'jsm', rel);
   if (!fs.existsSync(src)) { if (!fs.existsSync(dst)) console.warn(`three.js add-on missing: ${rel} (the 3D view uses classic figures)`); continue; }
   fs.mkdirSync(path.dirname(dst), { recursive: true });
   fs.writeFileSync(dst, fs.readFileSync(src, 'utf8').replace(/from 'three';/g, "from '../../three.module.min.js';"));
 }
-console.log('vendor/jsm: GLTFLoader, SkeletonUtils, BufferGeometryUtils');
+console.log('vendor/jsm: GLTFLoader, SkeletonUtils, BufferGeometryUtils, GLTFExporter, RoomEnvironment');
 
 const studioSrc = path.join(root, 'studio'), studioDst = path.join(root, 'public', 'studio');
 fs.mkdirSync(studioDst, { recursive: true });

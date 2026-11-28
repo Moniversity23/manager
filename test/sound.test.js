@@ -8,9 +8,9 @@ import fs from 'fs';
 import vm from 'vm';
 
 function fakeAudio() {
-  const made = { contexts: [], filters: [], played: 0 };
-  const param = v => ({ value: v, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
-  const node = extra => ({ connect() {}, disconnect() {}, ...extra });
+  const made = { contexts: [], filters: [], played: 0, started: [], sources: [], oscillators: 0 };
+  const param = v => ({ value: v, target: v, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime(x) { this.target = x; }, cancelScheduledValues() {} });
+  const node = extra => ({ connect(d) { this.to = d; }, disconnect() {}, ...extra });
   class AudioContext {
     constructor() { this.state = 'suspended'; this.currentTime = 0; this.sampleRate = 48000; this.destination = node(); made.contexts.push(this); }
     resume() { if (this.gestured) this.state = 'running'; if (this.onstatechange) this.onstatechange(); return Promise.resolve(); }
@@ -19,25 +19,39 @@ function fakeAudio() {
     createDynamicsCompressor() { return node({ threshold: param(0), ratio: param(1) }); }
     createBiquadFilter() { const f = node({ type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0) }); made.filters.push(f); return f; }
     createBuffer(ch, len) { return { getChannelData: () => new Float32Array(len), length: len }; }
-    createBufferSource() { return node({ buffer: null, loop: false, playbackRate: param(1), start() { made.played++; }, stop() {} }); }
-    createOscillator() { return node({ type: 'sine', frequency: param(440), start() {}, stop() {} }); }
+    createBufferSource() { const s = node({ buffer: null, loop: false, playbackRate: param(1), start() { made.played++; if (this.buffer && this.buffer.name) made.started.push(this.buffer.name); }, stop() {} }); made.sources.push(s); return s; }
+    createOscillator() { made.oscillators++; return node({ type: 'sine', frequency: param(440), start() {}, stop() {} }); }
     createAnalyser() { return node({ fftSize: 2048, getFloatTimeDomainData() {} }); }
+    createStereoPanner() { return node({ pan: param(0) }); }
+    // A recording "decodes" to three seconds of sound with a little silence at each end (as MP3s do).
+    decodeAudioData(ab) { return Promise.resolve({ name: ab.name, sampleRate: 32000, length: 96000, duration: 3, getChannelData: () => { const d = new Float32Array(96000); d.fill(0.1, 200, 95800); return d; } }); }
   }
   return { AudioContext, made };
 }
-function load({ phone = false } = {}) {
+// The stadium recordings as the server would give them: an index, and each file (unless missing).
+function fakeFetch(names, { missing = [] } = {}) {
+  return async url => {
+    if (url.endsWith('index.json')) return { ok: true, json: async () => ({ files: Object.fromEntries(names.map(n => [n, { file: n + '.mp3' }])) }) };
+    const n = url.split('/').pop().replace('.mp3', '');
+    if (missing.includes(n)) return { ok: false, status: 404 };
+    return { ok: true, arrayBuffer: async () => Object.assign(new ArrayBuffer(8), { name: n }) };
+  };
+}
+function load({ phone = false, fetch } = {}) {
   const { AudioContext, made } = fakeAudio();
   const listeners = {}, winL = {};
   const document = { hidden: false, addEventListener: (t, f) => { (listeners[t] ||= []).push(f); }, removeEventListener() {} };
   const window = { AudioContext, addEventListener: (t, f) => { (winL[t] ||= []).push(f); } };
-  const ctx = vm.createContext({ window, document, matchMedia: q => ({ matches: phone && /coarse/.test(q) }), performance: { now: () => Date.now() }, setTimeout: () => 0, setInterval: () => 0, clearInterval() {}, Math, console, Promise });
+  const clock = { t: 1e6 };
+  const ctx = vm.createContext({ window, document, matchMedia: q => ({ matches: phone && /coarse/.test(q) }), performance: { now: () => clock.t }, setTimeout: () => 0, setInterval: () => 0, clearInterval() {}, Math, console, Promise, isFinite, fetch });
   vm.runInContext(fs.readFileSync(new URL('../public/sound.js', import.meta.url), 'utf-8'), ctx);
   const S = window.GafferSound;
   const fire = (t, target = listeners) => { for (const f of target[t] || []) f({}); };
   // A tap: the browser allows audio from here on, and the gesture listener unlocks it.
   const tap = () => { for (const c of made.contexts) c.gestured = true; AudioContext.prototype.gestured = true; fire('pointerdown'); };
-  return { S, made, document, fire, tap, winL };
+  return { S, made, document, fire, tap, winL, clock };
 }
+const STADIUM = ['bed-calm', 'bed-lively', 'goal-1', 'goal-2', 'goal-3', 'goal-away', 'whistle-long', 'whistle-short', 'touch-1', 'touch-2', 'kick-1', 'save-gasp', 'applause', 'boo', 'cheer', 'ooh', 'groan', 'nearmiss-2', 'gasp'];
 
 describe('match sound', () => {
   it('nothing is created before a gesture; the first tap creates, unlocks and starts the audio', () => {
@@ -88,5 +102,67 @@ describe('match sound', () => {
     expect(ph.S.state().phone).toBe(true);
     expect(ph.made.filters.length - deskFilters).toBe(2);                // high-pass and presence lift
     expect(ph.made.filters.some(f => f.type === 'highpass' && f.frequency.value >= 100)).toBe(true);
+  });
+
+  it('the recorded ground: both beds loop once decoded (without the MP3 padding), and each event plays its recording', async () => {
+    const { S, made, tap } = load({ fetch: fakeFetch(STADIUM) }); tap();
+    S.crowd(true);
+    await S.preload();
+    expect(S.state().recorded).toMatchObject({ ready: true, loaded: STADIUM.length, beds: true });
+    const beds = made.sources.filter(s => s.buffer && /^bed-/.test(s.buffer.name));
+    expect(beds.map(s => s.buffer.name).sort()).toEqual(['bed-calm', 'bed-lively']);
+    for (const b of beds) { expect(b.loop).toBe(true); expect(b.loopStart).toBeCloseTo(200 / 32000, 5); expect(b.loopEnd).toBeCloseTo(95800 / 32000, 5); }
+    const after = fn => { const n = made.started.length; fn(); return made.started.slice(n); };
+    expect(after(() => S.event('KICK_OFF'))).toEqual(['whistle-long']);
+    expect(after(() => S.event('GOAL', { side: 'home' }))[0]).toMatch(/^goal-[123]$/);
+    expect(after(() => S.event('GOAL', { side: 'away' }))).toEqual(['goal-away']);
+    expect(after(() => S.event('CARD', { side: 'home', color: 'yellow' }))).toEqual(['whistle-short', 'boo']);      // the home crowd boos its own player's booking
+    expect(after(() => S.event('CARD', { side: 'away', color: 'yellow' }))).toEqual(['whistle-short', 'applause']);
+    expect(after(() => S.event('SAVE', { side: 'home' }))).toEqual(['save-gasp', 'applause']);
+    expect(after(() => S.event('HALF_TIME', {}))).toEqual(['whistle-long', 'whistle-long', 'applause']);
+    expect(after(() => S.event('FULL_TIME', { winner: 'home' }))).toEqual(['whistle-short', 'whistle-short', 'whistle-long', 'cheer', 'applause']);
+    expect(after(() => S.event('FULL_TIME', { winner: 'away' }))).toEqual(['whistle-short', 'whistle-short', 'whistle-long', 'boo']);
+    expect(after(() => S.event('SHOOT', { power: 1, x: 0.9 }))).toEqual(['kick-1']);
+    const osc = made.oscillators; S.event('MISS', { close: true }); expect(made.oscillators).toBe(osc);                // recorded, so nothing synthesised
+  });
+
+  it('excite() crossfades from the murmur to the fuller crowd as an attack builds', async () => {
+    const { S, made, tap } = load({ fetch: fakeFetch(STADIUM) }); tap();
+    S.crowd(true); await S.preload();
+    const gainOf = name => made.sources.find(s => s.buffer && s.buffer.name === name).to.gain.target;
+    S.excite(0); const calm0 = gainOf('bed-calm'), lively0 = gainOf('bed-lively');
+    S.excite(1); const calm1 = gainOf('bed-calm'), lively1 = gainOf('bed-lively');
+    expect(calm0).toBeGreaterThan(lively0);
+    expect(lively1).toBeGreaterThan(lively0 * 4);
+    expect(calm1).toBeLessThan(calm0 * 0.5);
+  });
+
+  it('a recording that cannot load leaves that sound synthesised; with no recordings at all the synthesised ground plays', async () => {
+    const part = load({ fetch: fakeFetch(['bed-calm', 'bed-lively', 'whistle-long', 'kick-1'], { missing: ['whistle-long'] }) }); part.tap();
+    part.S.crowd(true); await part.S.preload();
+    let osc = part.made.oscillators; part.S.event('KICK_OFF'); expect(part.made.oscillators).toBeGreaterThan(osc);     // the pea whistle
+    osc = part.made.oscillators; part.S.event('SHOOT', {}); expect(part.made.oscillators).toBe(osc);                     // the recorded kick
+    const none = load(); none.tap();
+    none.S.crowd(true);
+    expect(none.S.state().recorded).toMatchObject({ ready: false, loaded: 0, beds: false });
+    osc = none.made.oscillators; none.S.event('GOAL', { side: 'home' }); expect(none.made.oscillators).toBeGreaterThan(osc);
+  });
+
+  it('dribbling touches are spaced out, not a machine gun, and small touches are silent without the recordings', async () => {
+    const { S, made, tap, clock } = load({ fetch: fakeFetch(STADIUM) }); tap();
+    S.crowd(true); await S.preload();
+    const n = made.started.length;
+    S.event('DRIBBLE', { x: 0.4 }); clock.t += 100; S.event('DRIBBLE', { x: 0.4 }); clock.t += 200; S.event('DRIBBLE', { x: 0.4 });
+    expect(made.started.slice(n).filter(x => /^touch-/.test(x))).toHaveLength(2);
+    const none = load(); none.tap(); const osc = none.made.oscillators, played = none.made.played;
+    none.S.event('DRIBBLE', {}); none.S.event('TOUCH', {});
+    expect([none.made.oscillators, none.made.played]).toEqual([osc, played]);
+  });
+
+  it('the commentary gets the shared context and a voice output that the master volume does not scale twice', () => {
+    const { S, tap } = load(); tap();
+    const v = S.voice();
+    expect(v.ctx).toBeTruthy(); expect(v.out.gain.value).toBe(1);
+    S.setVolume(0.2); expect(v.out.gain.value).toBe(1);
   });
 });
