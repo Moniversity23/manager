@@ -13,9 +13,11 @@ speech model, needs no connection and pays for no service.
 ## The voice
 
 The voice is a blend of two of Kokoro's British male styles: 60% `bm_george` and 40% `bm_lewis`.
-They were chosen from four candidates by ear and by measured speaking pitch: medians of 145 Hz for
-`bm_george`, 101 Hz for `bm_lewis`, 128 Hz for `bm_daniel` and 122 Hz for `bm_fable`. The blend gives
-`bm_george`'s clarity a deeper, older weight. It is a synthetic voice and is not modelled on any
+They were chosen from Kokoro's four British male styles by measured speaking pitch (medians of
+145 Hz for `bm_george`, 101 Hz for `bm_lewis`, 128 Hz for `bm_daniel` and 122 Hz for `bm_fable`),
+mixing the clearest with the deepest for an older-sounding broadcaster. The pipeline could not judge
+by listening. Settings → Commentary voice → ▶ Test plays a sample, and another blend is one line in
+`lines.mjs` plus a rebuild. It is a synthetic voice and is not modelled on any
 real person or commentator.
 
 | Intensity | Speed | Pitch |
