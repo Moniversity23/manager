@@ -616,7 +616,26 @@ screenshots, each labelled, with an index). The other documents were updated too
 
 ### F. Deployment
 
-[DEPLOY]
+* **Pushed** normally (no force) to `main`: `1e034c0..24e6cc1`. The Pages workflow deployed it; the
+  live `sw.js` showed `gaffer-shell-v29` 30 s after the check began.
+* **Live files match the commit.** 20 files were fetched from https://moniversity23.github.io/manager/
+  and compared by SHA-256 with `24e6cc1`; all 20 are identical:
+  * `index.html`, `sw.js`, `sound.js`, `commentary.js`, `portraits.js`, `match3d.js`, the manifest and
+    the built `engine.worker.js`;
+  * both audio indexes, `bed-calm.mp3`, `goal-1.mp3`, `gl1.mp3`, `names/okafor-x.mp3`;
+  * `athlete.glb`, `athlete-match.glb`, `skin-young_african.webp`, the athletes' `index.json`;
+  * `RoomEnvironment.js` and `dev/athletes.html`.
+* **Live installation** (Chrome, phone emulation):
+  * no manifest errors and no installability errors;
+  * the service worker active with scope `/manager/` and controlling the page;
+  * the cache `gaffer-shell-v29` holds 29 files, including `portraits.js` and `RoomEnvironment.js`;
+  * both Install buttons present, and no console errors.
+* **Live sound** (Chrome, phone emulation, after one touch):
+  * all 25 stadium recordings decoded and the beds playing (RMS 0.025);
+  * the recorded commentator (205 lines, 503 called names) played a goal call of three recordings
+    (peak 0.125).
+* **Not done:** a real phone, a real GPU, the installed app on a device. Use the checklist in
+  `AUDIO.md`.
 
 ## Test results for section 14 (2026-11-28, Windows 10, 4 cores, Node 22)
 | Check | Result |
