@@ -1,5 +1,29 @@
 # Match audio — architecture and asset register
 
+> **2026-11-28 audit:** every sound is still generated in the browser (`public/sound.js`) or spoken
+> by the device (`public/commentary.js`). There are no audio files, so production delivers exactly
+> the code that ships. Found and fixed:
+> * **A hidden tab could leave the match silent.** Hiding the tab while no crowd played set a
+>   "suspended" flag that only a running crowd cleared, so every later match sound was dropped
+>   (reproduced on the previous file). The app's pause and the hidden tab are now separate, and sound
+>   plays again when neither holds.
+> * **Unlocking on phones.** Audio was created on the first sound, which may not be inside a tap. Now
+>   the first tap, click or key anywhere creates it and plays a silent sample in that gesture, and any
+>   later gesture wakes it if the system suspended it (a call, another app, the screen locking).
+>   Speech is unlocked by the first gesture too, and stops when the tab is hidden.
+> * **Phone speakers.** They cannot play below about 150 Hz, but those frequencies still drove the
+>   compressor. On touch devices the output is now high-passed at 140 Hz with a presence lift at
+>   2.4 kHz, and kicks and drums have mid-range content.
+> * **The master volume** now updates the commentary and announcer volume at once (before, they changed
+>   only at the next match).
+>
+> Volume controls: master (Settings → Sound); crowd, referee, ball and boots (the effects), commentary
+> and announcer (Settings → Match audio mixer). Checked in headless Chrome with phone emulation (touch,
+> coarse pointer, 390 × 844): no audio before a tap; after one it runs and speech is unlocked; crowd and
+> whistle reach the output; master 0 and crowd 0 silence it; pause and resume, hidden and shown both
+> work. `test/sound.test.js` covers the same logic. **Not checked on a real Android or iOS device, nor
+> as an installed app.**
+
 > **2026-11-18 update:** the crowd, whistle and ball sounds were restored to the original engine,
 > which has more football feel and did not crackle. The layered version (two crowd sections, sung
 > chants, player shouts, chimes) was removed. The match still sends structured events, but only key

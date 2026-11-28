@@ -73,6 +73,19 @@ const FORMATION_SLOTS = {
   '4-1-4-1': ['GK', 'CB', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CM', 'LW', 'RW', 'ST'],
 };
 const FORMATIONS = Object.keys(FORMATION_SLOTS);
+// Where each place of a formation stands, for drawing it (the Lineup screen and the match board):
+// [depth from his own goal 0..1, across the pitch 0..1 from the left], in FORMATION_SLOTS order, so
+// slotKey `${slot}-${i + 1}` stands at FORMATION_LAYOUT[formation][i]. A 4-4-2's wide players are in
+// the midfield line, a lone holding midfielder or striker is central, three centre-backs are spread.
+// Drawing only: the match engine and its timeline do not use it.
+const FORMATION_LAYOUT = {
+  '4-3-3':   [[0.05, 0.5], [0.2, 0.39], [0.2, 0.61], [0.24, 0.12], [0.24, 0.88], [0.47, 0.31], [0.47, 0.69], [0.34, 0.5], [0.7, 0.15], [0.7, 0.85], [0.8, 0.5]],
+  '4-2-3-1': [[0.05, 0.5], [0.2, 0.39], [0.2, 0.61], [0.24, 0.12], [0.24, 0.88], [0.36, 0.38], [0.36, 0.62], [0.58, 0.5], [0.62, 0.14], [0.62, 0.86], [0.8, 0.5]],
+  '4-4-2':   [[0.05, 0.5], [0.2, 0.39], [0.2, 0.61], [0.24, 0.12], [0.24, 0.88], [0.45, 0.38], [0.45, 0.62], [0.48, 0.13], [0.48, 0.87], [0.77, 0.4], [0.77, 0.6]],
+  '3-5-2':   [[0.05, 0.5], [0.19, 0.29], [0.18, 0.5], [0.19, 0.71], [0.34, 0.5], [0.47, 0.32], [0.47, 0.68], [0.5, 0.1], [0.5, 0.9], [0.77, 0.4], [0.77, 0.6]],
+  '5-3-2':   [[0.05, 0.5], [0.19, 0.31], [0.18, 0.5], [0.19, 0.69], [0.29, 0.1], [0.29, 0.9], [0.45, 0.28], [0.43, 0.5], [0.45, 0.72], [0.76, 0.4], [0.76, 0.6]],
+  '4-1-4-1': [[0.05, 0.5], [0.2, 0.39], [0.2, 0.61], [0.24, 0.12], [0.24, 0.88], [0.33, 0.5], [0.49, 0.37], [0.49, 0.63], [0.52, 0.13], [0.52, 0.87], [0.79, 0.5]],
+};
 const TACTICS = ['high_press', 'counter', 'possession', 'low_block'];
 const TRAINING_FOCUS = ['technical', 'physical', 'tactical', 'mental', 'balanced'];
 
@@ -120,6 +133,6 @@ function wageFor(ability) {
 module.exports = {
   RNG, hashString, clamp, round2,
   POS_ALL, ATTR_KEYS, POS_ATTRS, POS_GROUP, POS_COMPAT,
-  FORMATION_SLOTS, FORMATIONS, TACTICS, TRAINING_FOCUS,
+  FORMATION_SLOTS, FORMATION_LAYOUT, FORMATIONS, TACTICS, TRAINING_FOCUS,
   buildSlotMap, positionAbility, wageFor,
 };

@@ -139,11 +139,20 @@
   function stop() { queue.length = 0; speaking = null; if (synth) { try { synth.cancel(); } catch {} } onSpeak(false); caption(''); }
   function pause() { if (synth) { try { synth.pause(); } catch {} } }
   function resume() { if (synth) { try { synth.resume(); } catch {} } }
-  // iOS and some Android browsers only speak after a gesture: a silent line from a tap unlocks it.
+  // iOS and some Android browsers only speak after a gesture: a silent line from the first tap,
+  // click or key anywhere unlocks it.
   function unlock() { if (unlocked || !synth) return; unlocked = true; try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch {} }
+  if (typeof document !== 'undefined' && synth) {
+    const first = () => { unlock(); for (const g of ['pointerdown', 'touchend', 'keydown']) document.removeEventListener(g, first, true); };
+    for (const g of ['pointerdown', 'touchend', 'keydown']) document.addEventListener(g, first, { capture: true, passive: true });
+    // A hidden tab does not go on talking: what was waiting is dropped (it would be stale), and the
+    // match's next lines speak when it is visible again.
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { queue.length = 0; speaking = null; try { synth.cancel(); } catch {} onSpeak(false); } });
+  }
   function configure(o) { Object.assign(opts, o || {}); }
   function onCaption(fn) { caption = fn || (() => {}); }
   function onSpeaking(fn) { onSpeak = fn || (() => {}); }
 
-  window.GafferCommentary = { say, announce, stop, pause, resume, unlock, configure, onCaption, onSpeaking, PHRASES, PA, get available() { return !!synth; }, get voices() { return voices.map(v => `${v.name} (${v.lang})`); } };
+  function state() { return { available: !!synth, unlocked, voices: voices.length, speaking: !!speaking, queued: queue.length, speech: opts.speech, volume: opts.volume, paVolume: opts.paVolume }; }
+  window.GafferCommentary = { say, announce, stop, pause, resume, unlock, configure, onCaption, onSpeaking, state, PHRASES, PA, get available() { return !!synth; }, get voices() { return voices.map(v => `${v.name} (${v.lang})`); } };
 })();

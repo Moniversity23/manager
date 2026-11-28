@@ -1,0 +1,293 @@
+{
+ "built": "2026-11-28T03:02:47.914Z",
+ "base": {
+  "bytes": 1826540,
+  "triangles": 23322,
+  "vertices": 14173,
+  "primitives": 10,
+  "materials": 7,
+  "morphTargets": 37,
+  "textures": 7,
+  "textureBytes": 164994,
+  "joints": 66,
+  "animations": 0
+ },
+ "targets": [
+  {
+   "id": "headSquare",
+   "region": "face",
+   "rawVerticesMoved": 494,
+   "scaleMm": 10.9
+  },
+  {
+   "id": "headRound",
+   "region": "face",
+   "rawVerticesMoved": 1745,
+   "scaleMm": 12.3
+  },
+  {
+   "id": "headVJaw",
+   "region": "face",
+   "rawVerticesMoved": 2079,
+   "scaleMm": 7.7
+  },
+  {
+   "id": "headWide",
+   "region": "face",
+   "rawVerticesMoved": 5670,
+   "scaleMm": 14
+  },
+  {
+   "id": "headNarrow",
+   "region": "face",
+   "rawVerticesMoved": 5670,
+   "scaleMm": 14
+  },
+  {
+   "id": "chinWide",
+   "region": "face",
+   "rawVerticesMoved": 167,
+   "scaleMm": 11
+  },
+  {
+   "id": "chinNarrow",
+   "region": "face",
+   "rawVerticesMoved": 98,
+   "scaleMm": 4.7
+  },
+  {
+   "id": "chinOut",
+   "region": "face",
+   "rawVerticesMoved": 90,
+   "scaleMm": 11
+  },
+  {
+   "id": "chinIn",
+   "region": "face",
+   "rawVerticesMoved": 162,
+   "scaleMm": 8.4
+  },
+  {
+   "id": "jawStrong",
+   "region": "face",
+   "rawVerticesMoved": 424,
+   "scaleMm": 12.7
+  },
+  {
+   "id": "cheekHigh",
+   "region": "face",
+   "rawVerticesMoved": 84,
+   "scaleMm": 7.5
+  },
+  {
+   "id": "noseWide",
+   "region": "face",
+   "rawVerticesMoved": 346,
+   "scaleMm": 3.1
+  },
+  {
+   "id": "noseNarrow",
+   "region": "face",
+   "rawVerticesMoved": 286,
+   "scaleMm": 4.3
+  },
+  {
+   "id": "noseLong",
+   "region": "face",
+   "rawVerticesMoved": 348,
+   "scaleMm": 5.1
+  },
+  {
+   "id": "noseShort",
+   "region": "face",
+   "rawVerticesMoved": 319,
+   "scaleMm": 7
+  },
+  {
+   "id": "noseHump",
+   "region": "face",
+   "rawVerticesMoved": 394,
+   "scaleMm": 3.4
+  },
+  {
+   "id": "mouthWide",
+   "region": "face",
+   "rawVerticesMoved": 1106,
+   "scaleMm": 4.7
+  },
+  {
+   "id": "mouthNarrow",
+   "region": "face",
+   "rawVerticesMoved": 1014,
+   "scaleMm": 5.1
+  },
+  {
+   "id": "lipsFull",
+   "region": "face",
+   "rawVerticesMoved": 334,
+   "scaleMm": 4.3
+  },
+  {
+   "id": "lipsThin",
+   "region": "face",
+   "rawVerticesMoved": 168,
+   "scaleMm": 2.1
+  },
+  {
+   "id": "eyesBig",
+   "region": "face",
+   "rawVerticesMoved": 1224,
+   "scaleMm": 2.1
+  },
+  {
+   "id": "eyesSmall",
+   "region": "face",
+   "rawVerticesMoved": 1222,
+   "scaleMm": 2.5
+  },
+  {
+   "id": "eyesWide",
+   "region": "face",
+   "rawVerticesMoved": 1878,
+   "scaleMm": 3.8
+  },
+  {
+   "id": "eyesClose",
+   "region": "face",
+   "rawVerticesMoved": 1732,
+   "scaleMm": 2.8
+  },
+  {
+   "id": "earsBig",
+   "region": "face",
+   "rawVerticesMoved": 1004,
+   "scaleMm": 9.3
+  },
+  {
+   "id": "earsSmall",
+   "region": "face",
+   "rawVerticesMoved": 986,
+   "scaleMm": 9
+  },
+  {
+   "id": "browLow",
+   "region": "face",
+   "rawVerticesMoved": 187,
+   "scaleMm": 3.6
+  },
+  {
+   "id": "foreheadTall",
+   "region": "face",
+   "rawVerticesMoved": 144,
+   "scaleMm": 35.1
+  },
+  {
+   "id": "afr",
+   "region": "head",
+   "rawVerticesMoved": 6437,
+   "scaleMm": 9.2
+  },
+  {
+   "id": "asi",
+   "region": "head",
+   "rawVerticesMoved": 6470,
+   "scaleMm": 6.3
+  },
+  {
+   "id": "cau",
+   "region": "head",
+   "rawVerticesMoved": 6402,
+   "scaleMm": 9.7
+  },
+  {
+   "id": "muscular",
+   "region": "body",
+   "rawVerticesMoved": 14724,
+   "scaleMm": 11.6
+  },
+  {
+   "id": "lean",
+   "region": "body",
+   "rawVerticesMoved": 11086,
+   "scaleMm": 22.6
+  },
+  {
+   "id": "heavy",
+   "region": "body",
+   "rawVerticesMoved": 14913,
+   "scaleMm": 11.2
+  },
+  {
+   "id": "slim",
+   "region": "body",
+   "rawVerticesMoved": 13496,
+   "scaleMm": 8.1
+  },
+  {
+   "id": "older",
+   "region": "head",
+   "rawVerticesMoved": 5774,
+   "scaleMm": 3.3
+  },
+  {
+   "id": "younger",
+   "region": "head",
+   "rawVerticesMoved": 6129,
+   "scaleMm": 4.8
+  }
+ ],
+ "hair": {
+  "short01": {
+   "triangles": 3678,
+   "bytes": 208880
+  },
+  "short02": {
+   "triangles": 3344,
+   "bytes": 132204
+  },
+  "short03": {
+   "triangles": 1922,
+   "bytes": 86276
+  },
+  "short04": {
+   "triangles": 1050,
+   "bytes": 101844
+  },
+  "afro01": {
+   "triangles": 2192,
+   "bytes": 171304
+  },
+  "long01": {
+   "triangles": 2874,
+   "bytes": 144224
+  },
+  "braid01": {
+   "triangles": 3309,
+   "bytes": 156764
+  },
+  "ponytail01": {
+   "triangles": 3210,
+   "bytes": 170448
+  },
+  "cornrows": {
+   "triangles": 5304,
+   "bytes": 194220
+  },
+  "mohawk": {
+   "triangles": 3008,
+   "bytes": 120348
+  },
+  "buzz": {
+   "triangles": 2172,
+   "bytes": 88636
+  }
+ },
+ "shells": {
+  "gloves": 1252,
+  "beard-goatee": 754,
+  "beard-short": 1537,
+  "beard-stubble": 1537,
+  "beard-full": 1545,
+  "beard-mustache": 569
+ }
+}

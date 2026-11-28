@@ -9,7 +9,7 @@
 // The engine never uses Math.random; all randomness comes from this.rng, whose state is saved.
 
 const DATA = require('./data/world.json');
-const { RNG, hashString, clamp, buildSlotMap, positionAbility, wageFor, TACTICS, FORMATIONS, TRAINING_FOCUS, FORMATION_SLOTS, POS_ALL } = require('./utils');
+const { RNG, hashString, clamp, buildSlotMap, positionAbility, wageFor, TACTICS, FORMATIONS, TRAINING_FOCUS, FORMATION_SLOTS, FORMATION_LAYOUT, POS_ALL } = require('./utils');
 const { Player, Club, applyYouthCaps } = require('./models');
 const { pickXI, pickBench, isAvailable, countAvailable } = require('./engine/selection');
 const ME = require('./engine/matchEngine');
@@ -2257,7 +2257,7 @@ class GameWorld {
       contractAlerts: finalYear.length,
       manualXI, manualLineupSet: !!(c.manualXI && c.manualXI.length), manualBench: c.manualBench || [],
       currentXI: xiView.currentXI, autoXI: legacyXI(xiView.currentXI), bench: xiView.bench, selectionChanges: xiView.changes,
-      formationSlots: buildSlotMap(c.formation), formationShapes: FORMATION_SLOTS,
+      formationSlots: buildSlotMap(c.formation), formationShapes: FORMATION_SLOTS, formationLayouts: FORMATION_LAYOUT,
       boardObjective, seasonStatus: zone ? zoneLabel(zone) : 'Mid-table fight', currentZone: zone,
       recentResults, nextFixture, continueLabel: next,
       transferWindow: window,

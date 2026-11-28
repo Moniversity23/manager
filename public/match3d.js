@@ -900,84 +900,299 @@ function shapeBody(model, bone, lk) {
   model.position.y += (K(body.legs, 0.14) - 1) * 0.84;
 }
 
-// ── Close-up bodies ─────────────────────────────────────────────────────────────
-// Realistic footballer bodies made with Ara 3D Gen (MakeHuman, CC0) and optimised by
-// tools/character-pipeline: about 12,000 triangles, 4 materials and 0.5 MB each, rebound onto the
-// same skeleton as the match players, so every game clip and the body shaping drive them. They are
-// used only where one player fills the screen (Player Studio, award ceremonies) and loaded the
-// first time one is needed; the 22 players on the pitch stay the light Mesh2Motion figures.
-// Which body: the Studio's choice (look.baseBody), East Asian heritage, or the skin tone; the skin
-// texture is then tinted to his exact tone and the hair layer to his hair colour. Any failure falls
-// back to the classic figure.
-const BODY_URL = new URL('./models/bodies/', import.meta.url).href;
-const BODY_WAIT_MS = 6000;                                     // the longest an award ceremony waits for one
-let BODY_INDEX = null; const BODIES = new Map();
-function bodyIndex() {
-  if (!BODY_INDEX) BODY_INDEX = fetch(BODY_URL + 'index.json').then(r => { if (!r.ok) throw new Error('bodies ' + r.status); return r.json(); }).catch(e => { BODY_INDEX = null; throw e; });
-  return BODY_INDEX;
+// ── Athletes ────────────────────────────────────────────────────────────────────
+// The footballers: one base athlete (public/models/athletes, built by tools/character-pipeline/
+// athletes from Ara 3D Gen and MakeHuman; MIT and CC0) with 37 shape targets (28 face features,
+// 3 heritages, build and age), beard and goalkeeper-glove layers, and one small file per hairstyle
+// (MakeHuman's modelled hair). A player's look sets the targets' weights (athleteRecipe), so every
+// player has a face, build, hairstyle and beard of his own, the same in every match. The weights
+// are baked into his own copy of the positions and normals once, when he is built: nothing morphs
+// per frame, and everything else (indices, texture coordinates, skinning, textures) is shared by
+// the whole squad. His hairstyle follows the shape of his head through _SKINREF (each hair vertex
+// moves with the scalp vertex under it). Any failure falls back to the mannequin with his own look.
+// Two levels of detail share the targets: 'match' (about 9,000 triangles with hair, a 512 px skin;
+// 22 on the pitch) and 'full' (about 20,000, for the Player Studio and award ceremonies).
+const ATH_URL = new URL('./models/athletes/', import.meta.url).href;
+const ATH_WAIT_MS = 6000;                                      // the longest a close-up waits for him
+const ATH_P = {}, ATH_HAIR = new Map(); let ATH_INDEX = null;
+// Skin tones for the athletes (the classic figures' palette is paler; under the stadium lights these
+// read as the same eight tones from very light to very dark).
+const ATH_SKIN = ['#e8c0a3', '#dcae8e', '#cb9673', '#b67f59', '#99643f', '#7b4b2d', '#5f3921', '#432716'];
+function athleteIndex() {
+  if (!ATH_INDEX) ATH_INDEX = fetch(ATH_URL + 'index.json').then(r => { if (!r.ok) throw new Error('athletes ' + r.status); return r.json(); }).catch(e => { ATH_INDEX = null; throw e; });
+  return ATH_INDEX;
 }
-export function chooseBody(index, look) {
-  if (!index || !index.bodies || !index.bodies.length || (look && (look.baseBody === 'classic' || look.baseBody === 'procedural'))) return null;
-  const by = id => index.bodies.find(b => b.id === id);
-  if (look && look.baseBody && by(look.baseBody)) return by(look.baseBody);
-  if (look && look.heritage === 'east-asian' && by('m-asian')) return by('m-asian');
-  const sk = look && look.skin != null ? look.skin : 2;
-  return by(sk <= 2 ? 'm-light' : sk <= 4 ? 'm-brown' : 'm-dark') || index.bodies[0];
+async function gltfLoad(url) { const { GLTFLoader } = await import('./vendor/jsm/loaders/GLTFLoader.js'); return new GLTFLoader().loadAsync(url); }
+// A stored integer → its value (normalised attributes are already read as values).
+function unq(a) { const arr = a.isInterleavedBufferAttribute ? a.data.array : a.array; return a.normalized ? 1 : arr instanceof Int8Array ? 1 / 127 : arr instanceof Int16Array ? 1 / 32767 : 1; }
+const compact = (a, n = a.itemSize) => { const out = new Float32Array(a.count * n), get = [i => a.getX(i), i => a.getY(i), i => a.getZ(i)]; for (let i = 0; i < a.count; i++) for (let c = 0; c < n; c++) out[i * n + c] = get[c](i); return out; };
+// A target as the vertices it moves and their deltas (metres, or normal change), or null.
+function packTarget(a, k) {
+  const idx = [], val = [];
+  for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i); if (x || y || z) { idx.push(i); val.push(x * k, y * k, z * k); } }
+  return idx.length ? { idx: Uint32Array.from(idx), val: Float32Array.from(val) } : null;
 }
-function loadBody(entry) {
-  if (!BODIES.has(entry.id)) {
-    BODIES.set(entry.id, (async () => {
-      const [{ GLTFLoader }, SU] = await Promise.all([import('./vendor/jsm/loaders/GLTFLoader.js'), import('./vendor/jsm/utils/SkeletonUtils.js')]);
-      const t0 = performance.now();
-      const gltf = await new GLTFLoader().loadAsync(BODY_URL + entry.file);
-      const box = new THREE.Box3().setFromObject(gltf.scene);
-      return { ...entry, scene: gltf.scene, height: box.max.y - box.min.y || entry.heightM || 1.67, clone: SU.clone, loadMs: Math.round(performance.now() - t0) };
-    })().catch(e => { BODIES.delete(entry.id); throw e; }));
+// A geometry sharing a base's attributes, without shape targets (nothing morphs on the GPU).
+function sharedGeometry(src, pos, nrm) {
+  const g = new THREE.BufferGeometry();
+  for (const [k, a] of Object.entries(src.attributes)) if (k !== '_skinref') g.setAttribute(k, a);
+  if (pos) g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  if (nrm) g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setIndex(src.index);
+  return g;
+}
+function athleteBase(lod = 'full') {
+  if (!ATH_P[lod]) ATH_P[lod] = (async () => {
+    const t0 = performance.now();
+    const all = await athleteIndex(), index = lod === 'match' && all.lods && all.lods.match ? { ...all, ...all.lods.match } : all;
+    const [gltf, SU] = await Promise.all([gltfLoad(ATH_URL + index.base), import('./vendor/jsm/utils/SkeletonUtils.js')]);
+    const parts = {}, scale = index.targetScale || {};
+    gltf.scene.traverse(o => {
+      if (!o.isSkinnedMesh) return;
+      const nm = o.material.name, part = nm.startsWith('beard-') ? (o.geometry.userData.part || nm) : nm;
+      o.userData.part = part; parts[part] = o;
+      const gm = o.geometry, mp = gm.morphAttributes.position || [], mn = gm.morphAttributes.normal || [];
+      gm.userData.base = { pos: compact(gm.attributes.position), nrm: compact(gm.attributes.normal) };
+      gm.userData.targets = index.targets.map((id, t) => {
+        const p = mp[t] ? packTarget(mp[t], unq(mp[t]) * (scale[id] || 1)) : null;
+        const n = mn[t] && mn[t] !== gm.attributes.normal ? packTarget(mn[t], unq(mn[t])) : null;   // (three.js lists the base normal for targets without one)
+        return p || n ? { p, n } : null;
+      });
+      gm.userData.plain = sharedGeometry(gm);
+      gm.morphAttributes = {};
+    });
+    if (!parts.skin || !parts.kit) throw new Error('athlete parts missing');
+    // The centre of his head (for fuller hairstyles) and the base's skeleton (to bind hair to).
+    const sp = parts.skin.geometry.userData.base.pos, head = new THREE.Vector3(); let n = 0;
+    for (let i = 0; i < sp.length; i += 3) if (sp[i + 1] > 1.52) { head.x += sp[i]; head.y += sp[i + 1]; head.z += sp[i + 2]; n++; }
+    head.divideScalar(Math.max(1, n));
+    let headR = 0; for (let i = 0; i < sp.length; i += 3) if (sp[i + 1] > 1.52) headR = Math.max(headR, Math.hypot(sp[i] - head.x, sp[i + 1] - head.y, sp[i + 2] - head.z));
+    const sk = parts.skin.skeleton;
+    return { lod, index, scene: gltf.scene, parts, clone: SU.clone, height: index.heightM || 1.7, skin: index.skin || '#c5a28c', chest: index.chest || { front: 0.15, back: -0.05 }, head, headR,
+      bones: sk.bones.map(b => b.name), inv: sk.boneInverses, bytes: index.bytes, triangles: index.triangles, loadMs: Math.round(performance.now() - t0) };
+  })().catch(e => { delete ATH_P[lod]; throw e; });
+  return ATH_P[lod];
+}
+function athleteHair(A, style) {
+  const key = A.lod + ':' + style;
+  if (!ATH_HAIR.has(key)) ATH_HAIR.set(key, (async () => {
+    const e = A.index.hair && A.index.hair[style]; if (!e) throw new Error('no hairstyle ' + style);
+    const gltf = await gltfLoad(ATH_URL + e.file);
+    const meshes = [];
+    gltf.scene.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+    const near = (a, b) => a.elements.every((v, k) => Math.abs(v - b.elements[k]) < 1e-4);
+    for (const o of meshes) {
+      const names = o.skeleton.bones.map(b => b.name), gm = o.geometry;
+      o.userData.names = names;
+      o.userData.same = names.length === A.bones.length && names.every((nm, i) => nm === A.bones[i]) && o.skeleton.boneInverses.every((m, i) => near(m, A.inv[i]));
+      gm.userData.base = { pos: compact(gm.attributes.position) };
+      if (gm.attributes._skinref) { const r = gm.attributes._skinref, ref = new Uint32Array(r.count); for (let i = 0; i < r.count; i++) ref[i] = r.getX(i); gm.userData.ref = ref; }
+      gm.userData.plain = sharedGeometry(gm);
+    }
+    return { style, meshes, bytes: e.bytes, triangles: e.triangles };
+  })().catch(err => { ATH_HAIR.delete(key); throw err; }));
+  return ATH_HAIR.get(key);
+}
+
+// His identity on the athlete: weights from his face (the Studio's sliders, or the hash of his look
+// as for every other part of his face), his heritage and skin, his build and his age; his hairstyle
+// (with a variant per player where a style has two) and beard.
+const ATH_HAIRSTYLE = { crop: ['short02', 'short01'], swept: ['short03', 'short01'], fade: ['short04', 'short02'], curly: ['afro01'], afro: ['afro01'], long: ['long01', 'ponytail01'], twists: ['cornrows', 'braid01'], mohawk: ['mohawk'], buzz: ['buzz'], receding: ['buzz'], bald: [] };
+const ATH_BEARD = { stubble: 'stubble', goatee: 'goatee', full: 'full', moustache: 'mustache', 'chin strap': 'short' };
+export function athleteRecipe(lk) {
+  const f = faceOf(lk), b = bodyOf(lk), W = {};
+  const seed = lk ? (lk.faceSeed ?? ((lk.skin || 0) * 131 + (lk.head || 0) * 37 + (lk.eyes || 0) * 11 + (lk.brows || 0) * 7 + (lk.build || 0) * 3 + (lk.heightCm || 180))) : 1;
+  let h = hash32(seed * 7 + 101); const R = Array.from({ length: 10 }, () => { h = hash32(h + 1); return h / 4294967296; });
+  const add = (k, v) => { if (v > 0.02) W[k] = (W[k] || 0) + v; };
+  const side = (v, more, less, k) => { const d = (v - 0.5) * k; if (d > 0) add(more, d); else add(less, -d); };
+  const shape = { square: [['headSquare', 1]], round: [['headRound', 1]], diamond: [['headVJaw', 0.6], ['cheekHigh', 0.6]], heart: [['headVJaw', 1]], long: [['headNarrow', 0.6], ['foreheadTall', 0.7]], oval: [['headVJaw', 0.3]] }[f.shape] || [];
+  for (const [k, v] of shape) add(k, v);
+  side(R[0], 'headWide', 'headNarrow', 1.4);
+  side(f.jaw, 'jawStrong', 'chinNarrow', 2.4); if (f.jaw > 0.55) add('chinWide', (f.jaw - 0.55) * 2.2);
+  side(f.chin, 'chinOut', 'chinIn', 2.2);
+  if (f.cheek > 0.5) add('cheekHigh', (f.cheek - 0.5) * 2.4);
+  side(f.brow, 'browLow', 'foreheadTall', 1.8);
+  side(f.nose, 'noseWide', 'noseNarrow', 2.6);
+  side(f.noseLen != null ? f.noseLen : R[1], 'noseLong', 'noseShort', 2);
+  if (R[2] < 0.35) add('noseHump', 0.4 + R[3] * 0.7);
+  side(f.lip, 'lipsFull', 'lipsThin', 2.6);
+  side(R[4], 'mouthWide', 'mouthNarrow', 1.6);
+  add('eyesBig', 0.45);
+  side(f.eye, 'eyesBig', 'eyesSmall', 2.6);
+  side(R[5], 'eyesWide', 'eyesClose', 1.6);
+  side(f.ear, 'earsBig', 'earsSmall', 2.6);
+  // Heritage: East Asian from his nationality; otherwise leaning with his skin tone.
+  const sk = lk && lk.skin != null ? lk.skin : 2;
+  if ((lk && lk.heritage === 'east-asian') || (lk && lk.baseBody === 'm-asian')) add('asi', 0.85);
+  else if (sk >= 5) add('afr', 0.5 + (sk - 5) * 0.15 + R[6] * 0.25);
+  else if (sk <= 1) add('cau', 0.55 + (1 - sk) * 0.15 + R[6] * 0.25);
+  else { add('afr', 0.1 + (sk - 2) * 0.12 + R[6] * 0.2); add('cau', 0.35 - (sk - 2) * 0.1 + R[7] * 0.2); }
+  // Build: muscle from his build, a heavier or slighter frame at the ends of the range.
+  side(b.muscle, 'muscular', 'lean', 2.8);
+  const bw = lk ? (lk.build ?? 7) / 15 : 0.5;
+  if (bw > 0.68) add('heavy', (bw - 0.68) * 2.4); else if (bw < 0.3) add('slim', (0.3 - bw) * 2.6);
+  // Age: the face of a teenager or of a veteran.
+  const age = lk && lk.age;
+  if (age > 25) add('older', Math.min(1, (age - 25) / 12) * 0.9);
+  if (age && age < 21) add('younger', Math.min(1, (21 - age) / 4) * 0.8);
+  for (const k in W) W[k] = Math.min(1.35, +W[k].toFixed(3));
+  const styles = ATH_HAIRSTYLE[lk ? lk.hairStyle : 'crop'] || ATH_HAIRSTYLE.crop;
+  // Hair length beyond the scalp: a fuller afro, a shorter mohawk.
+  const len = { afro: 1.35, mohawk: 0.4 }[lk && lk.hairStyle] || 1;
+  return { w: W, hair: styles.length ? styles[Math.floor(R[8] * styles.length)] : null, beard: ATH_BEARD[lk && lk.beardStyle] || null, len };
+}
+// His own positions and normals: the base's plus each target's deltas times his weight (null when
+// none of his targets moves this part).
+function bakeAthlete(gm, w) {
+  const T = gm.userData.targets; let any = false;
+  for (let t = 0; t < w.length; t++) if (w[t] && T[t]) { any = true; break; }
+  if (!any) return null;
+  const pos = gm.userData.base.pos.slice(), nrm = gm.userData.base.nrm.slice();
+  for (let t = 0; t < w.length; t++) {
+    const k = w[t], tg = T[t]; if (!k || !tg) continue;
+    if (tg.p) { const { idx, val } = tg.p; for (let j = 0; j < idx.length; j++) { const o = idx[j] * 3; pos[o] += val[j * 3] * k; pos[o + 1] += val[j * 3 + 1] * k; pos[o + 2] += val[j * 3 + 2] * k; } }
+    if (tg.n) { const { idx, val } = tg.n; for (let j = 0; j < idx.length; j++) { const o = idx[j] * 3; nrm[o] += val[j * 3] * k; nrm[o + 1] += val[j * 3 + 1] * k; nrm[o + 2] += val[j * 3 + 2] * k; } }
   }
-  return BODIES.get(entry.id);
+  for (let o = 0; o < nrm.length; o += 3) { const l = Math.hypot(nrm[o], nrm[o + 1], nrm[o + 2]) || 1; nrm[o] /= l; nrm[o + 1] /= l; nrm[o + 2] /= l; }
+  return { pos, geo: sharedGeometry(gm, pos, nrm) };
 }
-// The bodies for the players on the pitch: { index, byId } with every body that loaded, or null when
-// none did or they take longer than timeoutMs (the match then uses the mannequins; loading carries
-// on and is cached). A player whose body failed gets the mannequin with his own look (never a body of
-// a different skin tone); the failed body is tried again for the next match.
-export async function loadBodySet(timeoutMs = 15000) {
+// Skin: the base's light, neutral texture multiplied to his exact tone (in linear light, so any tone
+// from very light to very dark), except the eyes, which share the texture (its bottom strip).
+function athleteSkinTint(A, skinIndex) {
+  const want = new THREE.Color(ATH_SKIN[skinIndex] || ATH_SKIN[2]), have = new THREE.Color(A.skin);
+  const r = (a, b) => Math.max(0.03, Math.min(1.8, a / Math.max(0.01, b)));
+  return new THREE.Color(r(want.r, have.r), r(want.g, have.g), r(want.b, have.b));
+}
+function athleteSkinMaterial(src, tint) {
+  const mat = src.clone();
+  mat.color.copy(tint);
+  mat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\nif (vMapUv.y > 0.8) diffuseColor.rgb = sampledDiffuseColor.rgb;\n#endif'); };
+  mat.customProgramCacheKey = () => 'athlete-skin';
+  return mat;
+}
+const ATH_MATS = new Map();
+function athleteFlat(key, make) { if (!ATH_MATS.has(key)) ATH_MATS.set(key, make()); return ATH_MATS.get(key); }
+
+function makeAthlete(F, A, hairSet, geo, m) {
+  const g = new THREE.Group();
+  const lk = m.look || null, rec = athleteRecipe(lk);
+  const w = new Float32Array(A.index.targets.length); A.index.targets.forEach((id, t) => { w[t] = rec.w[id] || 0; });
+  const hs = (lk ? lk.heightCm / 100 : 1.8) / A.height;
+  const bw = lk ? 0.98 + lk.build / 15 * 0.04 : 1;                  // the build is in his shape; this only broadens him a little
+  const holder = new THREE.Group(); holder.scale.set(S * hs * bw, S * hs, S * hs * bw); g.add(holder);
+  const model = A.clone(A.scene);
+  model.rotation.y = Math.PI / 2;                                    // the athlete faces +Z; our figures face +X
+  holder.add(model);
+  const kc = m.kitColours || { shirt: '#c62828', second: '#ffffff', shorts: '#ffffff', socks: '#c62828', pattern: 0 };
+  const hairCol = new THREE.Color(HAIR_PAL[lk ? lk.hairCol : 0] || HAIR_PAL[0]).lerp(new THREE.Color('#b8b4ae'), lk ? lk.grey || 0 : 0);
+  const tint = athleteSkinTint(A, lk ? lk.skin : 2);
+  const meshes = []; model.traverse(o => { if (o.isSkinnedMesh) meshes.push(o); });
+  let skel = null, skinMesh = null, skinPos = null, kitMat = null;
+  for (const o of meshes) {
+    const part = o.userData.part;
+    if ((part.startsWith('beard-') && part !== 'beard-' + rec.beard) || (part === 'gloves' && !m.gk)) { o.removeFromParent(); continue; }
+    if (!skel) skel = o.skeleton; else o.bind(skel, o.bindMatrix);  // one skeleton for all his parts
+    const src = A.parts[part].geometry, baked = bakeAthlete(src, w);
+    o.geometry = baked ? baked.geo : src.userData.plain;
+    o.frustumCulled = false; o.castShadow = true;
+    if (part === 'skin') { skinMesh = o; skinPos = baked ? baked.pos : null; o.material = athleteSkinMaterial(o.material, tint); }
+    else if (part === 'hair' || part.startsWith('beard-')) { o.material = o.material.clone(); o.material.color.copy(hairCol); if (o.material.transparent) { o.material.depthWrite = false; o.renderOrder = 2; o.castShadow = false; } }
+    else if (part === 'kit') o.material = kitMat || (kitMat = bodyKitMaterial(o.material, kc, A.height));
+    else if (part === 'gloves') o.material = athleteFlat('gloves:' + (m.gloveColour || '#f2f2f2'), () => new THREE.MeshStandardMaterial({ color: m.gloveColour || '#f2f2f2', roughness: 0.75 }));
+    else if (part === 'boots' && m.bootColour) { const c = m.bootColour, src2 = o.material; o.material = athleteFlat('boots:' + c, () => { const b = src2.clone(); b.color.set(c); return b; }); }
+  }
+  // His hairstyle, bound to his own skeleton, following his head's shape (its length beyond the scalp
+  // changed for some styles: what lies within the scalp's reach stays, so the hairline does not move).
+  const addHair = H => {
+    if (!H || !skinMesh || g.userData.hairStyle === H.style) return;
+    for (const hm of H.meshes) {
+      const src = hm.geometry, ref = src.userData.ref, base = src.userData.base.pos, sb = A.parts.skin.geometry.userData.base.pos;
+      let gm2 = src.userData.plain;
+      if (ref && (skinPos || rec.len !== 1)) {
+        const pos = base.slice(), c = A.head, k = rec.len, R0 = A.headR * 0.92;
+        for (let i = 0; i < ref.length; i++) {
+          const o = i * 3, s = ref[i] * 3;
+          if (k !== 1) { const dx = pos[o] - c.x, dy = pos[o + 1] - c.y, dz = pos[o + 2] - c.z, d = Math.hypot(dx, dy, dz); if (d > R0) { const f = (R0 + (d - R0) * k) / d; pos[o] = c.x + dx * f; pos[o + 1] = c.y + dy * f; pos[o + 2] = c.z + dz * f; } }
+          if (skinPos) { pos[o] += skinPos[s] - sb[s]; pos[o + 1] += skinPos[s + 1] - sb[s + 1]; pos[o + 2] += skinPos[s + 2] - sb[s + 2]; }
+        }
+        gm2 = sharedGeometry(src, pos, null);
+      }
+      const mat = hm.material.clone(); mat.color.copy(hairCol);
+      if (mat.alphaTest > 0) mat.alphaToCoverage = true;
+      const mesh = new THREE.SkinnedMesh(gm2, mat);
+      mesh.frustumCulled = false; mesh.castShadow = !mat.transparent; mesh.userData.part = 'hairstyle';
+      if (mat.transparent) { mat.depthWrite = false; mesh.renderOrder = 2; }
+      skinMesh.parent.add(mesh);
+      if (hm.userData.same) mesh.bind(skel, hm.bindMatrix);
+      else { const by = {}; for (const b of skel.bones) by[b.name] = b; mesh.bind(new THREE.Skeleton(hm.userData.names.map(nm => by[nm] || skel.bones[0]), hm.skeleton.boneInverses), hm.bindMatrix); }
+    }
+    g.userData.hairStyle = H.style;
+  };
+  const bone = name => model.getObjectByName(name);
+  const spine = bone('spine_03'), handR = bone('hand_r');
+  const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
+  // Limb lengths from his body (muscle is in his shape already, so the bones thicken him less).
+  const bd = bodyOf(lk);
+  shapeBody(model, bone, lk ? { ...lk, body: { ...bd, muscle: 0.5 + (bd.muscle - 0.5) * 0.35 } } : lk);
+  // Number, sponsor and crest on the shirt.
+  const k = S * hs, ch = A.chest, plateScale = k * 0.92;
+  if (spine && m.number != null) {
+    const plate = new THREE.Mesh(geo.number, new THREE.MeshBasicMaterial({ map: numberTexture(m.number, m.lightNumber !== false, m.shirtName), transparent: true, depthWrite: false }));
+    plate.rotation.y = -Math.PI / 2;
+    attachToBone(g, spine, plate, new THREE.Vector3((ch.back - 0.008) * k * bw, 0.02 * k, 0), plateScale);
+  }
+  if (spine && m.sponsor) {
+    const plate = new THREE.Mesh(geo.sponsor, new THREE.MeshBasicMaterial({ map: sponsorTexture(m.sponsor, m.lightNumber !== false), transparent: true, depthWrite: false }));
+    plate.rotation.y = Math.PI / 2;
+    attachToBone(g, spine, plate, new THREE.Vector3((ch.front + 0.004) * k * bw, -0.05 * k, 0), plateScale);
+  }
+  if (spine && m.crest) {
+    const plate = new THREE.Mesh(geo.crest, new THREE.MeshBasicMaterial({ map: crestTexture(m.crest.initials, m.crest.c1, m.crest.c2), transparent: true, depthWrite: false }));
+    plate.rotation.y = Math.PI / 2;
+    attachToBone(g, spine, plate, new THREE.Vector3((ch.front - 0.012) * k * bw, 0.05 * k, -0.075 * k), plateScale);
+  }
+  const { blob, shadows } = addGroundShadows(g, geo, m);
+  const mixer = new THREE.AnimationMixer(model);
+  const act = {};
+  for (const [key, c] of Object.entries(F.clips)) {
+    const a = mixer.clipAction(c.clip);
+    if (c.loop) { a.setLoop(THREE.LoopRepeat, Infinity); } else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    a.enabled = false; act[key] = a;
+  }
+  for (const key of LOCO) if (act[key]) { act[key].enabled = true; act[key].setEffectiveWeight(key === 'idle' ? 1 : 0); act[key].time = Math.random() * act[key].getClip().duration; act[key].play(); }
+  g.userData = { mixer, act, model, holder, head: null, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F, body: 'athlete', athlete: rec, bones: bones.s2 && bones.s3 ? bones : null, bakeKit: () => bakeBodyKit(model, kc, A.height),
+    armR: { hand: handR }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(key => [key, key === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004, hairStyle: null };
+  // The hairstyle now if it is loaded, otherwise as soon as it arrives.
+  if (rec.hair) {
+    const H = hairSet && hairSet[rec.hair];
+    if (H) addHair(H); else athleteHair(A, rec.hair).then(addHair).catch(e => console.warn('Hairstyle unavailable:', rec.hair, e && e.message));
+  }
+  return g;
+}
+// The athlete and the hairstyles a set of looks needs: { A, hair } or null when the base cannot load
+// in time (the match then uses the mannequins; loading carries on and is cached). A hairstyle that
+// fails leaves only its wearers without hair.
+export async function loadAthleteSet(looks = [], timeoutMs = 15000, lod = 'full') {
   try {
     const run = (async () => {
-      const index = await bodyIndex();
-      const list = (await Promise.allSettled(index.bodies.map(loadBody))).filter(r => r.status === 'fulfilled').map(r => r.value);
-      if (!list.length) throw new Error('no body loaded');
-      return { index, byId: Object.fromEntries(list.map(b => [b.id, b])) };
+      const A = await athleteBase(lod);
+      const styles = [...new Set(looks.map(lk => athleteRecipe(lk).hair).filter(Boolean))];
+      const got = await Promise.allSettled(styles.map(s => athleteHair(A, s)));
+      const hair = {}; for (const r of got) if (r.status === 'fulfilled') hair[r.value.style] = r.value;
+      return { A, hair };
     })();
+    run.catch(() => {});                                       // a late failure after the timeout is not an error
     return await Promise.race([run, new Promise(r => setTimeout(() => r(null), timeoutMs))]);
-  } catch (e) { console.warn('Match bodies unavailable, using the classic figures:', e && e.message); return null; }
+  } catch (e) { console.warn('Athletes unavailable, using the mannequins:', e && e.message); return null; }
 }
-// The head of a body at its bind pose: the cranium's centre and size (from the skin weighted to the
-// head bone) and the head joint, in the model's space. Measured once per body.
-function bodyHead(B) {
-  if (B.headInfo !== undefined) return B.headInfo;
-  let info = null;
-  B.scene.traverse(o => {
-    if (info || !o.isSkinnedMesh || !o.material || o.material.name !== 'skin') return;
-    const bones = o.skeleton.bones, hi = bones.findIndex(b => b.name === 'head'); if (hi < 0) return;
-    const P = o.geometry.attributes.position, SI = o.geometry.attributes.skinIndex, SW = o.geometry.attributes.skinWeight;
-    const gI = [i => SI.getX(i), i => SI.getY(i), i => SI.getZ(i), i => SI.getW(i)], gW = [i => SW.getX(i), i => SW.getY(i), i => SW.getZ(i), i => SW.getW(i)];
-    const box = new THREE.Box3(), v = new THREE.Vector3();
-    for (let i = 0; i < P.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (gI[k](i) === hi) w += gW[k](i); if (w > 0.6) box.expandByPoint(v.fromBufferAttribute(P, i)); }
-    if (box.isEmpty()) return;
-    const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
-    const width = Math.min(size.x, size.z * 1.05);
-    info = { width, cranium: new THREE.Vector3(c.x, box.max.y - width * 0.64, c.z - size.z * 0.05), joint: new THREE.Vector3().setFromMatrixPosition(o.skeleton.boneInverses[hi].clone().invert()) };
-  });
-  return (B.headInfo = info);
+// The athlete for one look (Player Studio, award ceremonies), or null for the classic figure.
+export async function athleteFor(look) {
+  if (look && (look.baseBody === 'classic' || look.baseBody === 'procedural')) return null;
+  return loadAthleteSet([look], 30000);
 }
-// Hairstyles drawn as shapes (the body's own short hair and brows stay underneath them).
-const BODY_HAIR = new Set(['crop', 'swept', 'curly', 'long', 'twists', 'afro', 'fade']);
-// The close-up body for a look, or null (classic figure) when it is turned off or cannot load.
-export async function bodyFor(look) {
-  try { const e = chooseBody(await bodyIndex(), look); return e ? await loadBody(e) : null; }
-  catch (e) { console.warn('Close-up body unavailable, using the classic figure:', e && e.message); return null; }
-}
-// Kit on the close-up body: one white fabric material; the part (shirt, collar and cuffs, shorts,
+export function preloadAthletes(lod = 'match') { return athleteBase(lod).then(() => true, () => false); }
+
+// Kit on the athlete: one white fabric material; the part (shirt, collar and cuffs, shorts,
 // stitching, socks, sock bands, drawstring) is in the vertex colour and painted in club colours here,
 // with stripes, hoops or a yoke on the shirt from the bind-pose position (as on the match kit).
 function bodyKitMaterial(src, kc, height) {
@@ -1044,78 +1259,6 @@ function bakeBodyKit(model, kc, height) {
   });
   return () => { for (const [o, geo, mat, baked, plain] of undo) { o.geometry = geo; o.material = mat; baked.dispose(); plain.dispose(); } };
 }
-// Skin: the base body's photo texture, tinted towards his exact tone (a ratio, so the texture's
-// detail stays). Hair layer (scalp, brows, lashes): grey in the file, his hair colour here.
-function bodySkinTint(base, skinIndex) {
-  const want = new THREE.Color(SKIN_PAL[skinIndex] || SKIN_PAL[2]), have = new THREE.Color(base || '#b07850');
-  const r = (a, b) => Math.max(0.55, Math.min(1.5, a / Math.max(0.02, b)));
-  return new THREE.Color(r(want.r, have.r), r(want.g, have.g), r(want.b, have.b));
-}
-function makeBodyFootballer(F, B, geo, m) {
-  const g = new THREE.Group();
-  const lk = m.look || null;
-  const hs = (lk ? lk.heightCm / 100 : 1.8) / B.height;
-  const bw = lk ? 0.95 + lk.build / 15 * 0.11 : 1;
-  const holder = new THREE.Group(); holder.scale.set(S * hs * bw, S * hs, S * hs * bw); g.add(holder);
-  const model = B.clone(B.scene);
-  model.rotation.y = Math.PI / 2;                               // the body faces +Z; our figures face +X
-  holder.add(model);
-  const kc = m.kitColours || { shirt: '#c62828', second: '#ffffff', shorts: '#ffffff', socks: '#c62828', pattern: 0 };
-  const hairCol = new THREE.Color(HAIR_PAL[lk ? lk.hairCol : 0] || HAIR_PAL[0]).lerp(new THREE.Color('#b8b4ae'), lk ? lk.grey || 0 : 0);
-  let kitMat = null;
-  model.traverse(o => {
-    if (!o.isMesh) return;
-    o.frustumCulled = false; o.castShadow = true;
-    const name = o.material && o.material.name;
-    if (name === 'skin') { o.material = o.material.clone(); o.material.color.copy(bodySkinTint(B.skin, lk ? lk.skin : 2)); }
-    else if (name === 'hair') { o.material = o.material.clone(); o.material.color.copy(hairCol); o.material.depthWrite = false; o.renderOrder = 2; o.castShadow = false; }
-    else if (name === 'kit') o.material = kitMat || (kitMat = bodyKitMaterial(o.material, kc, B.height));
-  });
-  const bone = name => model.getObjectByName(name);
-  const spine = bone('spine_03'), handR = bone('hand_r');
-  const bones = { s2: bone('spine_02'), s3: bone('spine_03'), ual: bone('upperarm_l'), uar: bone('upperarm_r'), neck: bone('neck_01') };
-  shapeBody(model, bone, lk);
-  // His hairstyle from his look, fitted to this body's head: the procedural styles (built for the
-  // classic head) scaled to the cranium's width and placed on its centre, on the head bone.
-  const hd = lk && BODY_HAIR.has(lk.hairStyle) && m.hair ? bodyHead(B) : null, headBone = bone('head');
-  if (hd && headBone) {
-    const hair = buildHead(geo, m, lk);
-    for (const c of [...hair.children]) if (!(c.isMesh && c.material === m.hair)) hair.remove(c);
-    hair.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
-    const k = S * hs, d = hd.cranium.clone().sub(hd.joint);                 // model space: the body faces +Z
-    attachToBone(g, headBone, hair, new THREE.Vector3(d.z * k * bw, d.y * k, -d.x * k * bw), k * hd.width / 0.198);
-  }
-  // Number, sponsor and crest sit on the shirt: the chest's depth comes from the body's own build.
-  const k = S * hs, ch = B.chest || { front: 0.15, back: -0.04 }, plateScale = k * 0.92;
-  if (spine && m.number != null) {
-    const plate = new THREE.Mesh(geo.number, new THREE.MeshBasicMaterial({ map: numberTexture(m.number, m.lightNumber !== false, m.shirtName), transparent: true, depthWrite: false }));
-    plate.rotation.y = -Math.PI / 2;
-    attachToBone(g, spine, plate, new THREE.Vector3((ch.back - 0.008) * k * bw, 0.02 * k, 0), plateScale);
-  }
-  if (spine && m.sponsor) {
-    const plate = new THREE.Mesh(geo.sponsor, new THREE.MeshBasicMaterial({ map: sponsorTexture(m.sponsor, m.lightNumber !== false), transparent: true, depthWrite: false }));
-    plate.rotation.y = Math.PI / 2;
-    attachToBone(g, spine, plate, new THREE.Vector3((ch.front + 0.004) * k * bw, -0.05 * k, 0), plateScale);
-  }
-  if (spine && m.crest) {
-    const plate = new THREE.Mesh(geo.crest, new THREE.MeshBasicMaterial({ map: crestTexture(m.crest.initials, m.crest.c1, m.crest.c2), transparent: true, depthWrite: false }));
-    plate.rotation.y = Math.PI / 2;
-    attachToBone(g, spine, plate, new THREE.Vector3((ch.front - 0.012) * k * bw, 0.05 * k, -0.075 * k), plateScale);
-  }
-  const { blob, shadows } = addGroundShadows(g, geo, m);
-  const mixer = new THREE.AnimationMixer(model);
-  const act = {};
-  for (const [key, c] of Object.entries(F.clips)) {
-    const a = mixer.clipAction(c.clip);
-    if (c.loop) { a.setLoop(THREE.LoopRepeat, Infinity); } else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
-    a.enabled = false; act[key] = a;
-  }
-  for (const key of LOCO) if (act[key]) { act[key].enabled = true; act[key].setEffectiveWeight(key === 'idle' ? 1 : 0); act[key].time = Math.random() * act[key].getClip().duration; act[key].play(); }
-  g.userData = { mixer, act, model, holder, head: null, blob, shadows, sy: S * hs, cel: lk ? lk.cel : 0, mocap: true, F, body: B.id, bones: bones.s2 && bones.s3 ? bones : null, bakeKit: () => bakeBodyKit(model, kc, B.height),
-    armR: { hand: handR }, face: 0, spd: 0, lx: null, lz: 0, one: null, w: Object.fromEntries(LOCO.map(key => [key, key === 'idle' ? 1 : 0])), gait: 1 + ((lk ? lk.height : 20) - 20) * 0.004 };
-  return g;
-}
-
 // Club shirt for the motion-captured model. The model has no texture coordinates, so the pattern
 // (1 stripes, 2 hoops, 3 dark yoke) is painted in the shader from each vertex's bind-pose position,
 // which moves with the cloth as the skeleton animates.
@@ -1315,12 +1458,12 @@ export function warmUp({ night = false, quality = 'auto' } = {}) {
 
 export async function createView(container, opts = {}) {
   const t0 = performance.now();
-  if (opts.bodies && !opts.bodySet) opts = { ...opts, bodySet: await loadBodySet(12000) };   // realistic players (cached after the first match)
+  if (opts.bodies && !opts.athletes) opts = { ...opts, athletes: await loadAthleteSet(opts.looks || [], 12000, 'match') };   // the athletes (cached after the first match)
   const view = await buildView(container, opts);
   if (globalThis.__m3dDebug) console.log('prepare createView', Math.round(performance.now() - t0), 'ms');
   return view;
 }
-async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null, bodySet = null } = {}) {
+async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 'tv', boards = ['THE GAFFER'], night = false, quality = 'auto', models = 'mocap', venue = {}, weather = 'clear', kits = null, badges = null, athletes = null } = {}) {
   let F = null;
   if (models !== 'classic') {
     try { F = await Promise.race([loadFootballer(), new Promise((_, no) => setTimeout(() => no(new Error('timed out')), 30000))]); }
@@ -1520,10 +1663,10 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
     const bd = badges && badges[side];
     const mats = { ...kit, ...matsFor(lk), look: lk, hairStyle: (n >> 4) % 4, boot: boots[(n >> 1) % boots.length], blob: blobMat, streak: streakMat, number, lightNumber: !gk, shirtName: String(d.name || '').split(' ').slice(-1)[0], detail: !low,
       sponsor: !gk && bd ? bd.sponsor : null, crest: bd && bd.crest ? bd.crest : null };
-    // A realistic body when the set is loaded (chosen as in the Studio: his choice, heritage, skin).
-    const be = F && bodySet ? chooseBody(bodySet.index, lk) : null, B = be ? bodySet.byId[be.id] : null;
-    if (B) mats.kitColours = gk ? { shirt: gkKit[side][0], second: '#20242c', shorts: '#20242c', socks: gkKit[side][0], pattern: 0 } : team[side].kc;
-    const p = B ? makeBodyFootballer(F, B, geo, mats) : F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
+    // The athlete when it is loaded (unless his Studio profile asks for the classic figure).
+    const ath = F && athletes && !(lk && (lk.baseBody === 'classic' || lk.baseBody === 'procedural'));
+    if (ath) Object.assign(mats, { gk, gloveColour: gk ? '#f4f4f4' : null, kitColours: gk ? { shirt: gkKit[side][0], second: '#20242c', shorts: '#20242c', socks: gkKit[side][0], pattern: 0 } : team[side].kc });
+    const p = ath ? makeAthlete(F, athletes.A, athletes.hair, geo, mats) : F ? makeFootballer(F, geo, mats) : makePlayer(geo, mats);
     p.userData.gk = gk; p.userData.pid = d.id; p.userData.number = number;
     p.userData.face = side === 'home' ? 0 : Math.PI;
     scene.add(p);
@@ -1909,13 +2052,120 @@ export async function animLab(container, { keys = null, cols = 6 } = {}) {
     setTime: (sec) => { for (const { f, key } of figs) { const ac = f.userData.act[key]; ac.time = (sec % ac.getClip().duration); f.userData.mixer.update(0); } renderer.render(scene, camera); } };
 }
 
+// ── Athlete lab (public/dev/athletes.html): a squad of athletes side by side — eleven outfield
+// players and two goalkeepers with different skin tones, faces, hairstyles, beards, builds, ages and
+// kits — from the front, the side, the match camera, or as a grid of faces. With classic: true the
+// same players are drawn as the mannequins, for a before-and-after comparison.
+export const LAB_SQUAD = [
+  { name: 'Okafor', look: { skin: 7, hairStyle: 'afro', hairCol: 0, beardStyle: 'full', head: 1, eyes: 0, brows: 3, heightCm: 186, build: 11, age: 29, faceSeed: 101 } },
+  { name: 'Lindqvist', look: { skin: 0, hairStyle: 'crop', hairCol: 4, beardStyle: 'none', head: 2, eyes: 2, brows: 1, heightCm: 189, build: 8, age: 23, faceSeed: 202 } },
+  { name: 'Moreno', look: { skin: 3, hairStyle: 'fade', hairCol: 1, beardStyle: 'goatee', head: 3, eyes: 1, brows: 2, heightCm: 174, build: 6, age: 26, faceSeed: 303, face: { shape: 'diamond' } } },
+  { name: 'Mensah', look: { skin: 5, hairStyle: 'twists', hairCol: 0, beardStyle: 'stubble', head: 0, eyes: 0, brows: 1, heightCm: 180, build: 9, age: 24, faceSeed: 404 } },
+  { name: 'Haddad', look: { skin: 2, hairStyle: 'long', hairCol: 1, beardStyle: 'moustache', head: 0, eyes: 1, brows: 3, heightCm: 178, build: 7, age: 31, faceSeed: 505, face: { shape: 'long' } } },
+  { name: 'Tanaka', look: { skin: 1, hairStyle: 'swept', hairCol: 0, beardStyle: 'none', head: 1, eyes: 0, brows: 0, heightCm: 172, build: 5, age: 19, faceSeed: 606, heritage: 'east-asian' } },
+  { name: 'Diallo', look: { skin: 6, hairStyle: 'buzz', hairCol: 0, beardStyle: 'chin strap', head: 2, eyes: 0, brows: 2, heightCm: 192, build: 14, age: 33, faceSeed: 707, face: { shape: 'square' } } },
+  { name: 'Silva', look: { skin: 4, hairStyle: 'mohawk', hairCol: 0, beardStyle: 'none', head: 3, eyes: 1, brows: 1, heightCm: 176, build: 6, age: 21, faceSeed: 808 } },
+  { name: 'Murphy', look: { skin: 0, hairStyle: 'curly', hairCol: 5, beardStyle: 'full', head: 1, eyes: 3, brows: 2, heightCm: 183, build: 10, age: 27, faceSeed: 909, face: { shape: 'round' } } },
+  { name: 'Traoré', look: { skin: 7, hairStyle: 'bald', hairCol: 0, beardStyle: 'goatee', head: 0, eyes: 0, brows: 3, heightCm: 185, build: 12, age: 35, grey: 0.3, faceSeed: 1010, face: { shape: 'heart' } } },
+  { name: 'Novak', look: { skin: 1, hairStyle: 'receding', hairCol: 2, beardStyle: 'stubble', head: 2, eyes: 2, brows: 1, heightCm: 181, build: 8, age: 36, grey: 0.55, faceSeed: 1111 } },
+  { name: 'Keller', gk: true, look: { skin: 1, hairStyle: 'crop', hairCol: 3, beardStyle: 'stubble', head: 2, eyes: 2, brows: 1, heightCm: 194, build: 10, age: 28, faceSeed: 1212 } },
+  { name: 'Adeyemi', gk: true, look: { skin: 6, hairStyle: 'fade', hairCol: 0, beardStyle: 'none', head: 1, eyes: 0, brows: 2, heightCm: 191, build: 9, age: 25, faceSeed: 1313 } },
+];
+export async function athleteLab(container, { view = 'front', classic = false, clip = 'idle', squad = LAB_SQUAD, lod = 'full' } = {}) {
+  const F = await loadFootballer();
+  const set = classic ? null : await loadAthleteSet(squad.map(x => x.look), 60000, lod);
+  if (!classic && !set) throw new Error('the athletes did not load');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8fb4d8);
+  scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x3a5a2a, 1.2));
+  const sun = new THREE.DirectionalLight(0xfff1e0, 2.2); sun.position.set(8, 16, 12); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14 }); scene.add(sun);
+  const rim = new THREE.DirectionalLight(0xbcd7ff, 0.9); rim.position.set(-6, 5, -8); scene.add(rim);
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), new THREE.MeshLambertMaterial({ map: pitchTexture() }));
+  grass.rotation.x = -Math.PI / 2; grass.receiveShadow = true; scene.add(grass);
+  const looks = lookKit(true), lam = c => new THREE.MeshLambertMaterial({ color: c });
+  const KITS = [{ shirt: '#c62828', second: '#ffffff', shorts: '#ffffff', socks: '#c62828', pattern: 'vertical-stripes', sponsor: 'GAFFER', crest: { initials: 'RF', c1: '#c62828', c2: '#ffffff' } },
+    { shirt: '#1e4fa3', second: '#9fd0ff', shorts: '#0f2a5a', socks: '#1e4fa3', pattern: 'hoops', sponsor: 'ATLAS', crest: { initials: 'BU', c1: '#1e4fa3', c2: '#ffd400' } }];
+  const GK = ['#f2d21f', '#2bb673'];
+  const figs = [], n = squad.length, blobMat = new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false });
+  squad.forEach((pl, i) => {
+    const gk = !!pl.gk, team = gk ? squad.slice(0, i).filter(x => x.gk).length : i % 2, kit = KITS[team];
+    const shirt = new THREE.Color(gk ? GK[team] : kit.shirt), pattern = gk ? 0 : (KIT_PATTERN[kit.pattern] ?? 0);
+    const lk = pl.look;
+    const m = { ...looks.matsFor(lk), look: lk, detail: true, boot: lam(0x15181d), blob: blobMat,
+      sleeve: lam(shirt), shirt3d: kitShirtMaterial(shirt, pattern, new THREE.Color(kit.second), F.height), shorts: lam(new THREE.Color(gk ? '#20242c' : kit.shorts)), sock: lam(new THREE.Color(gk ? GK[team] : kit.socks)),
+      glove: gk ? lam(0xffffff) : null, number: gk ? 1 : i + 2, shirtName: pl.name, lightNumber: !gk && shirt.getHSL({}).l < 0.62, sponsor: gk ? null : kit.sponsor, crest: kit.crest, gk, gloveColour: gk ? '#f4f4f4' : null,
+      kitColours: { shirt: '#' + shirt.getHexString(), second: kit.second, shorts: gk ? '#20242c' : kit.shorts, socks: gk ? GK[team] : kit.socks, pattern } };
+    const f = set ? makeAthlete(F, set.A, set.hair, looks.geo, m) : makeFootballer(F, looks.geo, m);
+    const u = f.userData;
+    for (const k of Object.keys(u.w)) { u.w[k] = 0; if (u.act[k]) u.act[k].setEffectiveWeight(0); }
+    const a = u.act[clip] || u.act.idle; for (const x of Object.values(u.act)) { x.stop(); x.enabled = false; }
+    a.enabled = true; a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.setEffectiveWeight(1); a.play();
+    f.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    scene.add(f); figs.push({ f, name: pl.name, gk, look: lk });
+  });
+  // Placement per view: a row facing the camera (front), the same row turned side-on (side), or
+  // spread over a patch of pitch under the broadcast camera (match).
+  const gap = 1.25, cx = (n - 1) * gap / 2;
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 400);
+  const place = v => {
+    view = v;
+    figs.forEach(({ f }, i) => {
+      if (v === 'match') { const r = Math.floor(i / 5), c = i % 5; f.position.set((c - 2) * 5 + (r % 2) * 2.5, 0, (r - 1) * 5); f.rotation.y = -Math.PI / 2 + (i % 3 - 1) * 0.5; }
+      else { f.position.set(i * gap - cx, 0, 0); f.rotation.y = v === 'side' ? 0 : -Math.PI / 2; }
+    });
+    if (v === 'match') { camera.fov = 24; camera.position.set(0, 13, 30); camera.lookAt(0, 0.5, 0); }
+    else { camera.fov = 22; camera.position.set(0, 1.35, cx * 2.6 + 6); camera.lookAt(0, 1.15, 0); }
+    camera.updateProjectionMatrix();
+  };
+  place(view);
+  const heads = () => figs.map(({ f }) => { const b = f.userData.model.getObjectByName('head'); const p = new THREE.Vector3(); (b || f).getWorldPosition(p); return p; });
+  const resize = () => { const w = container.clientWidth || 1280, h = container.clientHeight || 720; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+  resize(); addEventListener('resize', resize);
+  const faceCam = new THREE.PerspectiveCamera(24, 1, 0.05, 50);
+  // The faces view: one small viewport per player, the camera in front of his head (or at his side).
+  function drawFaces(side) {
+    const w = renderer.domElement.width / renderer.getPixelRatio(), h = renderer.domElement.height / renderer.getPixelRatio();
+    const cols = Math.ceil(Math.sqrt(n * w / h)), rows = Math.ceil(n / cols), cw = w / cols, chh = h / rows;
+    renderer.setScissorTest(true);
+    renderer.setClearColor(0x1a2430); renderer.clear();
+    heads().forEach((p, i) => {
+      const x = (i % cols) * cw, y = h - (Math.floor(i / cols) + 1) * chh;
+      renderer.setViewport(x, y, cw, chh); renderer.setScissor(x, y, cw, chh);
+      faceCam.aspect = cw / chh; faceCam.updateProjectionMatrix();
+      const fwd = new THREE.Vector3(side ? -1 : 0, 0, side ? 0 : 1);          // in front of him, or at his right
+      faceCam.position.copy(p).addScaledVector(fwd, 0.95).add(new THREE.Vector3(0, 0.08, 0)); faceCam.lookAt(p.x, p.y + 0.06, p.z);
+      renderer.render(scene, faceCam);
+    });
+    renderer.setScissorTest(false); const sz = new THREE.Vector2(); renderer.getSize(sz); renderer.setViewport(0, 0, sz.x, sz.y);
+  }
+  const draw = () => { if (view === 'faces' || view === 'faces-side') { figs.forEach(({ f }, i) => { f.position.set(i * gap * 3 - cx * 3, 0, 0); f.rotation.y = -Math.PI / 2; }); drawFaces(view === 'faces-side'); } else renderer.render(scene, camera); };
+  let last = performance.now(), running = true, frozen = null;
+  const loop = now => { if (!running) return; const dt = Math.min(0.05, (now - last) / 1000); last = now; if (frozen == null) for (const { f } of figs) f.userData.mixer.update(dt); draw(); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  let tris = 0, calls = 0;
+  return {
+    figs: figs.map(x => ({ name: x.name, gk: x.gk, recipe: x.f.userData.athlete || null, hair: x.f.userData.hairStyle || null })),
+    setView(v) { if (v !== 'faces' && v !== 'faces-side') place(v); else view = v; draw(); },
+    // Holds every player at one moment of his clip (for screenshots that match from run to run).
+    setTime(sec) { frozen = sec; for (const { f } of figs) { const u = f.userData; for (const a of Object.values(u.act)) if (a.enabled) a.time = sec % a.getClip().duration; u.mixer.update(0); } draw(); },
+    project(i) { camera.updateMatrixWorld(); const v = new THREE.Vector3(); figs[i].f.getWorldPosition(v); v.y = 2.45; v.project(camera); return [(v.x + 1) / 2, (1 - v.y) / 2]; },
+    info() { renderer.info.reset(); renderer.info.autoReset = false; draw(); tris = renderer.info.render.triangles; calls = renderer.info.render.calls; renderer.info.autoReset = true; return { triangles: tris, calls, programs: renderer.info.programs.length, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures, athlete: set ? { bytes: set.A.bytes, loadMs: set.A.loadMs, hair: Object.keys(set.hair) } : null }; },
+    dispose() { running = false; removeEventListener('resize', resize); renderer.dispose(); renderer.domElement.remove(); },
+  };
+}
+
 // ── Player Studio preview ───────────────────────────────────────────────────────────────────────
 // One footballer, built by exactly the same code as the match players (what the Studio shows is what
 // you see on the pitch), on a lit turntable. setLook() and setKit() rebuild him, playClip() runs any
 // clip from the shared animation set, exportGLB() writes him out as a .glb with his profile inside.
 export async function createStudioView(container, { quality = 'high', bodies = true } = {}) {
   const F = await loadFootballer();
-  let B = null, bodyToken = 0;
+  let AS = null, athToken = 0;                                     // the athlete, once loaded
   const hq = quality !== 'low';
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -1946,7 +2196,7 @@ export async function createStudioView(container, { quality = 'high', bodies = t
       number: kit.showNumber === false ? null : kit.number, shirtName: kit.showNumber === false ? '' : kit.name, lightNumber: !kit.gk && shirt.getHSL({}).l < 0.62,
       sponsor: kit.gk ? null : kit.sponsor || null, crest: kit.crest || null,
       kitColours: { shirt: kit.gk ? (kit.gkColour || '#f2d21f') : kit.shirt, second: kit.second || '#ffffff', shorts: kit.gk ? '#20242c' : kit.shorts, socks: kit.gk ? (kit.gkColour || '#f2d21f') : kit.socks, pattern } };
-    fig = B ? makeBodyFootballer(F, B, looks.geo, m) : makeFootballer(F, looks.geo, m);
+    fig = athleteOn() ? makeAthlete(F, AS.A, AS.hair, looks.geo, { ...m, gk: !!kit.gk, gloveColour: kit.gk ? '#f4f4f4' : null }) : makeFootballer(F, looks.geo, m);
     fig.rotation.y = -Math.PI / 2;                                      // facing the camera
     fig.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
     const u = fig.userData;
@@ -1978,20 +2228,21 @@ export async function createStudioView(container, { quality = 'high', bodies = t
   let last = performance.now(), running = true;
   const loop = now => { if (!running) return; const dt = Math.min(0.05, (now - last) / 1000); last = now; if (fig) fig.userData.mixer.update(dt); placeCamera(); renderer.render(scene, camera); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
-  // The close-up body for this look (loaded once, then cached); the classic figure meanwhile and on failure.
-  // Nothing is fetched until the Studio sets a look, so the first body downloaded is the right one.
+  // The athlete (loaded once, then cached; his hairstyle as he needs it); the classic figure meanwhile,
+  // on failure and when his profile asks for it. Nothing is fetched until the Studio sets a look.
+  const athleteOn = () => !!(AS && bodies && !(look && (look.baseBody === 'classic' || look.baseBody === 'procedural')));
   async function useBody() {
-    if (!bodies || !look) return;
-    const token = ++bodyToken, nb = await bodyFor(look);
-    if (token !== bodyToken) return;
-    if ((nb && nb.id) !== (B && B.id)) { B = nb; build(); container.dispatchEvent(new CustomEvent('gaffer-body', { detail: B ? B.id : null })); }
+    if (!bodies || !look || AS) return;
+    const token = ++athToken, set = await athleteFor(look);
+    if (token !== athToken || !set) return;
+    AS = set; build(); container.dispatchEvent(new CustomEvent('gaffer-body', { detail: 'athlete' }));
   }
   build(); useBody();
   return {
     clips: Object.keys(F.clips),
-    get body() { return B ? { id: B.id, label: B.label, triangles: B.triangles, bytes: B.bytes, loadMs: B.loadMs } : null; },
+    get body() { return athleteOn() ? { id: 'athlete', label: 'Athlete', triangles: AS.A.triangles, bytes: AS.A.bytes, loadMs: AS.A.loadMs, hair: fig && fig.userData.hairStyle } : null; },
     setLook(lk) { look = lk; build(); useBody(); },
-    setBodies(on) { bodies = !!on; if (!bodies) { B = null; build(); } else useBody(); },
+    setBodies(on) { bodies = !!on; build(); if (bodies) useBody(); },
     setKit(k2) { kit = { ...kit, ...k2 }; build(); },
     playClip(k2) { playClip(k2); },
     setSpeed(v) { clipSpeed = Math.max(0.1, Math.min(2, Number(v) || 1)); if (fig) for (const a of Object.values(fig.userData.act)) a.timeScale = clipSpeed; },
@@ -2030,9 +2281,9 @@ export async function readStudioGLB(arrayBuffer) {
 // holding his trophy and celebrating, with confetti. Built by the match renderer: his own look, his
 // club's kit and badges.
 export async function createAwardView(container, { look = null, kit = {}, gk = false, badge = null, trophy = 'cup', quality = 'auto', bodies = true } = {}) {
-  // The close-up body if it is ready within a few seconds; on a slow connection the ceremony goes ahead
-  // with the classic figure, and the body (still downloading) is cached for the next one.
-  const [F, B] = await Promise.all([loadFootballer(), bodies ? Promise.race([bodyFor(look), new Promise(r => setTimeout(() => r(null), BODY_WAIT_MS))]) : null]);
+  // The athlete if he is ready within a few seconds; on a slow connection the ceremony goes ahead with
+  // the classic figure, and the athlete (still downloading) is cached for the next one.
+  const [F, AS] = await Promise.all([loadFootballer(), bodies ? Promise.race([athleteFor(look), new Promise(r => setTimeout(() => r(null), ATH_WAIT_MS))]) : null]);
   const weak = (navigator.hardwareConcurrency || 4) <= 4 && /Mobi|Android/i.test(navigator.userAgent || '');
   const hq = quality === 'high' || (quality === 'auto' && !weak);
   const renderer = new THREE.WebGLRenderer({ antialias: hq });
@@ -2055,7 +2306,7 @@ export async function createAwardView(container, { look = null, kit = {}, gk = f
     shorts: lam(new THREE.Color(gk ? '#20242c' : (kit.shorts || '#f4f4f4'))), sock: lam(new THREE.Color(gk ? (kit.gk || '#f2d21f') : (kit.socks || kit.shirt || '#c62828'))),
     glove: gk ? lam(0xffffff) : null, sponsor: badge && !gk ? badge.sponsor : null, crest: badge ? badge.crest : null, number: null,
     kitColours: { shirt: '#' + shirt.getHexString(), second: kit.second || '#ffffff', shorts: gk ? '#20242c' : (kit.shorts || '#f4f4f4'), socks: gk ? (kit.gk || '#f2d21f') : (kit.socks || kit.shirt || '#c62828'), pattern: gk ? 0 : (KIT_PATTERN[kit.pattern] ?? 0) } };
-  const fig = B ? makeBodyFootballer(F, B, looks.geo, m) : makeFootballer(F, looks.geo, m);
+  const fig = AS ? makeAthlete(F, AS.A, AS.hair, looks.geo, { ...m, gk, gloveColour: gk ? '#f4f4f4' : null }) : makeFootballer(F, looks.geo, m);
   fig.position.y = 0.5; fig.rotation.y = -Math.PI / 2; scene.add(fig);
   const u = fig.userData;
   for (const k of Object.keys(u.w)) { u.w[k] = 0; if (u.act[k]) u.act[k].setEffectiveWeight(0); }

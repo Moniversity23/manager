@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-26",
+  "updated": "2026-11-28",
   "policy": "Only licences allowing commercial use without payment. Add an entry before the asset is used.",
   "assets": [
     {
@@ -269,6 +269,48 @@
       "processed": null,
       "usage": "Interface text",
       "modifications": "None"
+    },
+    {
+      "name": "Athlete base footballer, two levels of detail (Ara 3D Gen exports, with 37 shape targets)",
+      "url": "https://github.com/olatunde85/3d-gen",
+      "creator": "Joshua Olatunde and Ara 3D Gen contributors (exporter, procedural kit); MakeHuman: Data Collection AB, Joel Palmius, Jonas Hauquier (base mesh, modifiers, skins, eyes, brows, lashes, shoes06)",
+      "licence": "MakeHuman data CC0 1.0 (Ara's notice: base mesh, morph targets, skeleton, skins, eyes, eyebrows, eyelashes, hair, clothes and proxy meshes released under CC0 in September 2020); Ara code MIT; \"Characters exported by Ara 3D Gen may be used in commercial and non-commercial projects without attribution\" (assets/animations/licenses/ara3dgen-ASSETS_LICENSE.txt)",
+      "commercialUse": true,
+      "attributionRequired": false,
+      "downloaded": "2026-11-27",
+      "sha256": "99f61d9dd51161e4212165985319e904765d0777c0172fa832abc64e329fb5d7",
+      "original": "FOOTBALL-RALISM-LAB/outputs/gaffer-athletes/ath-*.glb (54 exports, not in git), from the recipes in tools/character-pipeline/athletes/variants.mjs by Ara 3D Gen commit 76d4e13 with the Windows targets fix",
+      "processed": "public/models/athletes/athlete.glb (sha256 005302a913b254eda6465a0024e755370542f386bd91320d33b74b02b8783f32), public/models/athletes/athlete-match.glb (sha256 fec81906619230f2be2db99914b0de22eb8ec2b69945ceadb2be867fe437a0cd); every file and hash in assets/characters/athletes-files.json",
+      "usage": "Every footballer: the 22 players in 3D matches (match level of detail), the Player Studio and award ceremonies (full detail)",
+      "modifications": "tools/character-pipeline/athletes/build-athletes.mjs and optimise.mjs --athlete: one neutral export optimised (simplified, rebound onto the Mesh2Motion skeleton, stylised light skin texture, WebP atlases); 37 targets made from the differences between exports of single MakeHuman modifiers (face features; heritage and age with the change of height removed; build, with the garments following); beard and goalkeeper-glove layers generated; quantised. Measurements in assets/characters/athletes-report.json and athletes-report-match.json"
+    },
+    {
+      "name": "Athlete hairstyles (11, two levels of detail)",
+      "url": "https://github.com/olatunde85/3d-gen",
+      "creator": "MakeHuman: Data Collection AB, Joel Palmius, Jonas Hauquier (short01-04, afro01, long01, braid01, ponytail01: MakeHuman hair proxies and textures); Ara 3D Gen contributors (cornrows, mohawk, buzz: Ara's procedural hair)",
+      "licence": "MakeHuman data CC0 1.0 (Ara's notice: base mesh, morph targets, skeleton, skins, eyes, eyebrows, eyelashes, hair, clothes and proxy meshes released under CC0 in September 2020); Ara code MIT; \"Characters exported by Ara 3D Gen may be used in commercial and non-commercial projects without attribution\" (assets/animations/licenses/ara3dgen-ASSETS_LICENSE.txt)",
+      "commercialUse": true,
+      "attributionRequired": false,
+      "downloaded": "2026-11-27",
+      "sha256": "(raw exports not kept in git)",
+      "original": "FOOTBALL-RALISM-LAB/outputs/gaffer-athletes/ath-<style>.glb",
+      "processed": "public/models/athletes/hair-<style>.glb and hair-<style>-match.glb (hashes in assets/characters/athletes-files.json)",
+      "usage": "The players' hairstyles (each loaded only when a player in view wears it)",
+      "modifications": "Hair parts kept, simplified (more for the match level of detail), rebound onto the Mesh2Motion skeleton, textures made grey (tinted to each player's colour) at 256 px, each vertex tied to the nearest scalp vertex (_SKINREF) so the hair follows the head's shape"
+    },
+    {
+      "name": "Athlete beards and goalkeeper gloves (generated)",
+      "url": "(this repository)",
+      "creator": "The Gaffer (tools/character-pipeline/athletes/build-athletes.mjs)",
+      "licence": "The game's own; the area where each beard grows is measured at build time from Ara's beard cards (MIT code)",
+      "commercialUse": true,
+      "attributionRequired": false,
+      "downloaded": "2026-11-27",
+      "sha256": "(part of athlete.glb and athlete-match.glb)",
+      "original": "-",
+      "processed": "layers inside public/models/athletes/athlete*.glb",
+      "usage": "Beards (goatee, short, full, moustache, stubble) and keepers' gloves",
+      "modifications": "Generated: copies of the skin over the area, offset outward, with a procedural strand texture and soft edges"
     }
   ]
 }

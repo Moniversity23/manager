@@ -35,6 +35,10 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const [IN, OUT] = args;
 const KIT_RATIO = +opt('kit-ratio', 0.5), BOOT_RATIO = +opt('boot-ratio', 0.45), SKIN_PX = +opt('skin', 1024);
+// Athlete detail (athletes/build-athletes.mjs): how much of the head, the body's skin and the eyes is
+// kept, and the simplifier's error allowed for each (a lighter match athlete allows more).
+const HEAD_RATIO = +opt('head-ratio', 0.62), BODY_RATIO = +opt('body-ratio', 0.3), EYE_RATIO = +opt('eye-ratio', 0.42);
+const HEAD_ERR = +opt('head-error', 0.0018), BODY_ERR = +opt('body-error', 0.006), PART_ERR = +opt('part-error', 0.004);
 // MakeHuman's shoes come up over the ankle (24–26 cm) with a white ankle sock painted on their
 // texture above about 10 cm. That part becomes sock (kit material, sock colour), so the club's socks
 // run down into the boot. Heights in metres in Ara's own scale. --skin-under-sock 0.52 is the older,
@@ -47,6 +51,14 @@ const BOOT_CUT = +opt('boot-cut', 0);
 // --cut 0 turns this off.
 const CUT = +opt('cut', 0.012), HEM = +opt('hem', 0.03), PULL_MIN = +opt('pull-min', 0.004), PULL_MAX = +opt('pull-max', 0.015);
 const REPORT = opt('report', null);
+// --athlete: the base of the athletes (athletes/build-athletes.mjs). Medium detail, so the head is
+// simplified gently and the body skin hard; every skin, eye, brow and lash vertex keeps the raw
+// vertex it came from (_RAWA, _RAWB, _RAWT: a corner made by the cut under the kit lies between
+// two), so morph targets can be computed after the optimisation; the skin is stylised; the mouth
+// goes; quantising is left to the athlete build (after the morph targets are added).
+const ATHLETE = args.includes('--athlete');
+const PROVENANCE_PARTS = new Set(['Skin', 'Eyes', 'Eyebrows', 'Eyelashes', 'Skin details']);
+const HEAD_JOINTS = /^(head|neck|neck1|headtop_end)$/i;
 
 // Ara part → the Gaffer's group, and the kit region code kept in COLOR_0 (decoded in match3d.js).
 const PARTS = {
@@ -78,6 +90,7 @@ async function main() {
   // 1–2. Parts: drop, compact, weld, simplify.
   const mesh = root.listMeshes()[0];
   const prims = mesh.listPrimitives().slice();
+  if (ATHLETE) addProvenance(doc, prims);
   const covered = CUT > 0 ? hideCoveredSkin(prims) : null;
   const unknown = [];
   for (const p of prims) {
@@ -115,10 +128,12 @@ async function main() {
       for (let i = 0; i < pa.length; i++) pa[i] += na[i] * part.inflate;
       P.setArray(pa);
     }
+    if (ATHLETE && name === 'Skin') { await simplifySkinByRegion(doc, mesh, p); p.setExtras({ part: name }); continue; }
+    if (ATHLETE && name === 'Eyes') { weldPrimitive(p, { tolerance: 0.0001 }); const n0 = p.getIndices().getCount() / 3; await simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio: EYE_RATIO, error: Math.max(0.002, HEAD_ERR), lockBorder: true }); compactPrimitive(p); log(`simplified Eyes: ${n0} → ${p.getIndices().getCount() / 3} triangles`); p.setExtras({ part: name }); continue; }
     if (part.simplify && part.simplify < 1) {
       weldPrimitive(p, { tolerance: 0.0001 });
       const n0 = p.getIndices().getCount() / 3;
-      await simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio: part.simplify, error: 0.004, lockBorder: true });
+      await simplifyPrimitive(p, { simplifier: MeshoptSimplifier, ratio: part.simplify, error: PART_ERR, lockBorder: true });
       compactPrimitive(p);
       log(`simplified ${name}: ${n0} → ${p.getIndices().getCount() / 3} triangles`);
     }
@@ -136,9 +151,10 @@ async function main() {
 
   // 5. Join each group into one primitive, then tidy and quantise.
   joinGroups(doc, mesh);
-  await doc.transform(dedup(), prune({ keepAttributes: true }), quantize({ pattern: /^(NORMAL|TEXCOORD|JOINTS|WEIGHTS|COLOR)/, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8, quantizeColor: 8, cleanup: true }));
+  if (ATHLETE) await doc.transform(dedup(), prune({ keepAttributes: true }));
+  else await doc.transform(dedup(), prune({ keepAttributes: true }), quantize({ pattern: /^(NORMAL|TEXCOORD|JOINTS|WEIGHTS|COLOR)/, quantizeNormal: 10, quantizeTexcoord: 12, quantizeWeight: 8, quantizeColor: 8, cleanup: true }));
   doc.createExtension(EXTTextureWebP).setRequired(true);
-  doc.createExtension(KHRMeshQuantization).setRequired(true);   // 16-bit normals and UVs, 8-bit weights
+  if (!ATHLETE) doc.createExtension(KHRMeshQuantization).setRequired(true);   // 16-bit normals and UVs, 8-bit weights
   for (const t of root.listTextures()) {
     const img = await sharp(Buffer.from(t.getImage())).webp({ quality: t.getName().includes('normal') ? 90 : 86, alphaQuality: 90, effort: 6 }).toBuffer();
     t.setImage(new Uint8Array(img)).setMimeType('image/webp');
@@ -258,6 +274,9 @@ function hideCoveredSkin(prims) {
     const t = (lo + hi) / 2, id = el.POSITION.length;
     for (const sem of sems) {
       if (/^(JOINTS|WEIGHTS)_/.test(sem)) continue;
+      if (sem === '_RAWA') { el[sem].push([el._RAWA[i][0]]); continue; }
+      if (sem === '_RAWB') { el[sem].push([el._RAWA[j][0]]); continue; }
+      if (sem === '_RAWT') { el[sem].push([t]); continue; }
       const e = lerp(el[sem][i], el[sem][j], t);
       el[sem].push(sem === 'NORMAL' || sem === 'TANGENT' ? unit(e) : e);
     }
@@ -392,7 +411,7 @@ async function buildMaterials(doc, mesh) {
     const f = byPart['Skin'].getMaterial().getBaseColorFactor().slice(0, 3).map(v => Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2));
     let skinPipe = (await imageOf(tex('Skin'))).resize(S, S);
     if (f.some(v => v < 0.999)) skinPipe = skinPipe.removeAlpha().linear(f, [0, 0, 0]);
-    const skinImg = await skinPipe.toBuffer();
+    const skinImg = ATHLETE ? await stylisedSkin(await skinPipe.png().toBuffer(), S) : await skinPipe.toBuffer();
     const eyeImg = tex('Eyes') ? await (await imageOf(tex('Eyes'))).resize(E, E).toBuffer() : null;
     const atlas = await sharp({ create: { width: S, height: H, channels: 3, background: '#000' } }).composite([{ input: skinImg, left: 0, top: 0 }, ...(eyeImg ? [{ input: eyeImg, left: 0, top: S }] : [])]).png().toBuffer();
     remapUV(byPart['Skin'], 0, 0, 1, S / H);
@@ -402,7 +421,7 @@ async function buildMaterials(doc, mesh) {
   // Hair atlas: the hair layer (scalp, stubble), then brows and lashes; grey so it can be tinted.
   {
     const D = 512, B = 256, H = D + B, WID = tex('Hair') ? 2 * D : D;
-    const grey = async (t, w, h) => { const im = (await imageOf(t)).resize(w, h).ensureAlpha(); const { data, info } = await im.raw().toBuffer({ resolveWithObject: true }); let mx = 1; for (let i = 0; i < data.length; i += 4) { const l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]; if (data[i + 3] > 20) mx = Math.max(mx, l); } for (let i = 0; i < data.length; i += 4) { const l = Math.min(255, Math.round((0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]) / mx * 255)); data[i] = data[i + 1] = data[i + 2] = l; } return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(); };
+    const grey = async (t, w, h) => { const im = (await imageOf(t)).resize(w, h).ensureAlpha(); const { data, info } = await im.raw().toBuffer({ resolveWithObject: true }); let mx = 1; for (let i = 0; i < data.length; i += 4) { const l = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]; if (data[i + 3] > 20) mx = Math.max(mx, l); } if (ATHLETE) { const lum = []; for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 128) lum.push(0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]); lum.sort((a, b) => a - b); mx = Math.max(8, lum.length ? lum[lum.length >> 1] : 128) / 190 * 255; } for (let i = 0; i < data.length; i += 4) { const l = Math.min(255, Math.round((0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]) / mx * 255)); data[i] = data[i + 1] = data[i + 2] = l; } return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer(); };
     const comp = [];
     const fx = D / WID;   // atlas width in cells of D
     if (tex('Skin details')) { comp.push({ input: await grey(tex('Skin details'), D, D), left: 0, top: 0 }); remapUV(byPart['Skin details'], 0, 0, fx, D / H); }
@@ -458,4 +477,72 @@ function joinGroups(doc, mesh) {
   }
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+// ── Athlete mode ──────────────────────────────────────────────────────────────
+// Provenance: which raw vertex each vertex came from. Ara's parts share one vertex buffer, so one
+// accessor per shared buffer gives every part its raw indices; compaction carries them along.
+function addProvenance(doc, prims) {
+  const made = new Map(), buf = doc.getRoot().listBuffers()[0];
+  for (const p of prims) {
+    const name = p.getMaterial() ? p.getMaterial().getName() : '';
+    if (!PROVENANCE_PARTS.has(name)) continue;
+    const P = p.getAttribute('POSITION');
+    if (!made.has(P)) {
+      const n = P.getCount(), a = new Float32Array(n), t = new Float32Array(n);
+      for (let i = 0; i < n; i++) a[i] = i;
+      made.set(P, [doc.createAccessor('_RAWA').setType('SCALAR').setArray(a).setBuffer(buf), doc.createAccessor('_RAWB').setType('SCALAR').setArray(a.slice()).setBuffer(buf), doc.createAccessor('_RAWT').setType('SCALAR').setArray(t).setBuffer(buf)]);
+    }
+    const [A, B, T] = made.get(P);
+    p.setAttribute('_RAWA', A).setAttribute('_RAWB', B).setAttribute('_RAWT', T);
+  }
+}
+// The skin at medium detail: the head (skin weighted to the head and neck) keeps its shape with a
+// gentle simplification; the body's skin (mostly hidden by the kit, and cut away beneath it) is
+// simplified hard. The two pieces are simplified with their borders locked and joined again.
+async function simplifySkinByRegion(doc, mesh, p) {
+  const skin = doc.getRoot().listSkins()[0], names = skin.listJoints().map(j => j.getName());
+  const J = p.getAttribute('JOINTS_0'), W = p.getAttribute('WEIGHTS_0'), n = J.getCount(), headW = new Float32Array(n), j4 = [0, 0, 0, 0], w4 = [0, 0, 0, 0];
+  for (let i = 0; i < n; i++) { J.getElement(i, j4); W.getElement(i, w4); for (let k = 0; k < 4; k++) if (HEAD_JOINTS.test(names[j4[k]] || '')) headW[i] += w4[k]; }
+  const ia = p.getIndices().getArray(), head = [], body = [];
+  for (let t = 0; t < ia.length; t += 3) ((headW[ia[t]] + headW[ia[t + 1]] + headW[ia[t + 2]]) / 3 >= 0.5 ? head : body).push(ia[t], ia[t + 1], ia[t + 2]);
+  const n0 = ia.length / 3, pieces = [];
+  for (const [list, ratio, error] of [[head, HEAD_RATIO, HEAD_ERR], [body, BODY_RATIO, BODY_ERR]]) {
+    if (!list.length) continue;
+    const q = p.clone(); q.setIndices(p.getIndices().clone().setArray(new Uint32Array(list))); compactPrimitive(q);
+    weldPrimitive(q, { tolerance: 0.0001 });
+    await simplifyPrimitive(q, { simplifier: MeshoptSimplifier, ratio, error, lockBorder: true });
+    compactPrimitive(q); pieces.push(q);
+  }
+  const joined = joinPrimitives(pieces);
+  for (const q of pieces) q.dispose();
+  for (const sem of p.listSemantics()) p.setAttribute(sem, joined.getAttribute(sem));
+  p.setIndices(joined.getIndices()); joined.dispose();
+  weldPrimitive(p, { tolerance: 0.0001 });
+  log(`simplified the skin: ${n0} → ${p.getIndices().getCount() / 3} triangles (head ${head.length / 3} kept finer, body ${body.length / 3} simplified hard)`);
+}
+// A stylised skin: photographic detail (pores, blotches, hair) is smoothed away and colour
+// variation is evened out, keeping the soft shape of the features (lips, lids, cheeks). The game
+// tints it to each player's own tone.
+async function stylisedSkin(png, S) {
+  const soft = await sharp(png).resize(S, S).median(5).blur(3.2).toBuffer();
+  const { data, info } = await sharp(soft).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < data.length; i += 3) { const l = (data[i] + data[i + 1] + data[i + 2]) / 3; if (l > 30 && l < 235) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n++; } }
+  r /= n; g /= n; b /= n;
+  const out = Buffer.alloc(data.length);
+  // One base serves every skin tone (the game multiplies the texture by each player's tone over this
+  // one), so the texture is moved to a light neutral tone: a multiply can darken it to any tone but
+  // could not lighten a dark texture.
+  const REF = [214, 176, 152], f = [REF[0] / r, REF[1] / g, REF[2] / b];
+  for (let i = 0; i < data.length; i += 3) {
+    // Pull every pixel two thirds of the way to the average tone, keeping its brightness shape.
+    const lum = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11) / (r * 0.3 + g * 0.59 + b * 0.11);
+    const k = Math.max(0.55, Math.min(1.3, lum));
+    out[i] = Math.min(255, Math.round((data[i] * 0.34 + r * k * 0.66) * f[0]));
+    out[i + 1] = Math.min(255, Math.round((data[i + 1] * 0.34 + g * k * 0.66) * f[1]));
+    out[i + 2] = Math.min(255, Math.round((data[i + 2] * 0.34 + b * k * 0.66) * f[2]));
+  }
+  return sharp(out, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer();
+}
+
+export { hideCoveredSkin, rebindToGaffer, buildMaterials, joinGroups, PARTS, DROP };
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e); process.exit(1); });

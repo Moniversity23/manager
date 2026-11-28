@@ -339,9 +339,9 @@ a.hl{color:var(--bl);text-decoration:none}a.hl:hover{text-decoration:underline}
 .bd-pi select{max-width:170px}
 @media(max-width:760px){.bd-wrap{grid-template-columns:minmax(0,1fr)}.bd-bench{flex-direction:row;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}.bd-card{min-width:168px;scroll-snap-align:start}.bd-pitch{min-height:330px}.bd-disc{width:42px;height:42px;font-size:17px}.bd-tabs button{font-size:12px}}
 /* Player cards: colour by tier (bronze, silver, gold, elite, icon) */
-.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px;margin-bottom:12px}
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;margin-bottom:12px}
 .sq-cards{background:none;border:none}
-.pcard{position:relative;display:flex;flex-direction:column;align-items:center;padding:10px 9px 8px;border-radius:16px;border:none;cursor:pointer;font:inherit;text-align:center;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .12s,box-shadow .12s;background:linear-gradient(160deg,var(--c1) 0%,var(--c2) 100%);color:var(--c3);min-width:0}
+.pcard{position:relative;display:flex;flex-direction:column;align-items:center;padding:8px 7px 7px;border-radius:14px;border:none;cursor:pointer;font:inherit;text-align:center;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .12s,box-shadow .12s;background:linear-gradient(160deg,var(--c1) 0%,var(--c2) 100%);color:var(--c3);min-width:0}
 .pcard:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.45)}
 .pcard::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 75% 8%,rgba(255,255,255,.5),transparent 52%),repeating-linear-gradient(115deg,rgba(255,255,255,.06) 0 6px,transparent 6px 14px);pointer-events:none}
 .pcard>*{position:relative}
@@ -350,27 +350,54 @@ a.hl{color:var(--bl);text-decoration:none}a.hl:hover{text-decoration:underline}
 .pcard.k3{--c1:#ffe79c;--c2:#d19c1d;--c3:#2b1d00}
 .pcard.k4{--c1:#8ff6e6;--c2:#178f9f;--c3:#032528}
 .pcard.k5{--c1:#3a3550;--c2:#0d0b18;--c3:#ffd76a}
-.pc-top{position:absolute;left:10px;top:9px;display:flex;flex-direction:column;align-items:center;line-height:1;z-index:1}
-.pc-ovr{font-family:var(--fn);font-weight:900;font-size:31px;letter-spacing:-.01em}
-.pc-pos{font-weight:800;font-size:12px;letter-spacing:.06em;margin-top:1px}
-.pc-nat{font-size:9.5px;font-weight:800;opacity:.7;margin-top:4px;letter-spacing:.04em}
-.pc-face{margin:0 0 2px 30px;filter:drop-shadow(0 4px 5px rgba(0,0,0,.35))}
-.pc-name{font-family:var(--fn);font-weight:900;font-size:17px;letter-spacing:.03em;text-transform:uppercase;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(0,0,0,.16);padding-top:4px;line-height:1.1}
+.pc-top{position:absolute;left:8px;top:7px;display:flex;flex-direction:column;align-items:center;line-height:1;z-index:1}
+.pc-ovr{font-family:var(--fn);font-weight:900;font-size:26px;letter-spacing:-.01em}
+.pc-pos{font-weight:800;font-size:11px;letter-spacing:.06em;margin-top:1px}
+.pc-nat{font-size:9px;font-weight:800;opacity:.7;margin-top:4px;letter-spacing:.04em}
+.pc-face{margin:0 0 2px 24px;filter:drop-shadow(0 4px 5px rgba(0,0,0,.35))}
+.pc-name{font-family:var(--fn);font-weight:900;font-size:14.5px;letter-spacing:.03em;text-transform:uppercase;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid rgba(0,0,0,.16);padding-top:4px;line-height:1.1}
 .pcard.k5 .pc-name{border-top-color:rgba(255,215,106,.25)}
-.pc-role{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:9px;background:rgba(0,0,0,.14);margin:4px 0 6px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-role{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:8px;background:rgba(0,0,0,.14);margin:3px 0 5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pcard.k5 .pc-role{background:rgba(255,215,106,.14)}
-.pc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px 9px;width:100%;font-size:10.5px;font-weight:700;opacity:.92}
-.pc-stats span{display:flex;align-items:baseline;justify-content:center;gap:3px}
-.pc-stats b{font-family:var(--fn);font-size:15px;font-weight:900}
-.pc-foot{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:7px;font-size:10.5px;font-weight:800}
+.pc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:3px 4px;width:100%;font-size:8.5px;letter-spacing:.04em;font-weight:700;opacity:.92}
+.pc-stats span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1.05}
+.pc-stats b{font-family:var(--fn);font-size:13px;font-weight:900}
+.pc-foot{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:6px;font-size:9.5px;font-weight:800}
 .pc-fitbar{flex:1;height:5px;border-radius:3px;background:rgba(0,0,0,.2);margin:0 7px;overflow:hidden}.pc-fitbar i{display:block;height:100%}
 .pc-pot{letter-spacing:-.05em;font-size:10px}
 .pc-flag{position:absolute;right:8px;top:8px;font-size:15px}
-.pcard.big{width:200px;flex:none;cursor:default;padding:12px 11px 10px}
-.pcard.big .pc-ovr{font-size:40px}.pcard.big .pc-name{font-size:20px}
+.pcard.big{width:180px;flex:none;cursor:default;padding:10px 9px 9px}
+.pcard.big .pc-ovr{font-size:34px}.pcard.big .pc-name{font-size:18px}
 .pp-hero{align-items:flex-start;gap:16px}
 .pp-role{display:inline-block;margin:4px 0 2px;font-weight:800;font-size:13px;color:var(--ac);background:rgba(0,229,204,.1);border:1px solid rgba(0,229,204,.3);border-radius:10px;padding:2px 10px}
-@media(max-width:640px){.pcards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pc-face{margin-left:26px}.pc-name{font-size:15px}.pp-hero{flex-direction:column;align-items:center;text-align:center}.pcard.big{width:min(220px,80vw)}}
+@media(max-width:640px){.pcards{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}.pc-face{margin-left:18px}.pc-name{font-size:12.5px}.pc-ovr{font-size:22px}.pc-stats{gap:2px 2px;font-size:8px}.pc-stats b{font-size:12px}.pc-role{font-size:8.5px}.pp-hero{flex-direction:column;align-items:center;text-align:center}.pcard.big{width:min(200px,72vw)}}
+/* Formation pitch (Lineup, match board): each player placed from his formation's layout. */
+.fp{position:relative;width:100%;aspect-ratio:.78;max-height:640px;margin:0 auto;border-radius:14px;overflow:hidden;background:repeating-linear-gradient(180deg,#1d7a3c 0 9%,#228644 9% 18%);box-shadow:inset 0 0 0 2px rgba(255,255,255,.14)}
+.fp::before{content:'';position:absolute;inset:4% 5%;border:2px solid rgba(255,255,255,.26);border-radius:3px;pointer-events:none;background:linear-gradient(rgba(255,255,255,.26),rgba(255,255,255,.26)) center/100% 2px no-repeat}
+.fp::after{content:'';position:absolute;left:50%;top:50%;width:22%;aspect-ratio:1;border:2px solid rgba(255,255,255,.26);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.fp-box{position:absolute;left:26%;width:48%;height:12%;border:2px solid rgba(255,255,255,.26);pointer-events:none}.fp-box.t{top:4%;border-top:none}.fp-box.b{bottom:4%;border-bottom:none}
+.fp-spot{position:absolute;transform:translate(-50%,-50%);z-index:1}
+/* Compact player card: overall rating, slot, suitability mark, portrait, name, condition. */
+.lc{position:relative;display:flex;flex-direction:column;align-items:center;width:66px;padding:4px 3px 5px;border:none;border-radius:10px;cursor:pointer;font:inherit;text-align:center;color:var(--c3);background:linear-gradient(160deg,var(--c1),var(--c2));box-shadow:0 3px 8px rgba(0,0,0,.35);line-height:1;min-width:0;transition:transform .1s}
+.lc:hover{transform:translateY(-2px)}
+.lc.k1{--c1:#e2ad7c;--c2:#8b5530;--c3:#2b1606}.lc.k2{--c1:#f2f5f9;--c2:#9aa6b5;--c3:#1a2330}.lc.k3{--c1:#ffe79c;--c2:#d19c1d;--c3:#2b1d00}.lc.k4{--c1:#8ff6e6;--c2:#178f9f;--c3:#032528}.lc.k5{--c1:#3a3550;--c2:#0d0b18;--c3:#ffd76a}
+.lc-o{position:absolute;left:4px;top:3px;font-family:var(--fn);font-weight:900;font-size:17px;letter-spacing:-.02em}
+.lc-p{position:absolute;right:4px;top:4px;font-size:9px;font-weight:900;letter-spacing:.03em}
+.lc-s{position:absolute;right:3px;top:15px;width:14px;height:14px;border-radius:50%;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.lc-sn{background:#18a957}.lc-so{background:#e08a12}.lc-sx{background:#d63c3c}
+.lc-f{display:block;height:32px;margin-top:13px}
+.lc-n{display:block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.02em;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.lc-c{display:block;width:84%;height:3px;border-radius:2px;background:rgba(0,0,0,.25);margin-top:3px;overflow:hidden}.lc-c i{display:block;height:100%}
+.lc-sel{outline:3px solid var(--yw);outline-offset:1px;z-index:2}.lc-with{outline:3px solid var(--ac);outline-offset:1px;z-index:2}
+.lc-mine{box-shadow:0 0 0 2px var(--ac),0 3px 8px rgba(0,0,0,.35)}.lc-in{box-shadow:0 0 0 2px var(--gr),0 3px 8px rgba(0,0,0,.35)}.lc-out{opacity:.85}
+.lc-inj{opacity:.55}.lc-flag{position:absolute;left:2px;bottom:10px;font-size:10px}
+.lc-empty{background:rgba(255,255,255,.1);color:var(--tx);border:1px dashed rgba(255,255,255,.35);height:72px;justify-content:center;box-shadow:none}.lc-empty .lc-n{margin-top:14px;font-weight:700;text-transform:none;opacity:.7}
+.lc-tag{position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font-size:8.5px;font-weight:900;padding:1px 5px;border-radius:6px;color:#fff}.lc-tag.o{background:var(--rd)}.lc-tag.i{background:var(--gr);color:#002}.lc-tag.m{background:var(--yw);color:#221}
+.lc-row{display:flex;flex-wrap:wrap;gap:8px}
+.lu-prev{margin-top:10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)}.lu-prev.on{position:sticky;bottom:10px;z-index:5;border-color:var(--yw);box-shadow:0 8px 26px rgba(0,0,0,.5)}
+.lu-pv{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lu-pv-p{display:flex;gap:8px;align-items:center;flex:1;min-width:190px}.lu-pv-p .lc{flex:none;cursor:default}.lu-pv-x{font-size:20px;color:var(--yw);font-weight:900}
+.fp-bd{max-height:520px}
+@media(max-width:640px){.lc{width:58px}.lc-o{font-size:15px}.lc-f{height:27px;margin-top:12px}.lc-n{font-size:9px}.fp{aspect-ratio:.72}.lu-pv-p .lc{display:none}.lu-pv-p{min-width:0}.lu-pv{gap:4px}}
 /* ── 2026-11-27 visual refresh (default theme) ───────────────────────── */
 :root:not([data-theme="light"]){--bg:#0c1731;--s1:#13244b;--s2:#182c59;--s3:#1f3768;--bd:#2a4578;--bd2:#38579a;--tx:#eef4ff;--dim:#a6bbdf;--mut:#5b78a9;--gr:#22e57c;--bl:#56b6ff;--rd:#ff5d62;--or:#ffb547;--yw:#ffd84d;--ac:#16e3c1;--gold:#ffd166}
 :root:not([data-theme="light"]) body{background:radial-gradient(1200px 600px at 85% -10%,rgba(46,110,255,.22),transparent 60%),radial-gradient(900px 500px at -10% 110%,rgba(22,227,193,.12),transparent 60%),linear-gradient(180deg,#0c1731,#0a1428)}
@@ -669,7 +696,7 @@ async function advance(){
   if (STATE.manager && STATE.manager.status === 'sacked') { navTo('career'); return notify('You were sacked — choose a new club in Career & Board.', 'w'); }
   if (STATE.liveMatch) return STATE.liveMatch.phase === 'full' ? finishLive() : showHalftime(LIVE = STATE.liveMatch);
   audioStop(); try { window.GafferCommentary && window.GafferCommentary.unlock(); } catch {}
-  if ((PREFS.viewMode || '3d') === '3d' && PREFS.models !== 'classic') import('./match3d.js').then(m => { if (PREFS.matchBodies !== false) m.loadBodySet(60000); return m.loadFootballer().then(() => m.warmUp({ quality: PREFS.gfx || 'auto' })); }).catch(() => {});   // players, bodies and shaders load while the week simulates   // load the players and compile their shaders while the week simulates
+  if ((PREFS.viewMode || '3d') === '3d' && PREFS.models !== 'classic') import('./match3d.js').then(m => { if (PREFS.matchBodies !== false) m.preloadAthletes(); return m.loadFootballer().then(() => m.warmUp({ quality: PREFS.gfx || 'auto' })); }).catch(() => {});   // players, bodies and shaders load while the week simulates   // load the players and compile their shaders while the week simulates
   sfx('click');
   busy = true; updateTopbar();
   const r = await post('/api/step-week', { interactive: true });
@@ -885,12 +912,14 @@ const shapeOf = (v, side) => {
   return { ...base, line: base.line + l * (l > 0 ? 0.045 : 0.04), width: base.width * (1 + w * (w > 0 ? 0.09 : 0.1)), compact: base.compact * (1 + w * (w > 0 ? 0.04 : 0.08)) };
 };
 let VIEW = null;
+const CENTRAL = new Set(['CDM', 'CM', 'CAM', 'ST', 'CF']);
 function basePositions(lineup, mirror){
-  const used = {};
+  const used = {}, count = {};
+  for (const s of lineup || []) count[s.slot] = (count[s.slot] || 0) + 1;
   return (lineup || []).map(s => {
     const [x, ys] = SLOT_POS[s.slot] || [0.5, [0.5]];
     const i = used[s.slot] = (used[s.slot] || 0) + 1;
-    const y = ys[(i - 1) % ys.length];
+    const y = count[s.slot] === 1 && CENTRAL.has(s.slot) ? 0.5 : ys[(i - 1) % ys.length];
     return { id: s.playerId, name: s.name, slot: s.slot, rt: s.rt ?? null, bx: mirror ? 1 - x : x, by: y, x: mirror ? 1 - x : x, y, off: false };
   });
 }
@@ -929,7 +958,9 @@ function playHalf(match, fromMin, toMin, done){
   if (use3d) start3D(VIEW); else requestAnimationFrame(viewTick);
 }
 const VIEW_MODES = [['3d', '3D stadium'], ['full', 'Full 2D'], ['key', 'Key moments'], ['commentary', 'Commentary'], ['instant', 'Instant result']];
-const view3dOptions = m => ({ bodies: PREFS.matchBodies !== false && PREFS.models !== 'classic', homeHue: m.lineups.homeHue ?? 210, awayHue: m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', m.home, m.away, 'THE GAFFER'], night: matchNight(m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: m.lineups.capacity, attendance: m.lineups.attendance, name: m.home }, weather: matchWeather(m), kits: m.lineups.kits || null, badges: m.lineups.badges || null });
+// Every look in the match (starters and substitutes), so the athletes' hairstyles load with the match.
+const matchLooks = m => [...(m.lineups.home || []), ...(m.lineups.away || [])].map(x => x.look).filter(Boolean).concat(Object.values(m.lineups.looks || {}));
+const view3dOptions = m => ({ bodies: PREFS.matchBodies !== false && PREFS.models !== 'classic', looks: matchLooks(m), homeHue: m.lineups.homeHue ?? 210, awayHue: m.lineups.awayHue ?? 0, cam: () => PREFS.cam || 'tv', boards: [STATE.sponsor ? STATE.sponsor.name : 'THE GAFFER', m.home, m.away, 'THE GAFFER'], night: matchNight(m), quality: PREFS.gfx || 'auto', models: PREFS.models || 'mocap', venue: { capacity: m.lineups.capacity, attendance: m.lineups.attendance, name: m.home }, weather: matchWeather(m), kits: m.lineups.kits || null, badges: m.lineups.badges || null });
 
 // ── Highlights ──────────────────────────────────────────────────────
 // Every goal, big save and shot off the woodwork shown in 3D is kept as a clip (the recorded
@@ -1528,9 +1559,10 @@ function stepPositions(now, dt){
       if (p0 >= 1 && s.attack && s.attack.header && s.pass.toIdx === s.attack.shooter && s.pass.steal == null && s.poss === s.attack.side) { const z = ball.z; simShoot(v, Math.max(0.3, secsTo)); if (s.shot) { s.shot.z0 = z; s.strike.header = true; s.strike.z0 = z; } }
       else if (p0 >= 1) { const ps = s.pass; if (ps.steal != null) simGive(v, otherSide(s.poss), ps.steal, rnd(0.6, 1.6)); else simGive(v, s.poss, ps.toIdx, s.attack && s.attack.header && s.attack.side === s.poss ? 0.2 : rnd(0.6, 1.9)); s.touch = { side: s.poss, idx: s.holder, t0: s.t, chest: !!(ps.plan && ps.plan.chest && ps.steal == null) }; audioEv(ps.plan && ps.plan.zEnd > 0.25 ? 'HEADER' : ps.lob > 0 ? 'BOUNCE' : 'TOUCH', { side: s.poss, x: ball.x }); }
     } else {
-      const hv = Math.hypot(h.vx || 0, (h.vy || 0) * 0.65), touch = 0.007 + 0.006 * Math.abs(Math.sin(s.t * 7));
-      const ox = hv > 0.012 ? h.vx / hv * touch : dir * 0.008, oy = hv > 0.012 ? h.vy / hv * touch * 1.4 : 0;
-      ball.x += (h.x + ox - ball.x) * 0.5; ball.y += (h.y + oy - ball.y) * 0.5; ball.z *= 0.6;
+      // In his hands (throw-in, keeper) the ball goes with him; otherwise he dribbles it, which is
+      // worked out after everyone has moved this step (simDribble), so it never lags behind him.
+      const inHands = (s.throwIn && !s.throwIn.done && s.poss === s.throwIn.side && s.holder === s.throwIn.idx) || (s.gkBall && !s.gkBall.done && s.poss === s.gkBall.side && s.holder === s.gkBall.idx);
+      s.dribbleNow = !inHands;
       if (s.throwIn && !s.throwIn.done && s.poss === s.throwIn.side && s.holder === s.throwIn.idx) { ball.x = h.x; ball.y = h.y; ball.z = 0.36; }
       if (s.gkBall && !s.gkBall.done && s.poss === s.gkBall.side && s.holder === s.gkBall.idx) { ball.x = h.x + dir * 0.004; ball.y = h.y; ball.z = 0.2; }
       if (s.t >= s.nextAt) simPass(v, secsTo);
@@ -1640,12 +1672,53 @@ function stepPositions(now, dt){
       d.x += d.vx * dt; d.y += d.vy * dt; d.tx = tx; d.ty = ty;
     });
   }
+  if (s.dribbleNow) { s.dribbleNow = false; if (s.phase === 'play' && !s.pass) simDribble(v, s, dt); }
   // Crowd noise follows the danger: louder as a chance builds.
   if (s.t >= s.exciteAt) {
     s.exciteAt = s.t + 0.3;
     const danger = s.phase === 'celebrate' ? 1 : s.attack ? 0.45 + 0.55 * (1 - Math.min(1, secsTo / 4.5)) : Math.max(0, Math.abs(ball.x - 0.5) - 0.25) * 1.2;
     try { if (window.GafferSound && window.GafferSound.excite && PREFS.sound !== false) window.GafferSound.excite(danger, s.attack ? s.attack.side : s.poss); } catch {}
   }
+}
+// Dribbling. The ball is its own object: the carrier plays it ahead along his run with a touch
+// every stride (alternate feet, a little to the side of the touching foot); it leaves the foot
+// quickly, slows as it rolls, and he runs onto it. Close control when slow (about half a metre
+// ahead), pushed up to nearly two metres ahead at a sprint. A change of direction takes it round
+// his side on a curve, never through him, and if it is ever behind him or out of reach the next
+// touch comes at once. Worked out in metres and match-view seconds after the players have moved,
+// so it does not depend on the frame rate or the speed setting. The view only follows the
+// engine's possession: who has the ball never comes from here.
+const DRIB_M = [105, 68];
+function simDribble(v, s, dt){
+  const ball = v.ball, h = (v.dots[s.poss] || [])[s.holder]; if (!h) return;
+  const [MX, MY] = DRIB_M, hx = h.x * MX, hy = h.y * MY, vx = (h.vx || 0) * MX, vy = (h.vy || 0) * MY, spd = Math.hypot(vx, vy);
+  let dr = s.drib;
+  if (!dr || dr.side !== s.poss || dr.idx !== s.holder) dr = s.drib = { side: s.poss, idx: s.holder, t0: s.t, T: 1e-4, from: [ball.x * MX, ball.y * MY], to: [ball.x * MX, ball.y * MY], ctrl: null, next: s.t, foot: 1, fx: sideDir(s.poss), fy: 0 };
+  // His line: where he is going (his run's target), else where he runs, else the way he last faced.
+  // Going by his target keeps the ball on the right side when he turns, before his speed catches up.
+  const gx = h.tx != null ? (h.tx - h.x) * MX : 0, gy = h.ty != null ? (h.ty - h.y) * MY : 0, gl = Math.hypot(gx, gy);
+  if (gl > 0.6) { dr.fx = gx / gl; dr.fy = gy / gl; } else if (spd > 0.5) { dr.fx = vx / spd; dr.fy = vy / spd; }
+  const fx = dr.fx, fy = dr.fy;
+  const roll = k => { const t = 1 - (1 - k) * (1 - k);                            // out of the foot fast, slowing as it rolls
+    if (!dr.ctrl) return [dr.from[0] + (dr.to[0] - dr.from[0]) * t, dr.from[1] + (dr.to[1] - dr.from[1]) * t];
+    const a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+    return [a * dr.from[0] + b * dr.ctrl[0] + c * dr.to[0], a * dr.from[1] + b * dr.ctrl[1] + c * dr.to[1]]; };
+  let [bx, by] = roll(Math.min(1, (s.t - dr.t0) / dr.T));
+  const rx = bx - hx, ry = by - hy, dist = Math.hypot(rx, ry), along = rx * fx + ry * fy;
+  const lead = 0.45 + Math.min(1, spd / 9) * 1.4;
+  const every = spd < 1.2 ? 0.5 : Math.max(0.36, 0.62 - spd * 0.025);        // about one touch a stride
+  const recover = (along < 0.12 || dist > lead + 1.4) && s.t - dr.t0 > 0.12;  // fallen behind or out of reach
+  if (s.t >= dr.next || recover) {
+    dr.foot = -dr.foot;
+    const side = 0.11 * dr.foot, roll = recover ? 0.28 : every;               // a recovery is a quick prod that overtakes him
+    const tx = hx + fx * spd * roll + fx * lead - fy * side, ty = hy + fy * spd * roll + fy * lead + fx * side;
+    // A big change of direction (a turn or a drag-back): round his side, not through him.
+    const turn = dist > 0.05 && (rx * fx + ry * fy) / dist < 0.3;
+    if (turn) { const sgn = (-rx * fy + ry * fx) >= 0 ? 1 : -1; dr.ctrl = [hx - fy * sgn * 0.7 + fx * 0.25, hy + fx * sgn * 0.7 + fy * 0.25]; } else dr.ctrl = null;
+    dr.from = [bx, by]; dr.to = [tx, ty]; dr.t0 = s.t; dr.T = roll; dr.next = s.t + Math.max(roll, every);
+    s.touch = { side: s.poss, idx: s.holder, t0: s.t, foot: dr.foot, turn };   // the view plays the touch
+  }
+  ball.x = bx / MX; ball.y = by / MY; ball.z *= Math.max(0, 1 - dt * 12);
 }
 function drawPitch(now){
   const v = VIEW; const cv = document.getElementById('mvCanvas'); if (!cv || !cv.getContext) return;
@@ -1949,7 +2022,7 @@ function playerCard(p, opts = {}){
   const tag = opts.static ? 'div' : 'button';
   return `<${tag} class="pcard ${cardTier(ovr ?? 0)}${opts.big ? ' big' : ''}" data-s="${esc(String(p.name || '').toLowerCase())} ${esc(String(p.position || '').toLowerCase())}" ${opts.static ? '' : `onclick="showPlayer(${p.id})"`} title="${esc(p.name)}">
     <span class="pc-top"><span class="pc-ovr">${p.fog && p.ovrLo != null ? '~' + Math.round((p.ovrLo + p.ovrHi) / 2) : ovr ?? '–'}</span><span class="pc-pos">${esc(p.position || '')}</span><span class="pc-nat" title="${esc(p.nation || '')}">${esc(natCode(p.nation))}</span></span>
-    <span class="pc-face">${playerPortrait(p, opts.big ? 104 : 78)}</span>
+    <span class="pc-face">${playerPortrait(p, opts.big ? 92 : 64)}</span>
     <span class="pc-name">${esc(surname)}</span>
     <span class="pc-role">${esc(playerRole(p))}</span>
     <span class="pc-stats">${CARD_STATS.map(([l, f]) => { const v = f(a); return `<span><b>${v ?? '?'}</b>${l}</span>`; }).join('')}</span>
@@ -2167,40 +2240,130 @@ function slotFit(p, slot){
 const sqById = id => (STATE.squad || []).find(p => p.id === id);
 const notFit = p => (p.injured ? 'Injured' : p.suspension ? `Suspended (${p.suspension} match${p.suspension > 1 ? 'es' : ''})` : '');
 
+// ── LINEUP ──────────────────────────────────────────────────────────────────────
+// The starting XI on a pitch in its formation's own shape (STATE.formationLayouts: the same table
+// the match board draws from), with the bench and the rest of the squad beside it, every player a
+// compact card: his overall rating (the big number, the same as on his player card), the slot, a
+// separate mark for how well he suits it (✓ natural, ≈ can play there, ! out of position, with his
+// rating there in the preview) and his condition. Tap a player, then the one to exchange him with:
+// two starters swap places; a starter and a substitute or reserve swap in and out; two substitutes
+// swap seats. The preview shows both players' cards and what changes; nothing is sent until Confirm.
+// Before a match every change is free; during one, substitutions are made on the match board
+// (pause, half-time), within the competition's limits.
+let LU = { sel: null, with: null };
+// [depth from his own goal, across from the left] for each place of a formation (by slotKey order).
+function formationSpots(formation, entries){
+  const L = ((STATE && STATE.formationLayouts) || {})[formation];
+  const idx = e => +String(e.slotKey || '').split('-').pop() - 1;
+  if (L && entries.every(e => L[idx(e)])) return entries.map(e => L[idx(e)]);
+  // An unknown shape: each slot's usual depth, players of the same slot spread across.
+  const depth = { GK: 0.05, CB: 0.2, LB: 0.24, RB: 0.24, CDM: 0.35, CM: 0.46, CAM: 0.58, LW: 0.62, RW: 0.62, ST: 0.79, CF: 0.75 };
+  const side = { LB: 0.12, LW: 0.14, RB: 0.88, RW: 0.86 }, n = {}, k = {};
+  for (const e of entries) n[e.slot] = (n[e.slot] || 0) + 1;
+  return entries.map(e => { const i = k[e.slot] = (k[e.slot] || 0) + 1; return [depth[e.slot] ?? 0.46, side[e.slot] ?? (0.5 + (i - 1 - (n[e.slot] - 1) / 2) * 0.22)]; });
+}
+// Where a spot is drawn on a pitch shown upright (his own goal at the bottom), in percent.
+const spotCss = ([d, x]) => `left:${(x * 100).toFixed(1)}%;top:${((0.9 - (d - 0.05) / 0.76 * 0.8) * 100).toFixed(1)}%`;
+// How well a player suits a slot: a mark of its own, apart from his overall rating.
+function suitOf(p, slot){
+  if (!p || !slot) return null;
+  const [t, c] = slotFit(p, slot), k = p.position === slot ? 'n' : c === 'var(--or)' ? 'o' : 'x';
+  return { k, t, c, r: slotRating(p, slot), mark: { n: '✓', o: '≈', x: '!' }[k] };
+}
+// A compact card. p: the player (or a stand-in with name, position, ovr); o: { slot, fit, act, cls, tag }.
+function miniCard(p, o = {}){
+  if (!p) return `<button class="lc lc-empty ${o.cls || ''}" ${o.act ? `onclick="${o.act}"` : ''}><span class="lc-p">${esc(o.slot || '')}</span><span class="lc-n">Empty</span></button>`;
+  const judged = o.suit !== undefined ? o.suit : o.slot;
+  const s = judged ? suitOf(p, judged) : null, fit = o.fit ?? p.fit, sur = String(p.name || '').split(' ').slice(1).join(' ') || p.name || '?';
+  const title = `${p.name} — ${p.ovr ?? '?'} overall${s ? `; ${s.r} as ${judged} (${s.t.toLowerCase()})` : ''}${fit != null ? `; condition ${fit}%` : ''}`;
+  return `<button class="lc ${cardTier(p.ovr ?? 0)} ${o.cls || ''}${p.injured ? ' lc-inj' : ''}" ${o.act ? `onclick="${o.act}"` : ''} title="${esc(title)}">
+    <span class="lc-o">${p.ovr ?? '–'}</span><span class="lc-p">${esc(o.slot || p.position || '')}</span>${s ? `<span class="lc-s lc-s${s.k}" title="${esc(s.t)}">${s.mark}</span>` : ''}
+    ${o.face === false ? '' : `<span class="lc-f">${playerPortrait(p, o.big ? 40 : 32)}</span>`}
+    <span class="lc-n">${esc(sur)}</span>
+    ${fit != null ? `<span class="lc-c"><i style="width:${fit}%;background:${fitColor(fit)}"></i></span>` : ''}
+    ${o.tag || ''}${p.injured ? '<span class="lc-flag">🏥</span>' : p.suspension ? '<span class="lc-flag">🟥</span>' : ''}
+  </button>`;
+}
+function luParse(key){ if (!key) return null; const i = key.indexOf(':'); return { kind: key.slice(0, i), key: key.slice(i + 1) }; }
+function luWho(k){
+  const xi = STATE.currentXI || [], bench = STATE.bench || [];
+  if (k.kind === 'xi') { const s = xi.find(x => x.slotKey === k.key); return s ? { id: s.playerId, slot: s.slot, p: s.playerId ? sqById(s.playerId) : null } : null; }
+  if (k.kind === 'bench') { const b = bench[+k.key]; return { id: b ? b.playerId : null, slot: null, p: b ? sqById(b.playerId) : null, seat: +k.key }; }
+  return { id: +k.key, slot: null, p: sqById(+k.key) };
+}
+function luTap(key){
+  if (!LU.sel) LU.sel = key;
+  else if (LU.sel === key) LU.sel = LU.with = null;
+  else if (!LU.with) LU.with = key;
+  else { LU.sel = key; LU.with = null; }
+  const A = luParse(LU.sel), B = luParse(LU.with);
+  if (A && B && A.kind === 'res' && B.kind === 'res') { LU.sel = key; LU.with = null; }   // two reserves: nothing to exchange
+  refresh();
+}
+function luCancel(){ LU.sel = LU.with = null; refresh(); }
+// What the exchange does, in words and cards, before anything is sent.
+function luPreview(){
+  const A = luParse(LU.sel), B = luParse(LU.with);
+  if (!A) return '<div class="small dim">Tap a player, then the one to exchange him with: two starters swap places, a substitute or reserve comes in for a starter, two substitutes swap seats. Nothing changes until you confirm.</div>';
+  const a = luWho(A);
+  if (!B) return `<div class="small"><b>${esc(a && a.p ? a.p.name : 'Empty place')}</b> selected${a && a.slot ? ` (${esc(a.slot)})` : ''}. Now tap the player to exchange him with. <a href="#" onclick="luCancel();return false">Cancel</a>${a && a.p ? ` · <a href="#" onclick="showPlayer(${a.p.id});return false">Profile</a>` : ''}${A.kind === 'xi' ? ` · <a href="#" onclick="openPicker('xi','${A.key}');return false">Compare everyone</a>` : ''}</div>`;
+  const b = luWho(B);
+  // Each takes the other's place: a starter's slot, a bench seat, or out of the matchday squad.
+  const place = k => (k.kind === 'xi' ? (luWho(k) || {}).slot || '?' : k.kind === 'bench' ? 'the bench' : 'out of the squad');
+  const line = (who, to, toKind) => {
+    if (!who || !who.p) return '';
+    const s = toKind === 'xi' ? suitOf(who.p, to) : null;
+    return `<div class="lu-pv-p">${miniCard(who.p, { slot: toKind === 'xi' ? to : null, face: true, big: true })}<div class="small"><b>${esc(who.p.name)}</b> → ${esc(to)}<br>${who.p.ovr} overall${s ? ` · <span style="color:${s.c}">${s.r} as ${esc(to)} · ${esc(s.t.toLowerCase())}</span>` : ''}<br><span style="color:${fitColor(who.p.fit)}">${who.p.fit}% condition</span>${notFit(who.p) ? ` · <span style="color:var(--rd)">${notFit(who.p)}</span>` : ''}</div></div>`;
+  };
+  return `<div class="lu-pv">${line(a, place(B), B.kind)}<div class="lu-pv-x">⇄</div>${line(b, place(A), A.kind)}</div>
+    <div class="row mt8"><button class="btn bp" onclick="luConfirm()">✓ Confirm</button><button class="btn bg" onclick="luCancel()">Cancel</button></div>`;
+}
+async function luConfirm(){
+  const A = luParse(LU.sel), B = luParse(LU.with); if (!A || !B) return;
+  const xi = STATE.currentXI || [];
+  const manual = new Map((STATE.manualXI || []).map(m => [m.slotKey, m.playerId]));
+  let bench = (STATE.bench || []).map(b => b.playerId);
+  const idOf = k => (k.kind === 'xi' ? (xi.find(s => s.slotKey === k.key) || {}).playerId ?? null : k.kind === 'bench' ? bench[+k.key] ?? null : +k.key);
+  const a = idOf(A), b = idOf(B);
+  const put = (k, id) => { if (k.kind === 'xi') { if (id != null) manual.set(k.key, id); else manual.delete(k.key); } else if (k.kind === 'bench') bench[+k.key] = id; };
+  put(A, b); put(B, a);
+  bench = bench.filter(x => x != null);
+  LU.sel = LU.with = null;
+  await sendLineup(manual, A.kind === 'bench' || B.kind === 'bench' ? bench : null, 'Lineup updated');
+}
 function rLineup(){
   const xi = STATE.currentXI || [], squad = STATE.squad || [], bench = STATE.bench || [];
   const manual = new Set((STATE.manualXI || []).map(m => m.slotKey));
-  const rowsOf = { GK: 0, CB: 1, LB: 1, RB: 1, CDM: 2, CM: 3, LW: 4, RW: 4, CAM: 4, ST: 5, CF: 5 };
-  const lines = [[], [], [], [], [], []];
-  xi.forEach(s => lines[rowsOf[s.slot] ?? 3].push(s));
   const filled = xi.filter(s => s.playerId), avg = a => (a.length ? Math.round(a.reduce((t, v) => t + v, 0) / a.length) : 0);
-  const tile = (s, _i, l) => {
-    const p = s.playerId ? sqById(s.playerId) : null;
-    return `<button class="pslot ${manual.has(s.slotKey) ? 'manual' : ''} ${p ? '' : 'empty'}" onclick="openPicker('xi','${s.slotKey}')">
-      <div class="sl">${esc(s.slot)}${manual.has(s.slotKey) ? ' · yours' : ''}</div><div class="nm" title="${esc(s.playerName || '')}">${esc(s.playerName ? (l.length > 3 ? s.playerName.split(' ').slice(1).join(' ') || s.playerName : s.playerName) : 'Empty')}</div>
-      ${p ? `<div class="pmeta">${rb(s.slotRating)}<span style="color:${fitColor(s.fit)}">${s.fit}%</span>${p.form != null ? rb10(p.form) : ''}</div>${p.position !== s.slot ? `<div class="small" style="color:var(--or)">${p.ovr} as ${esc(p.position)} · ${s.slotRating} here</div>` : ''}` : '<div class="small dim">tap to pick</div>'}
-    </button>`;
-  };
+  const spots = formationSpots(STATE.formation, xi);
+  const selCls = key => (LU.sel === key ? ' lc-sel' : LU.with === key ? ' lc-with' : '');
+  const pitch = xi.map((s, i) => { const p = s.playerId ? sqById(s.playerId) : null, key = `xi:${s.slotKey}`;
+    return `<div class="fp-spot" style="${spotCss(spots[i])}">${miniCard(p, { slot: s.slot, fit: s.fit, act: `luTap('${key}')`, cls: selCls(key) + (manual.has(s.slotKey) ? ' lc-mine' : '') })}</div>`; }).join('');
   const inSquad = new Set([...filled.map(s => s.playerId), ...bench.map(b => b.playerId)]);
-  const rest = squad.filter(p => !inSquad.has(p.id)).sort((a, b) => b.ovr - a.ovr);
-  const seat = i => {
-    const b = bench[i], p = b ? sqById(b.playerId) : null;
-    if (!p) return `<div class="lu-row" onclick="openPicker('bench','${i}')"><span class="pos pm" style="opacity:.4">–</span><span class="lu-n dim">Empty seat — tap to pick</span><span class="lu-act">Pick ›</span></div>`;
-    return `<div class="lu-row" onclick="openPicker('bench','${i}')">${posPill(p.position)}${rb(p.ovr)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${p.age} yrs · form ${p.form != null ? Number(p.form).toFixed(1) : '–'} · ${p.seasonStats.goals}G ${p.seasonStats.assists}A</span></span><span style="color:${fitColor(p.fit)};font-family:var(--fm);font-size:12px">${p.fit}%</span><span class="lu-act">Change ›</span></div>`;
-  };
-  return `<div class="sct">Lineup <span class="scs">${esc(STATE.formation)} · ${STATE.manualLineupSet ? 'your picks + assistant' : 'assistant picks'}</span></div>
-  <div class="g2">
-    <div class="card"><div class="ch">Starting XI <span class="small dim">tap a player to change him</span></div>
-      <div class="pitch">${lines.slice().reverse().filter(l => l.length).map(l => `<div class="prow">${l.map(tile).join('')}</div>`).join('')}</div>
-      <div class="lu-sum"><span>Team rating <b>${avg(filled.map(s => s.slotRating))}</b></span><span>Average condition <b style="color:${fitColor(avg(filled.map(s => s.fit)))}">${avg(filled.map(s => s.fit))}%</b></span><span>${manual.size} of ${xi.length} picked by you</span></div>
-      <div class="small dim mt8">On each player: his rating in that position, his condition and his recent form. A teal border is your pick; the rest are chosen by your assistant, who rotates only for condition (under 75%), injury or a clearly better option.</div>
+  const rest = squad.filter(p => !inSquad.has(p.id)).sort((a, b) => POS_ORDER.indexOf(a.position) - POS_ORDER.indexOf(b.position) || b.ovr - a.ovr);
+  // A selection that no longer exists (a new formation, a player moved elsewhere) is dropped.
+  const valid = key => { const k = luParse(key); if (!k) return false; if (k.kind === 'xi') return xi.some(x => x.slotKey === k.key); if (k.kind === 'bench') return +k.key >= 0 && +k.key < 7; return rest.some(q => q.id === +k.key); };
+  if (LU.sel && !valid(LU.sel)) LU.sel = LU.with = null;
+  if (LU.with && !valid(LU.with)) LU.with = null;
+  const sel = LU.sel ? luWho(luParse(LU.sel)) : null;
+  const seats = Array.from({ length: 7 }, (_, i) => { const b = bench[i], p = b ? sqById(b.playerId) : null, key = `bench:${i}`; return miniCard(p, { act: `luTap('${key}')`, cls: selCls(key), slot: p ? null : 'SUB', suit: sel && sel.slot ? sel.slot : null }); }).join('');
+  const live = !!STATE.liveMatch;
+  return `<div class="sct">Lineup <span class="scs">${STATE.manualLineupSet ? 'your picks + assistant' : 'assistant picks'}</span></div>
+  ${live ? '<div class="card" style="padding:9px 12px;border-color:var(--or)"><b style="color:var(--or)">A match is in progress.</b> <span class="small">Changes here count from the next match; substitutions in this one are made on the match board (pause or half-time).</span></div>' : ''}
+  <div class="g2 lu2">
+    <div class="card"><div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><div class="ch" style="margin:0;flex:1">Starting XI</div>
+        <label class="small dim" for="luForm">Formation</label><select id="luForm" style="width:auto" onchange="setTac('formation', this.value)">${(STATE.formations || Object.keys(STATE.formationShapes || {})).map(f => `<option ${f === STATE.formation ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
+      <div class="fp fp-lu"><i class="fp-box t"></i><i class="fp-box b"></i>${pitch}</div>
+      <div class="lu-sum"><span>Overall <b>${avg(filled.map(s => (sqById(s.playerId) || {}).ovr || 0))}</b></span><span title="Average rating of each player in his slot">In position <b>${avg(filled.map(s => s.slotRating))}</b></span><span>Condition <b style="color:${fitColor(avg(filled.map(s => s.fit)))}">${avg(filled.map(s => s.fit))}%</b></span><span>${manual.size} of ${xi.length} yours</span></div>
+      <div class="lu-prev${LU.sel ? ' on' : ''}">${luPreview()}</div>
+      <div class="small dim mt8">The big number is each player's overall rating. The mark beside the slot is how well he suits it: <b style="color:var(--gr)">✓</b> natural, <b style="color:var(--or)">≈</b> can play there, <b style="color:var(--rd)">!</b> out of position; the bar is his condition. A teal outline is your own pick; the assistant chooses the rest, rotating only for condition (under 75%), injury or a clearly better option.</div>
       ${(STATE.selectionChanges || []).length ? `<div class="card mt8" style="padding:9px"><div class="ch">Assistant's changes this week</div>${STATE.selectionChanges.map(c => `<div class="small">${esc(c.outName || '—')} → ${esc(c.inName || '—')} <span class="dim">(${esc(c.reason)})</span></div>`).join('')}</div>` : ''}
-      <div class="row mt12"><button class="btn br bsm" onclick="clearLineup()">Reset everything to the assistant</button></div>
+      <div class="row mt12"><button class="btn br bsm" onclick="LU.sel=LU.with=null;clearLineup()">Reset everything to the assistant</button></div>
     </div>
     <div>
-      <div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">Bench <span class="small dim">${bench.length} of 7 · tap to change</span></div>${Array.from({ length: 7 }, (_, i) => seat(i)).join('')}</div>
-      <div class="card" style="padding:0;overflow:hidden"><div class="ch" style="padding:12px 12px 4px">Not in the matchday squad <span class="small dim">${rest.length}</span></div>
-        ${rest.length ? rest.map(p => `<div class="lu-row" onclick="showPlayer(${p.id})">${posPill(p.position)}${rb(p.ovr)}<span class="lu-n"><b>${esc(p.name)}</b><span class="small dim">${p.age} yrs · form ${p.form != null ? Number(p.form).toFixed(1) : '–'}${notFit(p) ? ` · <span style="color:var(--rd)">${notFit(p)}</span>` : ''}</span></span><span style="color:${fitColor(p.fit)};font-family:var(--fm);font-size:12px">${p.fit}%</span></div>`).join('') : '<div class="small dim" style="padding:12px">Everyone is involved.</div>'}
+      <div class="card"><div class="ch">Substitutes <span class="small dim">${bench.length} of 7</span></div><div class="lc-row">${seats}</div></div>
+      <div class="card"><div class="ch">Rest of the squad <span class="small dim">${rest.length}${sel && sel.slot ? ` · ✓ ≈ ! for ${esc(sel.slot)}` : ''}</span></div>
+        ${rest.length ? `<div class="lc-row">${rest.map(p => miniCard(p, { act: `luTap('res:${p.id}')`, cls: selCls(`res:${p.id}`), suit: sel && sel.slot ? sel.slot : null })).join('')}</div>` : '<div class="small dim">Everyone is in the matchday squad.</div>'}
       </div>
     </div>
   </div>`;
@@ -2252,7 +2415,7 @@ function pickCard(c, d, isCur){
   const [vt, vc] = isCur ? ['', ''] : pickVerdict(c, d.cur, d.curR);
   return `<div class="pk ${isCur ? 'pk-cur' : ''} ${c.out ? 'pk-out' : ''}" ${isCur || c.out ? '' : `onclick="choosePick(${p.id})"`}>
     <div class="pk-top">${playerPortrait(p, 42)}${posPill(p.position)}<div class="pk-n"><b>${esc(p.name)}</b><div class="small" style="color:${fitCol}">${p.age != null ? `<span class="dim">${p.age} yrs · </span>` : ''}${fitTxt}</div></div>
-      <div class="pk-r"><span class="rb big ${tier(c.r)}">${c.r}</span>${diff != null ? `<span class="pk-d" style="color:${diff > 0 ? 'var(--gr)' : diff < 0 ? 'var(--rd)' : 'var(--dim)'}">${diff > 0 ? '+' + diff : diff === 0 ? '=' : diff}</span>` : ''}</div></div>
+      <div class="pk-r"><span class="rb big ${tier(p.ovr ?? c.r)}" title="Overall rating">${p.ovr ?? c.r}</span>${slot ? `<span class="pk-d" title="His rating in this position" style="color:${diff == null ? 'var(--dim)' : diff > 0 ? 'var(--gr)' : diff < 0 ? 'var(--rd)' : 'var(--dim)'}">${c.r} here${diff != null ? ` (${diff > 0 ? '+' + diff : diff === 0 ? '=' : diff})` : ''}</span>` : diff != null ? `<span class="pk-d" style="color:${diff > 0 ? 'var(--gr)' : diff < 0 ? 'var(--rd)' : 'var(--dim)'}">${diff > 0 ? '+' + diff : diff === 0 ? '=' : diff}</span>` : ''}</div></div>
     <div class="pk-stats"><span><i>Condition</i><b style="color:${fitColor(p.fit)}">${p.fit}%</b></span><span><i>Morale</i><b style="color:${p.mor >= 65 ? 'var(--gr)' : p.mor >= 45 ? 'var(--or)' : 'var(--rd)'}">${p.mor ?? '–'}</b></span><span><i>Form</i>${p.form != null ? rb10(p.form) : '<b class="dim">–</b>'}</span><span><i>Season</i><b>${ss.goals || 0}G ${ss.assists || 0}A</b></span><span><i>Games</i><b>${ss.apps || 0}</b></span></div>
     <div class="pk-stats pk-attrs">${attrs}</div>
     ${isCur ? '' : `<div class="pk-foot"><b style="color:${vc}">${vt}</b><span class="small dim">${esc(c.where)}</span>${c.out ? '' : '<span class="pk-go">Choose ›</span>'}</div>`}
@@ -2268,7 +2431,7 @@ function renderPicker(){
     ${d.cur ? `<div class="small dim" style="margin-bottom:4px">${PICK.kind === 'sub' ? 'COMING OFF' : 'THERE NOW'}</div>${pickCard({ p: d.cur, r: d.curR }, d, true)}` : '<div class="small dim" style="margin-bottom:8px">Nobody is here yet.</div>'}
     ${d.canAuto ? '<button class="btn bg bsm fw" style="margin-bottom:8px" onclick="autoSlot()">Let the assistant choose this position</button>' : ''}
     <div class="chips" style="margin:10px 0 6px"><span class="small dim">Order by</span>${[['rating', d.slot ? 'Best here' : 'Best rated'], ['fit', 'Freshest'], ['form', 'In form']].map(([k, l]) => `<button class="chip ${PICK.sort === k ? 'on' : ''}" onclick="PICK.sort='${k}';renderPicker()">${l}</button>`).join('')}</div>
-    <div class="small dim" style="margin-bottom:8px">The big number is his rating ${d.slot ? 'in this position' : 'in his own position'}; the number beside it is the difference from the player above. Green ▲ and red ▼ compare each key attribute with him too. ${esc(d.note || '')}</div>
+    <div class="small dim" style="margin-bottom:8px">The big number is his overall rating${d.slot ? '; beside it, his rating in this position and the difference from the player above' : '; beside it, the difference from the player above'}. Green ▲ and red ▼ compare each key attribute with him too. ${esc(d.note || '')}</div>
     ${cands.length ? cands.map(c => pickCard(c, d, false)).join('') : '<div class="small dim">Nobody else is available.</div>'}`;
   document.getElementById('pickMoContent').scrollTop = 0;
 }
@@ -2388,18 +2551,16 @@ function bdRenderSubs(){
   const h = HT.h, sel = BOARD.sel, left = bdSubsLeft(), wins = bdWindowsLeft();
   const lim = document.getElementById('bdLimits');
   if (lim) lim.innerHTML = `<b>${Math.max(0, left)}</b> of ${h.maxSubs} substitutions left${BOARD.mode === 'ht' ? ' · half-time is a free window' : ` · <b>${Math.max(0, wins)}</b> window${wins === 1 ? '' : 's'} left`}`;
-  const line = bdLineup(), rows = [[], [], [], [], [], []];
-  for (const x of line) rows[BD_ROW[x.slot] ?? 3].push(x);
-  const lat = x => (/^L/.test(x.slot) ? 0 : /^R/.test(x.slot) ? 2 : 1);           // left to right across each line
-  for (const r of rows) r.sort((a, b) => lat(a) - lat(b));
+  // The team in its formation's own shape, each player a compact card: his overall rating, his slot,
+  // how well he suits it (a separate mark) and his condition now.
+  const line = bdLineup(), spots = formationSpots(h.formation, line);
   const outSlot = sel.out != null ? (line.find(x => x.playerId === sel.out) || {}).slot : null;
-  const tok = x => {
-    const r = bdRating(x.playerId, x.slot), f = x.in ? (bdFit(x.playerId) ?? 100) : bdFit(x.playerId);
-    const cls = sel.out === x.playerId ? 'out' : x.in ? 'in' : BOARD.move === x.playerId ? 'mv' : '';
-    return `<button class="bd-tok ${cls}" onclick="bdTapPitch(${x.playerId})" title="${esc(bdName(x.playerId))}">
-      <span class="bd-disc">${r ?? '–'}<span class="bd-pos">${esc(x.slot)}</span>${sel.out === x.playerId ? '<span class="bd-tag o">OUT</span>' : x.in ? '<span class="bd-tag i">IN</span>' : x.moved ? '<span class="bd-tag m">⇄</span>' : ''}</span>
-      <span class="bd-nm">${esc(bdShort(bdName(x.playerId)))}</span>
-      <span class="bd-fit"><i style="width:${f ?? 0}%;background:${fitColor(f ?? 0)}"></i></span></button>`;
+  const bdPlayer = id => { const q = sqById(id), e = (h.onPitch || []).concat(h.bench || []).find(x => x.playerId === id) || {}; return q ? { ...q, name: bdName(id) } : { id, name: bdName(id), position: e.position, ovr: e.ovr, attrs: {} }; };
+  const tok = (x, i) => {
+    const f = x.in ? (bdFit(x.playerId) ?? 100) : bdFit(x.playerId);
+    const cls = sel.out === x.playerId ? ' lc-sel lc-out' : x.in ? ' lc-in' : BOARD.move === x.playerId ? ' lc-sel' : '';
+    const tag = sel.out === x.playerId ? '<span class="lc-tag o">OUT</span>' : x.in ? '<span class="lc-tag i">IN</span>' : x.moved ? '<span class="lc-tag m">⇄</span>' : '';
+    return `<div class="fp-spot" style="${spotCss(spots[i])}">${miniCard({ ...bdPlayer(x.playerId), injured: false, suspension: 0 }, { slot: x.slot, fit: f, act: `bdTapPitch(${x.playerId})`, cls, tag })}</div>`;
   };
   const pendingIn = new Set(HT.subs.map(s => s.onId));
   const bench = h.bench.filter(b => !pendingIn.has(b.playerId)).map(b => ({ ...b, here: outSlot ? bdRating(b.playerId, outSlot) : null }));
@@ -2408,16 +2569,16 @@ function bdRenderSubs(){
     const p = sqById(b.playerId), fitTxt = outSlot && p ? slotFit(p, outSlot) : null;
     return `<button class="bd-card ${sel.in === b.playerId ? 'sel' : ''} ${b.injured ? 'off' : ''}" onclick="bdTapBench(${b.playerId})">
       ${posPill(b.position)}<span style="min-width:0"><span class="n" style="display:block">${esc(b.name)}</span>
-      <span class="s">${b.injured ? '<span style="color:var(--rd)">Injured</span>' : outSlot ? `<b style="color:${fitTxt ? fitTxt[1] : 'var(--tx)'}">${b.here}</b> as ${esc(outSlot)} · ${fitTxt ? fitTxt[0] : ''}` : `Overall ${b.ovr}`}</span>
-      <span class="bd-fitbar"><i style="width:${b.fit}%;background:${fitColor(b.fit)}"></i></span></span>${rb(outSlot ? b.here : b.ovr)}</button>`;
+      <span class="s">${b.injured ? '<span style="color:var(--rd)">Injured</span>' : outSlot ? `<span style="color:${fitTxt ? fitTxt[1] : 'var(--tx)'}">${fitTxt ? fitTxt[0] : ''} · ${b.here} as ${esc(outSlot)}</span>` : 'Overall rating'}</span>
+      <span class="bd-fitbar"><i style="width:${b.fit}%;background:${fitColor(b.fit)}"></i></span></span>${rb(b.ovr)}</button>`;
   };
   let hint;
   if (!bdCanSub()) hint = `<div class="small" style="color:var(--or)">${left <= 0 ? `All ${h.maxSubs} substitutions have been made.` : 'All three substitution windows have been used.'} You can still move players and change the tactics.</div>`;
   else if (BOARD.move != null) hint = `<div class="small"><b style="color:var(--yw)">Move positions:</b> ${BOARD.move === 'pick' ? 'tap the first player.' : `now tap the player who swaps places with ${esc(bdShort(bdName(BOARD.move)))}.`} <a href="#" onclick="BOARD.move=null;bdRenderSubs();return false">Stop</a></div>`;
   else if (sel.out != null && sel.in != null) {
     const p = sqById(sel.in), fit = p ? slotFit(p, outSlot) : ['', 'var(--tx)'], rOut = bdRating(sel.out, outSlot), rIn = bdRating(sel.in, outSlot);
-    hint = `<div class="bd-swap"><div class="bd-pc o"><div class="k">OFF</div><b>${esc(bdName(sel.out))}</b><div class="small dim">${esc(outSlot)} · ${rOut} · ${bdFit(sel.out)}% fit</div></div><div class="bd-arrow">→</div>
-      <div class="bd-pc i"><div class="k">ON</div><b>${esc(bdName(sel.in))}</b><div class="small dim">${esc(p ? p.position : '')} · ${rIn} as ${esc(outSlot)} · ${bdFit(sel.in)}% fit</div></div></div>
+    hint = `<div class="bd-swap"><div class="bd-pc o"><div class="k">OFF</div><b>${esc(bdName(sel.out))}</b><div class="small dim">${esc(outSlot)} · ${(sqById(sel.out) || {}).ovr ?? '–'} overall · ${rOut} as ${esc(outSlot)} · ${bdFit(sel.out)}% fit</div></div><div class="bd-arrow">→</div>
+      <div class="bd-pc i"><div class="k">ON</div><b>${esc(bdName(sel.in))}</b><div class="small dim">${esc(p ? p.position : '')} · ${p ? p.ovr : '–'} overall · ${rIn} as ${esc(outSlot)} · ${bdFit(sel.in)}% fit</div></div></div>
       <div class="small mt8" style="color:${fit[1]}">He takes the ${esc(POS_NAME[outSlot] || outSlot)}'s position: ${fit[0].toLowerCase()}${rIn < rOut - 3 ? `. He is ${rOut - rIn} weaker there; you can move players with ⇄ or change the formation in Tactics.` : '.'}</div>
       <div class="row mt8"><button class="btn bp" onclick="bdConfirm()">✓ Confirm substitution</button><button class="btn bg" onclick="bdCancel()">Cancel</button><button class="btn bs bsm" onclick="openPicker('sub','${sel.out}')">Compare all</button></div>`;
   } else if (sel.out != null) hint = `<div class="small">Now pick who comes on for <b>${esc(bdName(sel.out))}</b>. The bench is sorted by how well each player fits the ${esc(POS_NAME[outSlot] || outSlot)}'s position. <a href="#" onclick="bdCancel();return false">Cancel</a></div>`;
@@ -2426,12 +2587,12 @@ function bdRenderSubs(){
   const changes = [...HT.subs.map(s => `<div class="bd-chg"><span style="color:var(--rd)">▼</span><span>${esc(bdName(s.offId))}</span><span style="color:var(--gr)">▲ ${esc(bdName(s.onId))}</span><span style="flex:1"></span><button class="btn bg bxs" onclick="bdUndo(${s.offId})">Undo</button></div>`),
     ...HT.swaps.map((w, i) => `<div class="bd-chg"><span style="color:var(--yw)">⇄</span><span>${esc(bdName(w[0]))} and ${esc(bdName(w[1]))} swap positions</span><span style="flex:1"></span><button class="btn bg bxs" onclick="bdUndoSwap(${i})">Undo</button></div>`)];
   el.innerHTML = `<div class="bd-wrap">
-      <div class="bd-pitch">${rows.slice().reverse().filter(r => r.length).map(r => `<div class="bd-row">${r.map(tok).join('')}</div>`).join('')}</div>
+      <div class="fp fp-bd"><i class="fp-box t"></i><i class="fp-box b"></i>${line.map(tok).join('')}</div>
       <div><div class="ch" style="margin-bottom:6px">Bench <span class="small dim">${bench.filter(b => !b.injured).length} available</span></div><div class="bd-bench">${bench.map(card).join('') || '<div class="small dim">Nobody left on the bench.</div>'}</div></div>
     </div>
     <div class="bd-preview">${hint}</div>
     ${changes.length ? `<div class="card mt8" style="padding:6px 12px"><div class="ch">Your changes</div>${changes.join('')}</div>` : ''}
-    <div class="row mt8"><button class="btn bs bsm" onclick="bdMove()">⇄ Move positions</button><span class="small dim">The number on each player is his rating in that position; the bar is his condition.</span></div>`;
+    <div class="row mt8"><button class="btn bs bsm" onclick="bdMove()">⇄ Move positions</button><span class="small dim">The big number is each player's overall rating; ✓ ≈ ! show how well he suits his position; the bar is his condition now.</span></div>`;
 }
 function bdTapPitch(id){
   const sel = BOARD.sel;
@@ -3017,15 +3178,15 @@ function rSettings(){
       <label class="lbl">Match view</label><select onchange="PREFS.viewMode=this.value;savePrefs()">${VIEW_MODES.map(([v, l]) => `<option value="${v}" ${(PREFS.viewMode || '3d') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D graphics quality</label><select onchange="PREFS.gfx=this.value;savePrefs()">${[['auto', 'Automatic (decides from your device)'], ['low', 'Low — smoothest on older phones'], ['high', 'High — sharper, with shadows']].map(([k, l]) => `<option value="${k}" ${(PREFS.gfx || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D weather</label><select onchange="PREFS.weather=this.value;savePrefs()">${[['on', 'Changes by fixture — rain, wind, and snow in winter'], ['off', 'Always dry and calm']].map(([k, l]) => `<option value="${k}" ${(PREFS.weather || 'on') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <label class="lbl mt12">Close-ups (award ceremonies, Player Studio)</label><select onchange="PREFS.realBodies=this.value==='on';savePrefs()">${[['on', 'Realistic bodies — about 0.5 MB each, loaded when first shown'], ['off', 'Classic figures — nothing extra to load']].map(([k, l]) => `<option value="${k}" ${(PREFS.realBodies !== false ? 'on' : 'off') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <label class="lbl mt12">Players in matches</label><select onchange="PREFS.matchBodies=this.value==='on';savePrefs()">${[['on', 'Athletes — realistic bodies with their own hairstyles (about 2.2 MB, loaded once)'], ['off', 'Mannequins — the lighter motion-captured figures']].map(([k, l]) => `<option value="${k}" ${(PREFS.matchBodies !== false ? 'on' : 'off') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">Close-ups (award ceremonies, Player Studio)</label><select onchange="PREFS.realBodies=this.value==='on';savePrefs()">${[['on', 'Athletes — his own face, build, hair and beard (about 2 MB, loaded once)'], ['off', 'Classic figures — nothing extra to load']].map(([k, l]) => `<option value="${k}" ${(PREFS.realBodies !== false ? 'on' : 'off') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <label class="lbl mt12">Players in matches</label><select onchange="PREFS.matchBodies=this.value==='on';savePrefs()">${[['on', 'Athletes — every player with his own face, build, hair and beard (about 2–3 MB, loaded once)'], ['off', 'Mannequins — the lighter motion-captured figures']].map(([k, l]) => `<option value="${k}" ${(PREFS.matchBodies !== false ? 'on' : 'off') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">3D players</label><select onchange="PREFS.models=this.value;savePrefs()">${[['mocap', 'Motion-captured — natural running, kicking and celebrating'], ['classic', 'Classic — lighter figures for very old phones']].map(([k, l]) => `<option value="${k}" ${(PREFS.models || 'mocap') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <label class="lbl mt12">Match audio mixer</label>
       <div class="card" style="padding:10px">${[['crowd', '🏟 Crowd'], ['ref', '🟨 Referee'], ['ball', '⚽ Ball and boots'], ['commentary', '🎙 Commentary'], ['announcer', '📢 Stadium announcer']].map(([k, l]) => { const val = { ...MIX_DEFAULT, ...(PREFS.mix || {}) }[k]; return `<div class="row" style="gap:8px;margin-bottom:6px"><span class="small" style="width:132px">${l}</span><input type="range" min="0" max="1" step="0.05" value="${val}" style="flex:1" oninput="PREFS.mix={...MIX_DEFAULT,...(PREFS.mix||{}),'${k}':+this.value};savePrefs();applyAudioPrefs();this.nextElementSibling.textContent=this.value>0?Math.round(this.value*100)+'%':'off'"><span class="small dim" style="width:34px;text-align:right">${val > 0 ? Math.round(val * 100) + '%' : 'off'}</span></div>`; }).join('')}
         <div class="row mt8"><button class="btn bsm ${PREFS.speech === false ? 'bg' : 'bact'}" onclick="toggleCommentary();renderSection('settings')">${PREFS.speech === false ? '🎙 Spoken commentary off' : '🎙 Spoken commentary on'}</button><button class="btn bsm ${PREFS.captions === false ? 'bg' : 'bact'}" onclick="PREFS.captions=PREFS.captions===false;savePrefs();applyAudioPrefs();renderSection('settings')">${PREFS.captions === false ? 'Captions off' : 'Captions on'}</button></div>
         <div class="small dim mt4">Commentary and announcements use your device's own voices (free, works offline) and are shown as captions too. A slider at 0 switches that sound off.</div></div>
       <label class="lbl mt12">Sound</label><div class="row"><button class="btn bsm ${PREFS.sound === false ? 'bg' : 'bact'}" onclick="toggleSound();renderSection('settings')">${PREFS.sound === false ? '🔇 Off' : '🔊 On'}</button>
-        <input type="range" min="0" max="1" step="0.05" value="${PREFS.volume ?? 0.6}" oninput="PREFS.volume=+this.value;savePrefs();if(window.GafferSound)GafferSound.setVolume(PREFS.volume)" style="flex:1;padding:0"></div></div>
+        <input type="range" min="0" max="1" step="0.05" value="${PREFS.volume ?? 0.6}" oninput="PREFS.volume=+this.value;savePrefs();applyAudioPrefs()" style="flex:1;padding:0"></div></div>
     ${settingsExtra()}
     <div class="card"><div class="ch">Editor</div>
       <label class="lbl">Rename your club</label><div class="row"><input id="renameClub" value="${esc(STATE.club)}" maxlength="30" style="flex:1"><button class="btn bs bsm" onclick="renameThing('club', ${STATE.clubId}, document.getElementById('renameClub').value)">Save</button></div>

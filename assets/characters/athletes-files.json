@@ -1,0 +1,131 @@
+{
+ "note": "Every athlete file that ships (public/models/athletes), with its size and SHA-256. Built by tools/character-pipeline/athletes/build-athletes.mjs (full) and the same with --lod match; see assets/characters/athletes-report.json and athletes-report-match.json.",
+ "built": "2026-11-28",
+ "files": [
+  {
+   "file": "athlete-match.glb",
+   "bytes": 1167516,
+   "sha256": "fec81906619230f2be2db99914b0de22eb8ec2b69945ceadb2be867fe437a0cd"
+  },
+  {
+   "file": "athlete.glb",
+   "bytes": 1826540,
+   "sha256": "005302a913b254eda6465a0024e755370542f386bd91320d33b74b02b8783f32"
+  },
+  {
+   "file": "hair-afro01-match.glb",
+   "bytes": 143780,
+   "sha256": "cda4b37e7f92c24187bd8089e379b276d8b2ff5877b6abb69ad4c9b0c00dec85"
+  },
+  {
+   "file": "hair-afro01.glb",
+   "bytes": 171304,
+   "sha256": "92c980213552376a8e929c25106bf74ce1127e6e1b8794e34ae6a42ebe0b51ae"
+  },
+  {
+   "file": "hair-braid01-match.glb",
+   "bytes": 110284,
+   "sha256": "3fbc8d9d582bc5eb93b06eff3ec59b580c5150423de8063b49dbdc2a97d61d2a"
+  },
+  {
+   "file": "hair-braid01.glb",
+   "bytes": 156764,
+   "sha256": "09985736811057c328f326186b474a80d0d5dd86eab1770a9e121043a07a9e8a"
+  },
+  {
+   "file": "hair-buzz-match.glb",
+   "bytes": 56588,
+   "sha256": "69c66ac83157958af635e92ce6c1ba67f9c479be1ead00f1b9faf598ef2357dd"
+  },
+  {
+   "file": "hair-buzz.glb",
+   "bytes": 88636,
+   "sha256": "47718f4fe938e7f774c87bec5dc4ad26a6264b15cdb332fe025860299798345a"
+  },
+  {
+   "file": "hair-cornrows-match.glb",
+   "bytes": 110676,
+   "sha256": "9a14a2f1b92f6de991dac10350d421c93306a6f86a769d78a121718af611ef61"
+  },
+  {
+   "file": "hair-cornrows.glb",
+   "bytes": 194220,
+   "sha256": "3a6c2d696474553d976e2758e90aaac64e598883a604f1230b27b8a305c737f2"
+  },
+  {
+   "file": "hair-long01-match.glb",
+   "bytes": 87060,
+   "sha256": "dc49f8780732d4214c475a01cb7c6086de33de803100dad938519950aa5a02d3"
+  },
+  {
+   "file": "hair-long01.glb",
+   "bytes": 144224,
+   "sha256": "f4f89fcb746e798d76a5e6da0b8d03c58ea29223228fa62a73aff40c4485412c"
+  },
+  {
+   "file": "hair-mohawk-match.glb",
+   "bytes": 73736,
+   "sha256": "f779772b4afe5de3f1206ca51bf8b41b327fa3ff97c1f1b39abcfaf5a44e6166"
+  },
+  {
+   "file": "hair-mohawk.glb",
+   "bytes": 120348,
+   "sha256": "76b98684a5adc4d4b452213251a77453f0350bf8b5a49a9f721de575294bfd9c"
+  },
+  {
+   "file": "hair-ponytail01-match.glb",
+   "bytes": 111344,
+   "sha256": "038785dff60eef066d0e297ee991c84f6608db601725e19f0feed4c226ea6b19"
+  },
+  {
+   "file": "hair-ponytail01.glb",
+   "bytes": 170448,
+   "sha256": "3de21ec9711569294638d233b7657d961cafe83a3cbe972ac7d6528ff19a8d1e"
+  },
+  {
+   "file": "hair-short01-match.glb",
+   "bytes": 140012,
+   "sha256": "8cb997d0b0517eff5544fd11e1e61f74398db5b7218e4a9bd041a7f53fcb81bb"
+  },
+  {
+   "file": "hair-short01.glb",
+   "bytes": 208880,
+   "sha256": "8f81f2c083871e38690b331e1f7bb85e8639bd331f511ed9eb9b739b36d3e4bc"
+  },
+  {
+   "file": "hair-short02-match.glb",
+   "bytes": 74184,
+   "sha256": "1f3e6313f05c03c08874be1b95a68b833131454924c1ce7888077db3cca73029"
+  },
+  {
+   "file": "hair-short02.glb",
+   "bytes": 132204,
+   "sha256": "8224b8e52b1413831ccde978776ee6971b8de96b983d6a391f18962cd67c196f"
+  },
+  {
+   "file": "hair-short03-match.glb",
+   "bytes": 57220,
+   "sha256": "3c526c6bf2898ef843edf1dbff5e07c38975314219a6c4aab08cbe29487166d5"
+  },
+  {
+   "file": "hair-short03.glb",
+   "bytes": 86276,
+   "sha256": "e9dc4e78add0dc4e2489d0d5b1f0ca37505427ca84a1b51aa06b23932651ae5e"
+  },
+  {
+   "file": "hair-short04-match.glb",
+   "bytes": 88876,
+   "sha256": "d6d9944aeda093a667735bb927abac05a5cd04dce33e69863c3eeb87f1e3d170"
+  },
+  {
+   "file": "hair-short04.glb",
+   "bytes": 101844,
+   "sha256": "df8a697f2c4acd2885f8d3a21342c1ed60a9ada72b676e4c0f30c72c9d5d7cfe"
+  },
+  {
+   "file": "index.json",
+   "bytes": 5143,
+   "sha256": "6759b7f073e36812eab719903fcaff3824fef5b82c0728651f7b6b5a0c3f1681"
+  }
+ ]
+}

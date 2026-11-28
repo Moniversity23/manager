@@ -1,10 +1,54 @@
-# Character pipeline: realistic close-up bodies
+# Character pipeline: athletes (and the earlier close-up bodies)
 
-Build-time tool (not shipped to the browser). It turns Ara 3D Gen footballer exports into the
-light, game-ready bodies in `public/models/bodies/`. Those bodies are used where one player fills the
-screen: the Player Studio and award ceremonies.
+Build-time tool (not shipped to the browser). It turns Ara 3D Gen footballer exports into game-ready
+files:
+* **Athletes** (since 2026-11-28, every footballer the game draws): `public/models/athletes/`, built by
+  `athletes/` (below).
+* **Close-up bodies** (2026-11-26, no longer loaded by the game): `public/models/bodies/`, built by
+  `build-bodies.mjs`.
 
-## Run it
+## Athletes
+One base footballer with 37 shape targets, at two levels of detail, plus 11 hairstyles and generated
+beard and glove layers. A player's look sets the targets' weights in the game (`athleteRecipe` in
+`public/match3d.js`).
+```
+cd tools/character-pipeline
+node athletes/variants.mjs                 # 54 Ara exports (about 7 minutes; cached, --force to redo)
+node athletes/build-athletes.mjs           # the full athlete (Player Studio, award ceremonies)
+node athletes/build-athletes.mjs --lod match   # the match athlete (22 on the pitch); after the full one
+```
+* **Exports** (`athletes/variants.mjs`): one neutral footballer (medium detail, an even mix of the
+  three heritages) and, from the same settings, one export per change: 28 single MakeHuman face
+  modifiers, 3 pure heritages, more and less muscle and weight, older and younger, 11 hairstyles and 5
+  beard styles. They go to `FOOTBALL-RALISM-LAB/outputs/gaffer-athletes/` (not in git).
+* **Base** (`optimise.mjs --athlete`): the neutral export simplified (head gently, the hidden body
+  hard), rebound onto the game skeleton, with a stylised skin texture moved to a light neutral tone
+  (the game multiplies it by each player's tone, so one base serves every skin). Each skin vertex keeps
+  the raw vertex it came from (`_RAWA`, `_RAWB`, `_RAWT`) so targets can be added after the
+  optimisation.
+* **Targets** (`build-athletes.mjs`): each export minus the neutral one, mapped to the optimised
+  vertices. Face targets reshape the head only; heritage and age too, after the head's own movement
+  and size are removed (those exports also change the height, which moved the head up to 15 cm);
+  build targets reshape the body, and the shirt, shorts and socks follow along their normals (Ara
+  rebuilds them with other vertex counts). Stored as 8-bit steps of a per-target scale
+  (`index.json` `targetScale`); plain integers, because glTF Transform's sparse writer stores
+  normalised 8-bit values as 0.
+* **Hairstyles:** the hair of each hairstyle export, simplified, rebound and made grey (tinted in the
+  game), each vertex tied to its nearest scalp vertex (`_SKINREF`) so the hair follows the head's
+  shape. The median of each texture becomes a light grey, so blond and ginger come out as such.
+* **Beards and gloves:** copies of the skin over the area where Ara grows each beard (or over the
+  hands), offset outward, with a strand texture; a beard's alpha fades to its edges.
+* **Match level of detail:** `--lod match` simplifies the head, skin, kit, boots and hair further and
+  uses a 512 px skin: about 9,400 triangles with no beard, plus 1,000–2,200 for a hairstyle.
+* **Writes** `athlete.glb`, `athlete-match.glb`, `hair-<style>[-match].glb`, `index.json` (targets,
+  scales, skin tone, hair files, `lods.match`), and `assets/characters/athletes-report[-match].json`.
+* **Checked by** `test/athletes.test.js`. The comparison scene is `public/dev/athletes.html`.
+
+## Close-up bodies (2026-11-26)
+The four bodies below are still built by `build-bodies.mjs` and checked by
+`test/character-bodies.test.js`, but the game now draws athletes instead.
+
+### Run it
 ```
 cd tools/character-pipeline
 npm install                      # glTF Transform, meshoptimizer, sharp (this folder only)

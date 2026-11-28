@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Athlete lab</title>
+<style>html,body{margin:0;height:100%;background:#1a2430;color:#fff;font:12px system-ui,sans-serif}#v{position:fixed;inset:0}.lbl{position:fixed;transform:translate(-50%,-100%);background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px;pointer-events:none;white-space:nowrap}#bar{position:fixed;left:8px;top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}#bar button{font:inherit;padding:4px 10px;border-radius:6px;border:0;background:#2f4157;color:#fff;cursor:pointer}#bar button.on{background:#3d8bfd}</style>
+</head><body><div id="v"></div><div id="bar"><span id="status">Loading the athletes…</span></div>
+<script type="module">
+// Development page: the athletes side by side (see match3d.js athleteLab).
+// ?view=front|side|match|faces|faces-side  &classic=1 (the same players as mannequins)  &lod=match (the pitch detail)  &t=0.6 (hold the pose)
+import { athleteLab } from '../match3d.js';
+const q = new URLSearchParams(location.search);
+const status = document.getElementById('status');
+try {
+  const lab = await athleteLab(document.getElementById('v'), { view: q.get('view') || 'front', classic: q.get('classic') === '1', clip: q.get('clip') || 'idle', lod: q.get('lod') || 'full' });
+  if (q.get('t')) lab.setTime(+q.get('t'));
+  const info = lab.info();
+  status.textContent = `${lab.figs.length} players · ${info.triangles.toLocaleString()} triangles · ${info.calls} draw calls`;
+  const labels = () => { document.querySelectorAll('.lbl').forEach(e => e.remove()); const v = q.get('view') || 'front'; if (v.startsWith('faces')) return; lab.figs.forEach((f, i) => { const [x, y] = lab.project(i); const el = document.createElement('div'); el.className = 'lbl'; el.textContent = f.name + (f.gk ? ' (GK)' : ''); el.style.left = x * 100 + '%'; el.style.top = y * 100 + '%'; document.body.appendChild(el); }); };
+  for (const v of ['front', 'side', 'match', 'faces', 'faces-side']) { const b = document.createElement('button'); b.textContent = v; b.className = (q.get('view') || 'front') === v ? 'on' : ''; b.onclick = () => { q.set('view', v); history.replaceState(null, '', '?' + q); lab.setView(v); document.querySelectorAll('#bar button').forEach(x => x.classList.toggle('on', x === b)); labels(); }; document.getElementById('bar').appendChild(b); }
+  labels(); addEventListener('resize', labels);
+  window.LAB = lab; window.LAB_READY = true;
+} catch (e) { status.textContent = 'Failed: ' + e.message; console.error(e); window.LAB_ERROR = String(e && e.stack || e); }
+</script></body></html>

@@ -9,11 +9,18 @@
 //  • The crowd follows the game: excite(0..1) raises volume and pitch as a chance builds.
 //  • Referee's pea whistle, ball kicks and passes, the net, "ooh"s for saves and misses, boos for
 //    cards, and a goal roar with an air horn.
-// Browsers only allow audio after a user gesture; the first click on Continue unlocks it.
+// Browsers only allow audio after a user gesture: the first tap, click or key anywhere creates the
+// audio context and plays a silent sound inside that gesture (what iOS and Android require), and any
+// later gesture wakes it again if the system suspended or interrupted it (a call, another app, the
+// screen locking). Two things silence it on purpose and are kept apart: the app pausing (the match
+// paused, a replay, leaving the match) and the tab being hidden; it plays again only when neither holds.
+// Phones: small speakers cannot play the low end, which would still drive the compressor and make
+// everything quieter, so on touch devices the output is high-passed and the presence range lifted.
 (function () {
   let ctx = null, master = null, noiseBuf = null, crowdNodes = null, volume = 0.6, chantTimer = null, level = 0;
   const bus = {}, mix = { crowd: 0.85, ref: 0.85, ball: 0.8 };
-  let cur = null, duckGain = null, suspended = false;
+  let cur = null, duckGain = null, appPaused = false, hidden = typeof document !== 'undefined' && document.hidden === true, unlocked = false, meter = null;
+  const phone = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const log = [];
   const OUT = () => cur || master;
   // Plays fn with every node it creates routed to one category's volume.
@@ -23,15 +30,22 @@
     if (ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    ctx = new AC();
+    try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 5;
     master = ctx.createGain();
     master.gain.value = volume;
-    master.connect(comp); comp.connect(ctx.destination);
+    let out = master;
+    if (phone) {
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 140; hp.Q.value = 0.7;
+      const pres = ctx.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 2400; pres.Q.value = 0.9; pres.gain.value = 4;
+      master.connect(hp); hp.connect(pres); out = pres;
+    }
+    out.connect(comp); comp.connect(ctx.destination);
+    master.comp = comp;
     duckGain = ctx.createGain(); duckGain.gain.value = 1; duckGain.connect(master);
     for (const c of Object.keys(mix)) { bus[c] = ctx.createGain(); bus[c].gain.value = mix[c]; bus[c].connect(c === 'crowd' ? duckGain : master); }
-    document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); else if (crowdNodes) resume(); });
+    ctx.onstatechange = () => { if (ctx.state !== 'running' && !appPaused && !hidden) wake(); };
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     let last = 0;
@@ -95,9 +109,9 @@
   }
 
   const whistle = (dur, delay = 0) => { tone(2150, dur, { gain: 0.1, delay, tremolo: 27 }); tone(2380, dur, { gain: 0.07, delay, tremolo: 27 }); noise(dur, { freq: 4200, q: 2, gain: 0.02, delay }); };
-  const thud = (g, f = 150) => { tone(f, 0.13, { gain: g, slideTo: 48 }); noise(0.04, { freq: 1800, q: 0.7, gain: g * 0.35 }); };
+  const thud = (g, f = 150) => { tone(f, 0.13, { gain: g, slideTo: 48 }); tone(f * 2.3, 0.06, { gain: g * 0.32, slideTo: f }); noise(0.04, { freq: 1800, q: 0.7, gain: g * 0.35 }); noise(0.022, { freq: 950, q: 1.3, gain: g * 0.32, attack: 0.002, release: 0.018 }); };
   const clap = (delay, g = 0.11) => { noise(0.07, { freq: 1500, q: 0.9, gain: g, attack: 0.004, release: 0.05, delay }); noise(0.05, { freq: 2600, q: 1.2, gain: g * 0.5, attack: 0.004, release: 0.04, delay: delay + 0.008 }); };
-  const drum = (delay, g = 0.3) => tone(95, 0.22, { gain: g, slideTo: 50, delay });
+  const drum = (delay, g = 0.3) => { tone(95, 0.22, { gain: g, slideTo: 50, delay }); tone(200, 0.12, { gain: g * 0.42, slideTo: 125, delay }); noise(0.03, { freq: 1300, q: 1, gain: g * 0.22, attack: 0.002, release: 0.02, delay }); };
 
   const SOUNDS = {
     click: () => tone(1600, 0.03, { gain: 0.05, type: 'triangle' }),
@@ -128,7 +142,7 @@
   const CAT = { whistle: 'ref', whistle2: 'ref', whistleEnd: 'ref', restart: 'ref', card: 'ref', pass: 'ball', kick: 'ball', net: 'ball', click: 'ball', deal: 'ball', levelup: 'ball', goal: 'crowd', goalAway: 'crowd', save: 'crowd', miss: 'crowd' };
   function play(name, vol) {
     if (!init()) return;
-    if (ctx.state === 'suspended' && !suspended) ctx.resume();
+    if (ctx.state !== 'running' && !appPaused && !hidden) wake();
     if (vol != null) setVolume(vol);
     const fn = SOUNDS[name];
     if (fn) using(CAT[name] || 'ball', fn);
@@ -137,7 +151,7 @@
   // Key match events → sounds. Anything not listed (touches, bounces, shouts …) is silent.
   const EVENTS = { KICK_OFF: 'whistle', RESTART: 'restart', INJURY: 'restart', PASS: 'pass', SHOOT: 'kick', SAVE: 'save', MISS: 'miss', WOODWORK: 'miss', CARD: 'card', HALF_TIME: 'whistle2', FULL_TIME: 'whistleEnd' };
   function event(type, d = {}) {
-    if (suspended) return;
+    if (appPaused || hidden) return;
     const name = type === 'GOAL' ? (d.side === 'away' ? 'goalAway' : 'goal') : EVENTS[type];
     if (!name) return;
     log.push([Math.round(performance.now()), type, d.side || '']); if (log.length > 300) log.shift();
@@ -146,7 +160,7 @@
 
   // A terrace chant: drum and claps in a football rhythm, with a sung line underneath.
   function chant() {
-    if (!crowdNodes || !ctx || suspended) return;
+    if (!crowdNodes || !ctx || appPaused || hidden) return;
     using('crowd', chantNow);
   }
   function chantNow() {
@@ -168,7 +182,7 @@
       return;
     }
     if (!init() || crowdNodes) return;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state !== 'running' && !appPaused && !hidden) wake();
     if (vol != null) setVolume(vol);
     const g = ctx.createGain(); g.gain.value = 0.0001; g.connect(bus.crowd || master);
     g.gain.setTargetAtTime(0.085, ctx.currentTime, 0.8);
@@ -216,9 +230,33 @@
   function setMix(m) { for (const c of Object.keys(mix)) { if (m && m[c] != null) mix[c] = Math.max(0, Math.min(1.2, Number(m[c]) || 0)); if (bus[c]) bus[c].gain.value = mix[c]; } }
   // Speech over the crowd: dip it a little (amount 0..1), back to normal with 0.
   function duck(amount) { if (!duckGain || !ctx) return; duckGain.gain.cancelScheduledValues(ctx.currentTime); duckGain.gain.setTargetAtTime(Math.max(0.3, 1 - (amount || 0)), ctx.currentTime, 0.25); }
-  function suspend() { suspended = true; if (ctx && ctx.state === 'running') ctx.suspend(); }
-  function resume() { suspended = false; if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  // Running exactly when the app has not paused it and the tab is visible.
+  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') { const r = ctx.resume(); if (r && r.catch) r.catch(() => {}); } }
+  function apply() { if (!ctx) return; if (appPaused || hidden) { if (ctx.state === 'running') ctx.suspend(); } else wake(); }
+  function suspend() { appPaused = true; apply(); }
+  function resume() { appPaused = false; apply(); }
   function stopAll() { crowd(false); duck(0); }
+  // A gesture: create the context (first time), play one silent sample inside the gesture, wake it.
+  function unlock() {
+    if (!init()) return;
+    if (!unlocked) { try { const b = ctx.createBuffer(1, 1, ctx.sampleRate), src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.start(0); unlocked = true; } catch (e) { /* tried again on the next gesture */ } }
+    if (!appPaused && !hidden) wake();
+  }
+  if (typeof document !== 'undefined') {
+    for (const g of ['pointerdown', 'touchend', 'keydown', 'click']) document.addEventListener(g, unlock, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', () => { hidden = document.hidden; apply(); });
+    window.addEventListener('pageshow', () => { hidden = document.hidden; apply(); });
+    window.addEventListener('pagehide', () => { hidden = true; apply(); });
+  }
+  // For checks: the state of the audio, and the level at the output (RMS, 0..1) over the last frame.
+  function state() { return { context: ctx ? ctx.state : 'none', unlocked, appPaused, hidden, crowd: !!crowdNodes, volume, mix: { ...mix }, phone, sampleRate: ctx ? ctx.sampleRate : null }; }
+  function outputLevel() {
+    if (!ctx || !master) return 0;
+    if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.comp.connect(meter); }
+    const a = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(a);
+    let sum = 0; for (let i = 0; i < a.length; i++) sum += a[i] * a[i];
+    return Math.sqrt(sum / a.length);
+  }
 
-  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, mix, log };
+  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, unlock, state, level: outputLevel, mix, log };
 })();

@@ -1,4 +1,4 @@
-# Integration changelog: reference projects, live match and UI (2026-11-24)
+# Integration changelog: reference projects, live match, UI and athletes (2026-11-24 to 2026-11-28)
 
 Each entry: what was there before, what changed, the files, why, the tests, and the result.
 
@@ -332,6 +332,107 @@ that fails to download only affects the players who would wear it.
   `src/models.js`.
 * Tests: `test/tactics-extra.test.js` (new), `test/ball.test.js` and `test/instructions.test.js`.
 
+## 14. Athletes with faces, dribbling, sound, Lineup and cards (2026-11-28)
+
+**Footballers (priority 1).** Every footballer is now an athlete: in matches, in the Player Studio
+and at award ceremonies. Details are in `PLAYER_STUDIO_INTEGRATION_AUDIT.md`.
+* **One base, shape targets:** one base footballer from Ara 3D Gen (MakeHuman CC0 data) with 37 shape
+  targets: 28 face features (head shape and width, jaw, chin, cheekbones, brow, forehead, nose width,
+  length and hump, mouth width, lips, eye size and spacing, ears), 3 heritages and 2 ages (the face
+  only), and 4 builds (muscular, lean, heavy, slim).
+* **Hair and kit:** 11 modelled hairstyles (eight MakeHuman styles, and Ara's cornrows, mohawk and
+  buzz). Beards (goatee, short, full, moustache, stubble) are soft-edged layers. Keepers wear gloves.
+  The skin texture is stylised and tinted to eight tones.
+* **His own identity:** his look sets the weights: the Studio's face sliders when set, otherwise the
+  hash of his look. Heritage comes from his nationality or skin tone, and build and age from his own.
+  His hairstyle and beard come from his look, with two variants for some styles. The result is the
+  same every match.
+* **Two levels of detail:**
+  * Match: 1.17 MB, about 9,400 triangles plus 1,000–2,200 for the hairstyle.
+  * Full (Player Studio, award ceremonies): 1.83 MB, about 16,000 triangles plus hair.
+  * Hairstyles are 55–203 KB each and load only when a player in view wears one.
+* **In the game:** the weights are baked once per player, so nothing morphs per frame. The mannequin
+  with his look is the fallback. The four close-up bodies of section 12 are no longer loaded.
+* **Fixed in the pipeline:** sparse 8-bit targets that were stored as zero; heritage and age targets
+  that moved the head with the height; garments that did not follow a change of build; a skin texture
+  too dark to tint lighter; hair textures that made blond hair look black.
+* **Comparison scene:** `public/dev/athletes.html` shows 11 outfield players and 2 keepers, with
+  different skins, faces, hairstyles, beards, builds, ages and both kits. Views: front, side, match
+  camera, and a grid of faces from the front and side. Add `?classic=1` to see the same players as
+  mannequins, and `?lod=match` for the match athlete.
+* **Measured** (13 players, shadows): the match athletes need 268 draw calls and 309,420 triangles; the
+  mannequins need 805 and 477,920. A real 3D match with athletes: 243 draw calls, about 340,000
+  triangles.
+
+**Dribbling (priorities 2 and 3).** The match view draws the dribble as touches:
+* **Touches:** the carrier pushes the ball ahead, about every 0.36–0.62 s and longer at pace. It rolls
+  out and slows between touches: 0.45 m ahead when walking, about 1.9 m at a sprint.
+* **Turns** use a curved touch. A tackled or received ball carries on from where it is.
+* **Results unchanged:** it runs after the players move, at any speed, and decides nothing.
+  Possession, passes and shots still come from the timeline.
+* **Measured** on settled dribbling at 4× speed: the ball behind the carrier in 1.5% of frames (19.4%
+  before), with 7 jumps (24 before). At 1× speed: 2.1% of frames, no jumps.
+* **Passes and shots:** their trajectories are unchanged from section 13 and covered by
+  `ball.test.js`.
+
+**Sound (priority 4).** Every sound is still generated in code, so there are no audio files to check.
+See `AUDIO.md`. Fixed:
+* **Hidden tab:** hiding the tab while no crowd played used to silence every later match sound. This
+  was reproduced on the previous file.
+* **Phones:** the first tap now unlocks audio, and any later gesture wakes it after the system
+  suspends it. Speech is unlocked by the first gesture too and stops while the tab is hidden.
+* **Phone speakers:** they get a high-pass filter and a presence lift, and kicks and drums now have
+  mid-range sound.
+* **Master volume:** it now changes the commentary and announcer volume at once.
+
+**Lineup and cards (priorities 5–8):**
+* **Lineup:**
+  * The starting XI stands on a pitch in its formation's own shape. Each player is a compact card:
+    overall rating (the big number), slot, a separate suitability mark (✓ natural, ≈ can play there,
+    ! out of position) and condition.
+  * Tap a player, then another: two starters swap places, a substitute or reserve comes in for a
+    starter, or two substitutes swap seats. The preview shows both players' cards with overall
+    rating, rating in the new slot and condition. Nothing changes until Confirm. On phones the preview
+    stays at the bottom of the screen.
+  * Substitutes and the rest of the squad are shown as cards, marked for the selected slot.
+  * A formation selector sits above the pitch. Before a match every change is free. During one, a
+    notice points to the match board.
+* **Match board:** it uses the same pitch and cards. The bench shows each player's overall rating, and
+  his suitability for the selected slot appears as text. The preview reads, for example, "35 overall ·
+  39 as RW". The detailed chooser also shows overall rating as its big number.
+* **Formations** come from one table (`FORMATION_LAYOUT`, `src/utils.js`, sent in the snapshot):
+  * a 4-4-2 used to be drawn as 4-2-2-2;
+  * in the 3D match, a lone holding midfielder (4-3-3, 4-1-4-1) or lone striker (4-3-3, 4-2-3-1,
+    4-1-4-1) stood off-centre and now stands central;
+  * the formation was already saved with the career; this is now tested.
+* **Cards:** about 15% smaller (grid 152 → 128 px, portrait 78 → 64 px), with every number kept. On
+  phones they fit three across, and each number sits over its label.
+
+**Files:**
+* `public/match3d.js`: athletes (`athleteRecipe`, `makeAthlete`, `loadAthleteSet`, `athleteFor`,
+  `athleteLab`) in matches, Studio and awards.
+* `public/index.html`: dribble, Lineup, board, cards, settings and audio wiring.
+* `public/sound.js`, `public/commentary.js`, `public/sw.js` (v28), `public/dev/athletes.html`, and
+  `studio/js/app.js` (body choice; copied to `public/studio/` by the build).
+* `src/utils.js`, `src/index.js` (`formationLayouts`).
+* `public/models/athletes/` (25 files, 5.6 MB in all; one match loads about 2 MB).
+* `tools/character-pipeline/athletes/` and `optimise.mjs`; `assets/characters/athletes-*.json`.
+* Tests: `athletes.test.js` (10), `dribble.test.js` (6), `formation-layout.test.js` (5) and
+  `sound.test.js` (5), all new.
+
+## Test results for section 14 (2026-11-28, Windows 10, 4 cores, Node 22)
+| Check | Result |
+|---|---|
+| Build (`scripts/build-web.js`) and ESLint | **Passed** (one existing warning, in `tactics-extra.test.js`) |
+| Vitest, full run | **171 of 172 passed**. The one failure is the soak's speed limit under parallel load (415 ms/week), as in sections 12 and 13 |
+| `soak.test.js` alone | **Passed:** median 354 ms/week (limit 400; 336–348 in earlier runs, on a machine that was slower that day) |
+| New tests: athletes (10), dribbling (6), formations and Lineup cards (5), sound (5) | **Passed** |
+| Browser, comparison scene: 11 outfield players and 2 keepers; front, side, match camera, faces front and side; mannequins and match detail | Done (screenshots) |
+| Browser, 3D match with athletes: match files requested (`athlete-match.glb` and 9 hairstyles), no errors | **Passed** |
+| Browser, sound with phone emulation (touch, coarse pointer, 390 × 844) | **Passed**: no audio before a tap; after one it runs and speech is unlocked; crowd and whistle output 0.051, kick 0.031; master 0 → 0, crowd 0 → 0; pause and resume; hidden and shown recovers (output 0.057) |
+| Browser, Lineup at 1366 and 390 wide: 4-2-3-1, 3-5-2, 4-4-2 and 4-3-3; select, preview, confirm; no sideways scroll; half-time board substitution preview | **Passed** after two fixes: a stale selection after a formation change threw an error, and the card numbers overflowed |
+| Real phone, real GPU, installed app | **Not tested** |
+
 ## Test results for section 13 (2026-11-27, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -379,6 +480,7 @@ that fails to download only affects the players who would wear it.
 ## Remaining issues
 * About one header chance in five or six is still struck with the foot. This happens when there is
   no way to get a cross in, such as a turnover right before the shot.
-* Realistic Ara bodies are used for close-ups only. Studio face sliders, hairstyles, beards and
-  goalkeeper gloves are not shown on them (see the integration audit).
+* Athletes: MakeHuman made smoother rather than hand-sculpted stylised art; brown eyes for everyone;
+  short-hair hairlines are cut-outs; only male athletes (see the integration audit).
+* Sound was not checked on a real Android or iOS device, nor as an installed app.
 * Real-phone frame rate and first-half start on a real GPU were not measured.

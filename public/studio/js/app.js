@@ -58,7 +58,7 @@ function redraw() { clearTimeout(redrawTimer); redrawTimer = setTimeout(() => { 
 
 // ── controls built from one table, so every control is wired to the model ──
 const SELECTS = {
-  baseBody: [['auto', 'Automatic (from skin tone)'], ['m-light', 'Realistic: light skin'], ['m-brown', 'Realistic: brown skin'], ['m-dark', 'Realistic: dark skin'], ['m-asian', 'Realistic: East Asian'], ['classic', 'Classic figure']],
+  baseBody: [['auto', 'Athlete (his own face, build and hair)'], ['m-asian', 'Athlete with East Asian heritage'], ['classic', 'Classic figure']],
   skinTone: [['very-light', 'Very light'], ['light', 'Light'], ['medium', 'Medium'], ['tan', 'Tan'], ['brown', 'Brown'], ['dark', 'Dark'], ['deep', 'Deep'], ['very-dark', 'Very dark']],
   faceShape: [['oval', 'Oval'], ['round', 'Round'], ['square', 'Square'], ['long', 'Long'], ['diamond', 'Diamond'], ['heart', 'Heart']],
   eyeShape: [['almond', 'Almond'], ['round', 'Round'], ['hooded', 'Hooded'], ['deep-set', 'Deep-set'], ['upturned', 'Upturned']],
@@ -106,7 +106,7 @@ function setProfile(p, nm, id) { profile = JSON.parse(JSON.stringify(p)); if (nm
 function renderStatus() {
   const info = view ? view.info() : null, a = profile.appearance;
   $('status').innerHTML = [['Name', esc(name)], ['Saved', assetId ? 'In the library' : 'Not yet'], ['Height', `${a.heightCm} cm · ${a.weightKg} kg`], ['Skeleton', info ? (info.bones === 'ok' ? 'Shared match rig' : 'Missing') : '…'],
-    ['Body', view && view.body ? `Realistic (${esc(view.body.label)})` : 'Classic figure'], ['Model', info ? `${info.meshes} parts · ${info.triangles.toLocaleString()} triangles` : '…'], ['Clip', info ? info.clip : '…']].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join('');
+    ['Body', view && view.body ? `Athlete${view.body.hair ? ` · ${esc(view.body.hair)} hair` : ''}` : 'Classic figure'], ['Model', info ? `${info.meshes} parts · ${info.triangles.toLocaleString()} triangles` : '…'], ['Clip', info ? info.clip : '…']].map(([k, v]) => `<div><span>${k}</span><strong>${v}</strong></div>`).join('');
 }
 
 // ── create, regenerate, save ──

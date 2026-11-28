@@ -1,6 +1,6 @@
 # Claude handover: The Gaffer
 
-*Updated 2026-11-27. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
+*Updated 2026-11-28. Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
 through `.github/workflows/pages.yml`).*
 
 ## Architecture
@@ -24,17 +24,28 @@ through `.github/workflows/pages.yml`).*
   * view reuse across halves (`attach`, `rebind`);
   * mocap players (`makeFootballer`, `animateFootballer`);
   * the Studio and award views;
-  * close-up bodies (`bodyFor`, `chooseBody`, `makeBodyFootballer`), loaded on demand from
-    `public/models/bodies/`.
+  * athletes (`loadAthleteSet`, `athleteFor`, `athleteRecipe`, `makeAthlete`): every footballer,
+    from `public/models/athletes/` (match detail on the pitch, full detail in the Studio and award
+    ceremonies), with the mannequin as the fallback;
+  * the athlete lab (`athleteLab`, page `public/dev/athletes.html`).
 * **Animation pipeline:** `scripts/anim/` (`glb.js`, `inspect.js`, `extract-ara.js`, `retarget.js`,
   `build-footballer.js`), producing `public/models/footballer.glb` and `footballer-anims.json`
   (61 clips).
 * **Player Studio:** `studio/` → `public/studio/`, `src/studio/*`, `public/appearance.js`.
 * **Character pipeline (build time):** `tools/character-pipeline/` (its own `npm install`). It turns
-  Ara 3D Gen exports into the close-up bodies; see its README.
+  Ara 3D Gen exports into the athletes (and the earlier close-up bodies); see its README.
+* **Sound:** `public/sound.js` (Web Audio synthesis) and `public/commentary.js` (device speech); no
+  audio files.
 
 ## Completed in this release
 See `docs/INTEGRATION_CHANGELOG.md`. In short:
+* **Athletes, dribbling, sound, Lineup and cards (2026-11-28, section 14):**
+  * every footballer is an athlete: one base with 37 shape targets (face, heritage, build, age),
+    11 modelled hairstyles, beards and keeper gloves; his look gives him a face and build of his own;
+  * the ball is dribbled ahead of the carrier in touches;
+  * sound unlocks on the first tap, survives a hidden tab, and has a phone-speaker EQ;
+  * the Lineup is a formation pitch of compact cards (overall rating, suitability apart) with
+    select-and-exchange; the match board uses the same pitch and cards; cards are smaller.
 * **Match board, cards, ball, camera and athletes (2026-11-27, section 13):**
   * a DLS-inspired substitution board (pitch, bench, out/in, preview, swaps) in pause and half-time;
   * mentality, pressing, passing and player instructions; instructions now saved;
@@ -69,14 +80,16 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
 ## Outstanding
 * About one header chance in six is still struck with the foot (it starts while the other side has
   the ball). Keepers now throw or roll the ball out after a catch.
-* **Realistic bodies (close-ups and, since 2026-11-27, the pitch):**
-  * Four base faces only. Not shown on them: Studio face sliders, beards and goalkeeper gloves.
-  * Semi-realistic (MakeHuman photo skin), not a stylised low-poly art style.
-  * Fingers differ from Ara's by about 15 mm (held poses).
-  * Only male bodies ship.
-  * Next steps are in the integration audit.
-* Real-phone frame rate and first-half start on a real GPU are unmeasured. Headless Chrome on this
-  machine renders in software.
+* **Athletes:**
+  * Stylised from MakeHuman (smoothed skin, real hair), not hand-sculpted stylised art; faces vary
+    within MakeHuman's range. Hairlines of the short styles are cut-outs (soft only with antialiasing).
+  * Eye colour is the same brown for everyone; no tattoos, headbands or sleeves.
+  * Only male athletes. Fingers differ from Ara's by about 15 mm (held poses).
+  * The four close-up bodies (`public/models/bodies/`, 2.2 MB) are no longer loaded; deleting them is
+    left to the owner.
+* Real-phone frame rate, first-half start on a real GPU, and sound on a real Android or iOS device
+  (and as an installed app) are unmeasured. Headless Chrome on this machine renders in software;
+  sound was checked there with phone emulation.
 * The soak test's 400 ms/week limit fails when the whole suite runs in parallel on this 4-core
   machine. Run alone it passes (341 ms/week).
 
@@ -89,7 +102,8 @@ npm start                 # server mode on PORT (unset MONGODB_URI locally; .env
 python -m http.server 3157 --directory public   # the GitHub Pages setup (offline engine in a worker)
 node scripts/anim/build-footballer.js            # rebuild the model and clips (fails if a retarget is > 1° off)
 node scripts/anim/extract-ara.js [file.glb]      # only when the Ara source clips must be refreshed
-cd tools/character-pipeline && npm install && node build-bodies.mjs [--export]   # rebuild the close-up bodies
+cd tools/character-pipeline && npm install && node athletes/variants.mjs && node athletes/build-athletes.mjs && node athletes/build-athletes.mjs --lod match   # rebuild the athletes
+cd tools/character-pipeline && node build-bodies.mjs [--export]   # the earlier close-up bodies
 ```
 * **Browser checks** were driven over the Chrome DevTools protocol, including:
   * a frame-by-frame audit that every shot, dive, goal and substitution on screen matches an engine
@@ -98,7 +112,7 @@ cd tools/character-pipeline && npm install && node build-bodies.mjs [--export]  
   * half-start timing;
   * screenshots of every hub on desktop and phone.
 * **Deploy:** push `main`; the Pages workflow builds, lints and uploads `public/`. Bump `CACHE` in
-  `public/sw.js` when shipped files change (now `gaffer-shell-v27`).
+  `public/sw.js` when shipped files change (now `gaffer-shell-v28`).
 
 ## Rules that still apply
 * Never let the view or physics decide an outcome. Keep results deterministic, and keep saves and

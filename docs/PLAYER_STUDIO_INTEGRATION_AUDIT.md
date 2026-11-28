@@ -261,3 +261,59 @@ fewer meshes.
   sculpted stylised faces) needs new art, not just optimisation.
 * **Beards and goalkeeper gloves** are not drawn on the athletes.
 * **The crop hairstyle** sits a little like a cap; long hair frames the face like a hood.
+
+## Athletes: every footballer with a face of his own (2026-11-28)
+
+The four close-up bodies gave four faces, MakeHuman's photographic skin and no beards or gloves. The
+athletes replace them everywhere (match, Player Studio, award ceremonies).
+
+**Approach chosen.** One base footballer and shape targets, all from Ara 3D Gen (MakeHuman CC0 data):
+* 54 exports: a neutral footballer and, with the same settings, one export per change (28 single face
+  modifiers, 3 heritages, 4 builds, 2 ages, 11 hairstyles, 5 beards). The same settings give the same
+  mesh, so each difference is a clean shape target.
+* Built by `tools/character-pipeline/athletes/`: 37 targets on one optimised base, at two levels of
+  detail; hairstyles as separate small files that follow the head (`_SKINREF`); beards and goalkeeper
+  gloves generated as soft-edged layers. A stylised skin: photographic detail smoothed out, moved to a
+  light neutral tone and tinted per player (eight tones).
+* In the game, `athleteRecipe(look)` turns his look into weights: the Studio's face sliders when set,
+  otherwise the hash of his look; heritage from nationality or skin tone; his build; his age. The
+  weights are baked once into his own positions and normals. Nothing morphs per frame; everything else
+  is shared.
+
+**Alternatives looked at and not taken:**
+* Quaternius Universal Base Characters (CC0): only two bodies and five hairstyles are free; a new
+  rebind and painted kits would be needed; still one face per body.
+* Blender Studio Human Base Meshes (CC0): .blend only, and Blender is not installed here.
+* Changing only the skin texture, materials or lighting of the four bodies: ruled out by the brief.
+
+**Found and fixed in the build** (each would have spoiled the result without an error):
+1. glTF Transform writes a sparse accessor from its denormalised values, so normalised 8-bit target
+   values were stored as 0 or ±1: 32 of the 37 targets moved the skin by 0.1 mm at most. Targets are
+   now plain 8-bit steps of a per-target scale, and `test/athletes.test.js` checks that every target
+   uses its full range.
+2. Heritage and age exports change the height, so those head targets moved the head 7–15 cm off the
+   neck. The head's own movement and size are now removed from them.
+3. Build exports rebuild the shirt, shorts and socks with other vertex counts. The garments now follow
+   the body along their normals (up to 13 mm), so sleeves and shorts fit a more muscular player.
+4. The skin texture averaged a dark brown, which a multiplying tint cannot lighten. It is now light
+   and neutral.
+5. Hair textures normalised to their brightest pixel made blond and ginger hair look almost black. The
+   median now maps to a light grey.
+
+**Measured** (headless Chrome, software rendering; `public/dev/athletes.html`, 13 players, shadows on):
+
+| | Mannequins | Athletes (match detail) | Athletes (full detail) |
+|---|---|---|---|
+| Draw calls (with the shadow pass) | 805 | 268 | 268 |
+| Triangles (with the shadow pass) | 477,920 | 309,420 | 536,996 |
+| Download | inside `footballer.glb` | 1.17 MB + 55–134 KB per hairstyle | 1.83 MB + 84–203 KB per hairstyle |
+
+In a real 3D match (22 players, stadium, shadows) the athletes drew 243 calls and about 340,000
+triangles. Frame rate on a real phone is not measured.
+
+**Limits (honestly):**
+* The style is MakeHuman made smoother, not hand-sculpted stylised art. Faces vary within MakeHuman's
+  range (28 features, 3 heritages, age): wide, but not unlimited.
+* The short hairstyles' hairlines are texture cut-outs; they are soft only with antialiasing (on except
+  at Low quality).
+* Everyone has brown eyes; there are no tattoos, headbands or sleeves; only male athletes ship.
