@@ -8,7 +8,7 @@ import fs from 'fs';
 import vm from 'vm';
 
 function fakeAudio() {
-  const made = { contexts: [], filters: [], played: 0, started: [], sources: [], oscillators: 0 };
+  const made = { contexts: [], filters: [], played: 0, started: [], sources: [], mediaSources: [], mediaPlayed: [], oscillators: 0 };
   const param = v => ({ value: v, target: v, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime(x) { this.target = x; }, cancelScheduledValues() {} });
   const node = extra => ({ connect(d) { this.to = d; }, disconnect() {}, ...extra });
   class AudioContext {
@@ -20,6 +20,7 @@ function fakeAudio() {
     createBiquadFilter() { const f = node({ type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0) }); made.filters.push(f); return f; }
     createBuffer(ch, len) { return { getChannelData: () => new Float32Array(len), length: len }; }
     createBufferSource() { const s = node({ buffer: null, loop: false, playbackRate: param(1), start() { made.played++; if (this.buffer && this.buffer.name) made.started.push(this.buffer.name); }, stop() {} }); made.sources.push(s); return s; }
+    createMediaElementSource(media) { const s = node({ media }); made.mediaSources.push(s); return s; }
     createOscillator() { made.oscillators++; return node({ type: 'sine', frequency: param(440), start() {}, stop() {} }); }
     createAnalyser() { return node({ fftSize: 2048, getFloatTimeDomainData() {} }); }
     createStereoPanner() { return node({ pan: param(0) }); }
@@ -40,7 +41,7 @@ function fakeFetch(names, { missing = [] } = {}) {
 function load({ phone = false, fetch } = {}) {
   const { AudioContext, made } = fakeAudio();
   const listeners = {}, winL = {};
-  const document = { hidden: false, addEventListener: (t, f) => { (listeners[t] ||= []).push(f); }, removeEventListener() {} };
+  const document = { hidden: false, addEventListener: (t, f) => { (listeners[t] ||= []).push(f); }, removeEventListener() {}, createElement: tag => tag === 'audio' ? { loop: false, play() { made.mediaPlayed.push(this.__gafferName); return Promise.resolve(); }, pause() {}, removeAttribute() {}, load() {} } : {} };
   const window = { AudioContext, addEventListener: (t, f) => { (winL[t] ||= []).push(f); } };
   const clock = { t: 1e6 };
   const ctx = vm.createContext({ window, document, matchMedia: q => ({ matches: phone && /coarse/.test(q) }), performance: { now: () => clock.t }, setTimeout: () => 0, setInterval: () => 0, clearInterval() {}, Math, console, Promise, isFinite, fetch });
@@ -104,14 +105,17 @@ describe('match sound', () => {
     expect(ph.made.filters.some(f => f.type === 'highpass' && f.frequency.value >= 100)).toBe(true);
   });
 
-  it('the recorded ground: both beds loop once decoded (without the MP3 padding), and each event plays its recording', async () => {
+  it('streams the two ambience beds and decodes bounded event recordings', async () => {
     const { S, made, tap } = load({ fetch: fakeFetch(STADIUM) }); tap();
     S.crowd(true);
     await S.preload();
-    expect(S.state().recorded).toMatchObject({ ready: true, loaded: STADIUM.length, beds: true });
-    const beds = made.sources.filter(s => s.buffer && /^bed-/.test(s.buffer.name));
-    expect(beds.map(s => s.buffer.name).sort()).toEqual(['bed-calm', 'bed-lively']);
-    for (const b of beds) { expect(b.loop).toBe(true); expect(b.loopStart).toBeCloseTo(200 / 32000, 5); expect(b.loopEnd).toBeCloseTo(95800 / 32000, 5); }
+    expect(S.state().recorded).toMatchObject({ ready: true, loaded: STADIUM.length - 2, beds: true, bedMode: 'media-stream' });
+    expect(S.state().decodedBytes).toBeLessThanOrEqual(S.state().recorded.decodedLimitBytes);
+    expect(S.state().peakDecodedBytes).toBeLessThanOrEqual(S.state().recorded.decodedLimitBytes);
+    const beds = made.mediaSources.filter(s => /^bed-/.test(s.media.__gafferName));
+    expect(beds.map(s => s.media.__gafferName).sort()).toEqual(['bed-calm', 'bed-lively']);
+    for (const b of beds) expect(b.media.loop).toBe(true);
+    expect(made.mediaPlayed.sort()).toEqual(['bed-calm', 'bed-lively']);
     const after = fn => { const n = made.started.length; fn(); return made.started.slice(n); };
     expect(after(() => S.event('KICK_OFF'))).toEqual(['whistle-long']);
     expect(after(() => S.event('GOAL', { side: 'home' }))[0]).toMatch(/^goal-[123]$/);
@@ -126,10 +130,28 @@ describe('match sound', () => {
     const osc = made.oscillators; S.event('MISS', { close: true }); expect(made.oscillators).toBe(osc);                // recorded, so nothing synthesised
   });
 
+  it('drops decoded stadium PCM when the match closes and keeps the peak for the session report', async () => {
+    const { S, tap } = load({ fetch: fakeFetch(STADIUM) }); tap(); S.crowd(true); await S.preload();
+    const peak = S.state().peakDecodedBytes;
+    expect(S.state().decodedBytes).toBeGreaterThan(0);
+    S.stopAll();
+    expect(S.state()).toMatchObject({ decodedBytes: 0, cacheBytes: 0, peakDecodedBytes: peak, decodedBuffers: 0 });
+  });
+
+  it('evicts least-recently-used reaction PCM before the byte budget is exceeded', async () => {
+    const names = ['bed-calm', 'bed-lively', ...Array.from({ length: 40 }, (_, i) => `reaction-${i}`)];
+    const { S, tap } = load({ fetch: fakeFetch(names) }); tap(); S.crowd(true); await S.preload();
+    const state = S.state();
+    expect(state.cacheBytes).toBeLessThanOrEqual(state.recorded.decodedLimitBytes);
+    expect(state.peakDecodedBytes).toBeLessThanOrEqual(state.recorded.decodedLimitBytes);
+    expect(state.recorded.loaded).toBeLessThan(40);
+    expect(state.recorded.loaded).toBeGreaterThan(0);
+  });
+
   it('excite() crossfades from the murmur to the fuller crowd as an attack builds', async () => {
     const { S, made, tap } = load({ fetch: fakeFetch(STADIUM) }); tap();
     S.crowd(true); await S.preload();
-    const gainOf = name => made.sources.find(s => s.buffer && s.buffer.name === name).to.gain.target;
+    const gainOf = name => made.mediaSources.find(s => s.media.__gafferName === name).to.gain.target;
     S.excite(0); const calm0 = gainOf('bed-calm'), lively0 = gainOf('bed-lively');
     S.excite(1); const calm1 = gainOf('bed-calm'), lively1 = gainOf('bed-lively');
     expect(calm0).toBeGreaterThan(lively0);

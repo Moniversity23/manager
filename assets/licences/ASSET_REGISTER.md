@@ -4,8 +4,12 @@ Every third-party file the game ships or keeps for its build, with its licence a
 Machine-readable copy: [`asset-register.json`](asset-register.json). Clip-by-clip animation detail:
 [`assets/animations/licenses/REGISTER.md`](../animations/licenses/REGISTER.md).
 
-Only licences that allow commercial use without payment are accepted. Add a row here (and to the
-JSON) **before** an asset is used.
+These rows describe the public build. Local learning experiments may use accessible personal-use or
+non-redistributable assets under `assets/animations/local-only/`; keep their short source/restriction
+record there and out of public build inputs. No such local-only asset was added in Milestone 16.
+
+For assets entering the public build, add a row here (and to the JSON) before use. This register does
+not restrict local-only experimentation.
 
 | Asset | Original URL | Creator | Licence | Commercial use | Attribution required | Downloaded | SHA-256 (original) | Original file | Processed file | Used for | Modifications |
 |---|---|---|---|---|---|---|---|---|---|---|---|

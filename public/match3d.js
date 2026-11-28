@@ -851,6 +851,123 @@ function dribbleWeight(u, D) {
   if (D.since != null && D.since >= 0 && D.since < DRIB_OUT) return { w: 1 - (D.since / DRIB_OUT) ** 2, foot: u.touchFoot || D.lastFoot || due };
   return null;
 }
+function aimLegSegment(bone, child, target, blend) {
+  if (!bone || !child || !bone.parent || blend <= 0) return;
+  const start = bone.getWorldPosition(new THREE.Vector3());
+  const end = child.getWorldPosition(new THREE.Vector3());
+  const from = end.clone().sub(start), to = target.clone().sub(start);
+  if (from.lengthSq() < 1e-8 || to.lengthSq() < 1e-8) return;
+  const parentQ = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+  const worldQ = bone.getWorldQuaternion(new THREE.Quaternion());
+  const delta = new THREE.Quaternion().setFromUnitVectors(from.normalize(), to.normalize());
+  const localQ = parentQ.invert().multiply(delta.multiply(worldQ));
+  bone.quaternion.slerp(localQ, blend);
+  bone.updateWorldMatrix(false, true);
+}
+const LEG_IK_MARGIN = 0.005; // keep a small bend at full reach without rejecting the player's longest natural extension
+function solveFootToWorld(u, foot, targetToe, blend, lockHeight = false) {
+  const B = u.bones; if (!B) return null;
+  const left = foot < 0, hip = left ? B.thl : B.thr, knee = left ? B.cal : B.car;
+  const ankle = left ? B.ftl : B.ftr, toe = left ? B.toel : B.toer;
+  if (!hip || !knee || !ankle || !toe) return null;
+  u.holder.updateWorldMatrix(true, true);
+  const h = hip.getWorldPosition(new THREE.Vector3()), k = knee.getWorldPosition(new THREE.Vector3());
+  const a = ankle.getWorldPosition(new THREE.Vector3()), q = toe.getWorldPosition(new THREE.Vector3());
+  if (!lockHeight) targetToe.y = q.y;
+  const targetAnkle = targetToe.clone().add(a.clone().sub(q));
+  const l1 = h.distanceTo(k), l2 = k.distanceTo(a), raw = targetAnkle.clone().sub(h), rawLen = raw.length();
+  if (l1 < 0.05 || l2 < 0.05 || rawLen < 1e-5) return null;
+  const reach = Math.max(Math.abs(l1 - l2) + 0.015, Math.min(l1 + l2 - LEG_IK_MARGIN, rawLen));
+  const dir = raw.multiplyScalar(1 / rawLen), along = (l1 * l1 - l2 * l2 + reach * reach) / (2 * reach);
+  let bend = k.clone().sub(h).addScaledVector(dir, -k.clone().sub(h).dot(dir));
+  if (bend.lengthSq() < 1e-7) bend.set(0, 0, 1).addScaledVector(dir, -dir.z);
+  if (bend.lengthSq() < 1e-7) bend.set(0, 1, 0).addScaledVector(dir, -dir.y);
+  bend.normalize();
+  const wantedKnee = h.clone().addScaledVector(dir, along).addScaledVector(bend, Math.sqrt(Math.max(0, l1 * l1 - along * along)));
+  const wantedAnkle = h.clone().addScaledVector(dir, reach);
+  aimLegSegment(hip, knee, wantedKnee, blend);
+  const movedKnee = knee.getWorldPosition(new THREE.Vector3());
+  aimLegSegment(knee, ankle, wantedAnkle, blend);
+  ankle.updateWorldMatrix(false, true); toe.updateWorldMatrix(false, true);
+  // Preserve the shoe's contact point as the leg swings. Solving only the ankle
+  // lets the boot rotate under the calf and makes the toe skate vertically.
+  aimLegSegment(ankle, toe, targetToe, blend);
+  ankle.updateWorldMatrix(false, true); toe.updateWorldMatrix(false, true);
+  return { toe: toe.getWorldPosition(new THREE.Vector3()), knee: movedKnee, reach: rawLen, maxReach: l1 + l2 - LEG_IK_MARGIN, reachable: rawLen <= l1 + l2 - LEG_IK_MARGIN };
+}
+function dribbleLegIK(u, r, D) {
+  const B = u.bones; if (!B || D.bx == null || D.bz == null) return;
+  const toe = (r.foot < 0 ? B.toel : B.toer).getWorldPosition(new THREE.Vector3());
+  const forward = new THREE.Vector3(Math.cos(u.face), 0, -Math.sin(u.face));
+  const target = new THREE.Vector3(D.bx, toe.y, D.bz).addScaledVector(forward, -BALL_R);
+  const solved = solveFootToWorld(u, r.foot, target, Math.min(0.95, Math.max(0, r.w)));
+  u.dribIK = { foot: r.foot, weight: r.w, target: [D.bx, D.bz], knee: solved && solved.knee, reachable: !!(solved && solved.reachable) };
+}
+function dribbleBodyCycle(u, D, dt) {
+  const B = u.bones; if (!B) return;
+  u.dribBody = (u.dribBody || 0) + ((D ? 1 : 0) - (u.dribBody || 0)) * Math.min(1, dt * 8);
+  const w = u.dribBody; if (w < 0.01) return;
+  const period = Math.max(0.25, (D && D.since != null ? D.since : 0) + (D && D.eta != null ? D.eta : 0.5));
+  const cycle = D && D.since != null ? D.since / period : 1 - Math.max(0, Math.min(1, (D && D.eta || 0.4) / period));
+  const swing = Math.sin(cycle * Math.PI * 2), side = Math.sin(u.face), forward = Math.cos(u.face);
+  _side.set(side, 0, Math.cos(u.face)); _fwd.set(forward, 0, -Math.sin(u.face));
+  turnBone(B.s2, _side, -0.035 * w);
+  turnBone(B.s3, _up, swing * 0.035 * w);
+  turnBone(B.ual, _side, (0.07 + swing * 0.045) * w);
+  turnBone(B.uar, _side, (0.07 - swing * 0.045) * w);
+}
+// A small football-specific lower-body cadence layered into the running clip: shorter
+// close-control steps, a mild inward roll on the ball-side boot, and a bent recovery leg.
+// The scheduled touch is still solved against the live ball by dribbleLegIK below.
+function footballDribbleCycle(u, D) {
+  const B = u.bones, w = u.dribBody || 0; if (!B || w < 0.02 || !D) return;
+  const phase = ((u.phase || 0) + (u.gaitOffset || 0)) * Math.PI * 2;
+  const touching = dribbleWeight(u, D), activeFoot = touching ? touching.foot : (u.dribFoot || D.foot || D.lastFoot || 1);
+  for (const foot of [-1, 1]) {
+    const left = foot < 0, step = Math.sin(phase + (left ? 0 : Math.PI));
+    const thigh = left ? B.thl : B.thr, calf = left ? B.cal : B.car, boot = left ? B.ftl : B.ftr;
+    const control = foot === activeFoot ? 1 : 0.45;
+    if (thigh) turnBone(thigh, _side, foot * step * 0.035 * w * control);
+    if (calf) turnBone(calf, _side, Math.max(0, step) * 0.065 * w * (foot === activeFoot ? 0.45 : 1));
+    if (boot) turnBone(boot, _side, foot * (0.018 + Math.max(0, -step) * 0.045) * w * control);
+  }
+}
+function plantFeet(u, phase, dt, skipFoot = 0) {
+  const B = u.bones;
+  if (!B || phase == null || !Number.isFinite(phase)) return;
+  u.plantClock = (u.plantClock || 0) + dt;
+  const period = Math.max(0.18, Math.min(1.5, u.gaitPeriod || 0.5));
+  const states = u.planted || (u.planted = { left: { active: false }, right: { active: false } });
+  for (const [foot, name, toe] of [[-1, 'left', B.toel], [1, 'right', B.toer]]) {
+    if (!toe) continue;
+    const p = (phase + (foot > 0 ? 0.5 : 0)) % 1, state = states[name];
+    const beforeSolve = toe.getWorldPosition(new THREE.Vector3());
+    const history = state.heights || (state.heights = []), cutoff = u.plantClock - period * 1.2;
+    while (history.length && history[0].t < cutoff) history.shift();
+    let low = Infinity; for (const sample of history) low = Math.min(low, sample.y);
+    const ground = low + 0.025, vy = state.previousY == null ? 0 : (beforeSolve.y - state.previousY) / Math.max(1e-3, dt);
+    if (foot === skipFoot) { state.previousY = beforeSolve.y; history.push({ t: u.plantClock, y: beforeSolve.y }); state.active = false; state.anchor = null; state.previous = null; continue; }
+    const entered = !state.active, active = state.active ? beforeSolve.y < ground + 0.055 : history.length >= 6 && beforeSolve.y <= ground && vy < 0.35;
+    state.previousY = beforeSolve.y; history.push({ t: u.plantClock, y: beforeSolve.y }); state.contactHeight = ground;
+    if (!active) { state.active = false; state.anchor = null; state.previous = null; continue; }
+    let world = beforeSolve;
+    if (entered) { state.anchor = world.clone(); state.previous = null; state.active = true; }
+    const solved = solveFootToWorld(u, foot, state.anchor.clone(), 1, true);
+    // A planted foot is only a valid constraint while the hip can reach it. During
+    // sprint recovery, holding a point after the leg has passed its range creates
+    // visible skating; release and let the next natural landing establish a new anchor.
+    if (solved && !solved.reachable) { state.unreachable = (state.unreachable || 0) + 1; state.lastReach = solved.reach; state.maxReach = solved.maxReach; state.active = false; state.anchor = null; state.previous = null; continue; }
+    if (solved) { state.lastReach = solved.reach; state.maxReach = solved.maxReach; }
+    world = toe.getWorldPosition(world);
+    const slip = state.previous ? world.distanceTo(state.previous) / Math.max(1e-3, dt) : 0;
+    state.previous = world.clone(); state.lastSlip = slip;
+    const log = globalThis.__footPlantStat;
+    if (log && foot !== skipFoot && !entered) {
+      log.samples.push({ slip, speed: u.spd || 0, phase: p, foot });
+      if (log.samples.length > 2000) log.samples.shift();
+    }
+  }
+}
 function dribbleReach(u, D) {
   const r = dribbleWeight(u, D), B = u.bones; if (!r || !r.foot || r.w <= 0) return;
   u.reach = r;
@@ -859,15 +976,16 @@ function dribbleReach(u, D) {
   turnBone(L ? B.thl : B.thr, _side, 0.18 * r.w);
   turnBone(L ? B.cal : B.car, _side, 0.14 * r.w);
   turnBone(L ? B.ftl : B.ftr, _side, -0.1 * r.w);
+  dribbleLegIK(u, r, D);
 }
 // Where the dribbler's boot meets the ball now, and how much of the ball's place it should take
 // (null outside a touch): just ahead of the toe joint of whichever boot is nearer the ball (the
 // touching foot, or the other when the stride and the touch disagree), on the grass.
 function dribbleContact(u, D, bx, bz) {
   const r = D && dribbleWeight(u, D), B = u.bones; if (!r || !r.foot || !B || !B.toel || !B.toer) return null;
-  const f = u.face, at = b => { const p = b.getWorldPosition(new THREE.Vector3()); return [p.x + Math.cos(f) * BALL_R, p.z - Math.sin(f) * BALL_R]; };
-  const L = at(B.toel), R = at(B.toer), d = q => Math.hypot(q[0] - bx, q[1] - bz), q = d(L) < d(R) ? L : R;
-  return { x: q[0], z: q[1], w: Math.min(1, r.w * 1.25), f };
+  const f = u.face, b = r.foot < 0 ? B.toel : B.toer, p = b.getWorldPosition(new THREE.Vector3());
+  const x = p.x + Math.cos(f) * BALL_R, z = p.z - Math.sin(f) * BALL_R;
+  return { x, z, w: r.w, f, foot: r.foot, gap: Math.hypot(x - bx, z - bz), ahead: (bx - x) * Math.cos(f) - (bz - z) * Math.sin(f) };
 }
 const CEL = ['celFist', 'celVictory', 'celJump', 'celFlip', 'celDab'];
 // Ground speed (m/s at our figure scale) at which each locomotion clip's feet don't slide.
@@ -989,7 +1107,7 @@ function makeFootballer(F, geo, m) {
 // His body: limb lengths move the joints along the bones (no stretching of the mesh), muscle
 // thickens limbs across them; longer legs lift the hips so his feet stay on the grass. Used for
 // the Mesh2Motion figure and the close-up body alike (both are on the same skeleton).
-function shapeBody(model, bone, lk) {
+export function shapeBody(model, bone, lk) {
   const body = bodyOf(lk), K = (v, amt) => 1 + ((v ?? 0.5) - 0.5) * amt;
   for (const sd of ['l', 'r']) {
     for (const n of ['calf_', 'foot_']) { const b = bone(n + sd); if (b) b.position.y *= K(body.legs, 0.14); }
@@ -1513,6 +1631,7 @@ function layerPose(u, a, dt) {
 
 // Called every frame instead of pose() for a mocap figure. `a` is the same action description.
 function animateFootballer(u, a, dt, t, simRate) {
+  u.dribIK = null;
   u.spd += (a.speed - u.spd) * Math.min(1, dt * 8);
   const F = u.F, sp = u.spd / (u.sy / S), k = simRate || 1;              // speed in model metres
   // ── one-shot actions from match events ──
@@ -1573,19 +1692,20 @@ function animateFootballer(u, a, dt, t, simRate) {
   else if (sp < GAIT_STEPS[0][1]) { const x = (sp - 0.35) / (GAIT_STEPS[0][1] - 0.35); w.idle = 1 - x; w.walk = x; }
   else { let i = 0; while (i < GAIT_STEPS.length - 2 && sp > GAIT_STEPS[i + 1][1]) i++; const [a0, v0] = GAIT_STEPS[i], [a1, v1] = GAIT_STEPS[i + 1], x = Math.max(0, Math.min(1, (sp - v0) / (v1 - v0))); if (u.act[a0] && u.act[a1]) { w[a0] = 1 - x; w[a1] = x; } else w.walk = 1; }
   const G = GAIT_DATA[u.athlete ? 'athlete' : 'mannequin'];
-  let cyc = 0, gw = 0;
+  let cyc = 0, gw = 0, phaseOffset = 0;
   for (const key of LOCO) {
     const ac = u.act[key]; if (!ac) continue;
     u.w[key] += ((w[key] || 0) * active - u.w[key]) * Math.min(1, dt * 7);
     const wt = u.w[key];
     ac.enabled = wt > 0.003;
     ac.setEffectiveWeight(wt);
-    if (G[key]) { cyc += wt * G[key][0] * ac.getClip().duration; gw += wt; }
+    if (G[key]) { cyc += wt * G[key][0] * ac.getClip().duration; phaseOffset += wt * G[key][1]; gw += wt; }
     else if (STRIDE[key]) ac.timeScale = Math.max(0.55, Math.min(1.7, sp / STRIDE[key] / u.gait));
   }
   // One phase for every forward gait: it advances by the ground covered over the blended gaits'
   // stride per cycle, so the planted foot stays put; each clip is placed at that phase.
   u.dribFoot = null;
+  u.gaitOffset = gw > 0.01 ? phaseOffset / gw : 0;
   if (gw > 0.01) {
     let rate = Math.max(0, sp) / (cyc / gw) / u.gait;                      // stride cycles a second
     // Dribbling: his stride is lined up with the next touch so a foot swings through just as he
@@ -1598,13 +1718,15 @@ function animateFootballer(u, a, dt, t, simRate) {
       u.dribFoot = Math.abs(eL) <= Math.abs(eR) ? -1 : 1;
       rate = Math.max(rate * 0.85, Math.min(rate * 1.15, rate + (u.dribFoot < 0 ? eL : eR) / D.eta));
     }
+    u.gaitPeriod = rate > 0.01 ? 1 / rate : 0.5;
     u.phase = ((u.phase || 0) + dt * rate) % 1;
   }
   for (const key in G) { const ac = u.act[key]; if (ac && ac.enabled) { ac.timeScale = 0; ac.time = (((u.phase || 0) + G[key][1]) % 1) * ac.getClip().duration; } }
   u.mixer.update(dt);
   trunkPosture(u, dt);
   if (u.bones) layerPose(u, u.one && u.one.key === 'chestCtl' ? { ...a, chest: null } : a, dt);
-  if (u.bones && a.drib && !u.one) dribbleReach(u, a.drib);
+  if (u.bones) dribbleBodyCycle(u, a.drib && !u.one ? a.drib : null, dt);
+  if (u.bones) footballDribbleCycle(u, a.drib && !u.one ? a.drib : null);
   { const L = globalThis.__animLog; if (L) { if (a.shield) L.shield = (L.shield || 0) + 1; if (a.chest != null) L.chest = (L.chest || 0) + 1; } }   // test hook
   // Test hook: how far the kicking foot is from its contact frame when the ball leaves.
   if (globalThis.__animLog && a.strike != null && u.one && /^(kick|shoot|pass)/.test(u.one.key) && !u.one.logged && a.strike >= 0.11) { u.one.logged = true; const c = F.clips[u.one.key]; (globalThis.__animLog.kickSync = globalThis.__animLog.kickSync || []).push(+(u.one.a.time - c.contact - (a.strike - 0.11) * k).toFixed(3)); }
@@ -1615,6 +1737,13 @@ function animateFootballer(u, a, dt, t, simRate) {
   if (a.header) lift = Math.max(lift, Math.sin(Math.PI * Math.min(1, a.header)) * 0.35);
   u.holder.rotation.set(roll, 0, 0);
   u.holder.position.y = lift * u.sy;
+  if (u.bones && gw > 0.01 && active) {
+    const planned = a.drib && !u.one ? dribbleWeight(u, a.drib) : null;
+    plantFeet(u, ((u.phase || 0) + u.gaitOffset) % 1, dt, planned && planned.w > 0.45 ? planned.foot : 0);
+    if (a.drib && !u.one) dribbleReach(u, a.drib);
+  } else if (u.planted) {
+    for (const state of Object.values(u.planted)) { state.active = false; state.anchor = null; state.previous = null; state.previousY = null; state.heights = []; }
+  }
   u.blob.scale.setScalar(1 - Math.min(0.6, lift));
 }
 
@@ -1854,6 +1983,18 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
   if (ro) ro.observe(container);
 
   const subsOn = { home: 0, away: 0 };
+  const matchDebug = (() => {
+    try { if (new URLSearchParams(window.location.search).get('matchDebug') !== '1') return null; } catch { return null; }
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'position:fixed;z-index:10000;right:6px;bottom:6px;max-width:min(92vw,420px);max-height:45vh;overflow:auto;margin:0;padding:8px 10px;border-radius:6px;background:rgba(5,12,18,.88);color:#d9f3ff;font:11px/1.4 ui-monospace,monospace;white-space:pre-wrap;pointer-events:none;';
+    pre.setAttribute('aria-label', 'Match diagnostics');
+    const shared = globalThis.__m16MatchDebug || (globalThis.__m16MatchDebug = { contacts: [], last: null, peakAudioBytes: 0 });
+    if (shared.pre && shared.pre.parentNode) shared.pre.parentNode.removeChild(shared.pre);
+    shared.pre = pre; document.body.appendChild(pre);
+    globalThis.__footPlantStat = { samples: [] };
+    return pre;
+  })();
+  const debugState = globalThis.__m16MatchDebug || (globalThis.__m16MatchDebug = { contacts: [], last: null, peakAudioBytes: 0 });
   function buildFigure(v, side, i, d, number) {
     const lineup = (v.m.lineups && v.m.lineups[side]) || [];
     const entry = lineup.find(x => x.playerId === d.id) || lineup[i];
@@ -1914,7 +2055,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
       const cel = sim.phase === 'celebrate' ? sim.celebrate : null;
       const bx = (v.ball.x - 0.5) * L, bz = (v.ball.y - 0.5) * W, by = BALL_R + (v.ball.z || 0) * 6;
       const strikeAge = sim.strike ? sim.t - sim.strike.t0 : 9, tackleAge = sim.tackle ? sim.t - sim.tackle.t0 : 9;
-      let ballFix = null;
+      let ballContact = null;
       const threat = !!sim.attack && sim.phase === 'play';
 
       for (const side of ['home', 'away']) {
@@ -1965,7 +2106,7 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
           // Only real touches count (not the moment he takes over the ball), and only with the ball at his feet.
           if (dribble && sim.drib && sim.drib.side === side && sim.drib.idx === i && ballNear < 2.5) {
             const tc = sim.touch && sim.touch.side === side && sim.touch.idx === i && !sim.touch.chest ? sim.touch : null;
-            a.drib = { eta: (sim.drib.next - sim.t) / simRate, since: tc ? (sim.t - tc.t0) / simRate : null, t0: tc ? tc.t0 : null, foot: sim.drib.nextFoot || 1, lastFoot: tc ? tc.foot : null };
+            a.drib = { eta: (sim.drib.next - sim.t) / simRate, since: tc ? (sim.t - tc.t0) / simRate : null, t0: tc ? tc.t0 : null, foot: sim.drib.nextFoot || 1, lastFoot: tc ? tc.foot : null, bx, bz };
           }
           const jockey = !dribble && !cel && speed < 3.6 && ballDist > 1.5;
           let want = speed < 0.9 || jockey || a.dive || a.ready || a.hold ? ballAng : moveAng;
@@ -1991,7 +2132,21 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
           if (!a.header) u.hd = 0;
           if (sim.card && sim.t - sim.card.t0 < 2.5 && sim.card.side === side && i !== sim.card.idx && !cel) { const bk = (v.dots[side] || [])[sim.card.idx]; if (bk && Math.hypot(bk.x - d.x, (bk.y - d.y) * 0.65) < 0.08) a.appeal = true; }
           if (u.mocap) animateFootballer(u, a, dt, t, simRate); else pose(u, a, dt, t, i);
-          if (a.drib && u.mocap) { const c = dribbleContact(u, a.drib, bx, bz); if (c) ballFix = c; const st = globalThis.__dribStat; if (st) { st.drib = (st.drib || 0) + 1; if (c) st.reach = (st.reach || 0) + 1; } }   // (a test hook counts)
+          if (a.drib && u.mocap) {
+            const c = dribbleContact(u, a.drib, bx, bz);
+            if (c) {
+              ballContact = c;
+              const st = globalThis.__dribStat;
+              if (st) { st.drib = (st.drib || 0) + 1; st.reach = (st.reach || 0) + 1; st.last = { gap: c.gap, foot: c.foot, speed, phase: u.phase, eta: a.drib.eta, since: a.drib.since }; }
+              if (a.drib.t0 != null && a.drib.since != null && a.drib.since <= 0.05 && u.dribMetricT0 !== a.drib.t0) {
+                u.dribMetricT0 = a.drib.t0;
+                const sample = { gap: c.gap, foot: c.foot, speed, simRate, x: bx, z: bz, ahead: c.ahead, t: sim.t };
+                debugState.last = sample;
+                if (matchDebug) { debugState.contacts.push(sample); if (debugState.contacts.length > 500) debugState.contacts.shift(); }
+                const log = globalThis.__dribLog; if (log) log.push([+c.gap.toFixed(3), +c.w.toFixed(2), +c.ahead.toFixed(3), c.foot]);
+              }
+            }
+          }
         });
       }
 
@@ -2030,16 +2185,9 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
         if (fourth.userData.mocap) animateFootballer(fourth.userData, fA, dt, t, simRate); else pose(fourth.userData, fA, dt, t, 50);
       }
 
-      // Ball: position, spin from its movement, shadow, trail. At a dribbling touch the ball is drawn
-      // at the boot that plays it (a correction of at most 45 cm, faded in and out over the 0.3 s
-      // around the contact), so the foot is seen to meet it.
+      // Render the authoritative rolling ball at its true world position. Contact is achieved by
+      // matching the selected boot to the ball with leg IK; the visual layer never moves the ball.
       let rbx = bx, rbz = bz;
-      if (ballFix && by < BALL_R + 0.3) {
-        const dx = ballFix.x - bx, dz = ballFix.z - bz, dd = Math.hypot(dx, dz);
-        if (dd < 0.8) { const k = ballFix.w * Math.min(1, 0.45 / Math.max(1e-6, dd)); rbx += dx * k; rbz += dz * k; }
-        const D = globalThis.__dribLog; if (D && ballFix.w > 0.7) D.push([+dd.toFixed(3), +ballFix.w.toFixed(2), +(-(dx * Math.cos(ballFix.f) - dz * Math.sin(ballFix.f))).toFixed(3), +(-(dx * Math.sin(ballFix.f) + dz * Math.cos(ballFix.f))).toFixed(3)]);    // test hook: the boot-to-ball gap near contact (before the correction), how near, and the ball's offset from the boot: ahead (+) and to his right (+)
-      }
-      ballFix = null;
       ball.position.set(rbx, by, rbz);
       tmp.copy(ball.position).sub(prevBall); prevBall.copy(ball.position);
       const moved = tmp.length(), ballSpeed = moved / dt;
@@ -2053,6 +2201,31 @@ async function buildView(container, { homeHue = 210, awayHue = 0, cam = () => 't
         if (air || sp) ball.rotation.y += Math.sign(curl) * Math.min(1, Math.abs(curl) / 3) * dt * 14;
       }
       ballBlob.position.x = rbx; ballBlob.position.z = rbz;
+      if (matchDebug) {
+        const sound = window.GafferSound && window.GafferSound.state ? window.GafferSound.state() : {};
+        const speech = window.GafferCommentary && window.GafferCommentary.state ? window.GafferCommentary.state() : {};
+        const sw = navigator.serviceWorker && navigator.serviceWorker.controller ? 'controlling' : 'not controlling';
+        const active = sim.poss && sim.holder != null ? (players[sim.poss] || [])[sim.holder] : null;
+        const au = active && active.userData, c = ballContact;
+        const contactRows = debugState.contacts;
+        const gaps = contactRows.map(x => x.gap).sort((a, b) => a - b);
+        const p95 = gaps.length ? gaps[Math.min(gaps.length - 1, Math.ceil(gaps.length * 0.95) - 1)] : null;
+        const slipRows = globalThis.__footPlantStat ? globalThis.__footPlantStat.samples.map(x => x.slip).sort((a, b) => a - b) : [];
+        const slipAt = q => slipRows.length ? slipRows[Math.min(slipRows.length - 1, Math.ceil(slipRows.length * q) - 1)] : null;
+        const audioBytes = (sound.decodedBytes || 0) + (speech.recorded && speech.recorded.decodedBytes || 0);
+        debugState.peakAudioBytes = Math.max(debugState.peakAudioBytes || 0, audioBytes);
+        const bufferCount = (sound.decodedBuffers || 0) + (speech.recorded && speech.recorded.decoded || 0);
+        const playingCount = (sound.recorded && sound.recorded.playing || 0) + (speech.recorded && speech.recorded.liveBuffers || 0);
+        matchDebug.textContent = [
+          `FPS ${Math.round(1000 / Math.max(1, dt * 1000))} | frame ${(dt * 1000).toFixed(1)} ms | players ${players.home.length + players.away.length}`,
+          `animation ${au && au.dribIK ? 'dribble IK' : au && au.w ? Object.keys(au.w).filter(k => au.w[k] > 0.2).join('+') : '—'} | speed ${au && Number.isFinite(au.spd) ? au.spd.toFixed(2) : '—'} m/s | phase ${au && au.phase != null ? au.phase.toFixed(2) : '—'}`,
+          `foot contact L/R ${au && au.dribIK ? (au.dribIK.foot < 0 ? 'ball' : 'free') + '/' + (au.dribIK.foot > 0 ? 'ball' : 'free') : au && au.planted ? (au.planted.left.active ? 'planted' : 'swing') + '/' + (au.planted.right.active ? 'planted' : 'swing') : '—'} | ball ${bx.toFixed(2)}, ${bz.toFixed(2)} | velocity ${(tmp.x / dt).toFixed(2)}, ${(tmp.z / dt).toFixed(2)} m/s`,
+          `boot-ball ${c ? c.gap.toFixed(3) + ' m' : '—'} | dribble ${sim.touch && Number.isFinite(sim.touch.t0) ? sim.touch.t0.toFixed(2) : '—'} | pending ${sim.drib ? Math.max(0, sim.drib.next - sim.t).toFixed(3) + ' s' : '—'} | contacts ${contactRows.length}, p95 ${p95 == null ? '—' : p95.toFixed(3) + ' m'}`,
+          `planted slip p50/p95/max ${slipAt(0.5) == null ? '—' : slipAt(0.5).toFixed(3)}/${slipAt(0.95).toFixed(3)}/${slipAt(1).toFixed(3)} m/s | samples ${slipRows.length}`,
+          `audio ${sound.context || 'none'} | decoded ${ (audioBytes / 1048576).toFixed(1)} MB (sampled session peak ${ (debugState.peakAudioBytes / 1048576).toFixed(1)} MB) | ${bufferCount} cached + ${playingCount} playing | ${window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true ? 'installed' : 'browser'}`,
+          `service worker ${sw} | audio prefetch ${(globalThis.__m16AudioPrefetch && globalThis.__m16AudioPrefetch.state) || 'waiting'} | touch log ${debugState.last ? debugState.last.gap.toFixed(3) + ' m @ ' + debugState.last.simRate + 'x' : 'waiting'}`
+        ].join('\n');
+      }
       const bh = Math.min(1, (by - BALL_R) / 6);
       ballBlob.scale.setScalar(0.5 + bh * 0.9); ballBlob.material.opacity = 0.9 - bh * 0.6;
       if (!frozen) { hist.unshift([rbx, by, rbz]); if (hist.length > TRAIL + 1) hist.pop(); }
@@ -2684,6 +2857,9 @@ export async function createAwardView(container, { look = null, kit = {}, gk = f
   requestAnimationFrame(loop);
   return { dispose() { running = false; removeEventListener('resize', resize); renderer.dispose(); renderer.domElement.remove(); } };
 }
+
+// Exported for the deterministic skeleton contact regression in test/dribble.test.js.
+export { dribbleLegIK, plantFeet, warpClip };
 
 // ── Portraits: the player himself, head and shoulders ──
 // His athlete (the face, skin, eyes, hair and beard he has on the pitch and in the Player Studio) in

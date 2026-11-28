@@ -1,111 +1,76 @@
-# Player animation — how it works and what was used
+# Player animation and football movement
 
-## Audit (before this work)
+## Runtime
 
-* **Engine:** three.js r170 (WebGL), vendored in `public/vendor/`; the 3D match view is `public/match3d.js`.
-* **Players:** built in code from simple shapes (cylinders, spheres, lathed torso) with a
-  hand-written pose function. No skinned meshes, no skeleton, no animation clips, no model files.
-* **Match engine:** the result is decided by the server or offline engine; the match view runs its
-  own visual simulation (`stepPositions`, `simPass`, `simShoot` in `public/index.html`) that sets
-  `sim.strike`, `sim.tackle`, `sim.dive`, `sim.touch`, `sim.block`, `sim.injured`, `sim.card`.
-* **Machine:** Windows 10, Node 22, Python 3.14; Blender not installed.
+The match renderer is `public/match3d.js`, using the vendored three.js r170 runtime. Players keep
+their existing IDs, appearance data, portraits, club kits and shared footballer skeleton. The
+authoritative match engine and career-save format do not depend on the visual animation system.
 
-## Tools
+`scripts/anim/build-footballer.js` produces the match skeleton and clips from the existing
+Mesh2Motion base and the retargeted Ara football actions. The source/processed asset records remain
+in `assets/animations/licenses/REGISTER.md` and `assets/licences/ASSET_REGISTER.md`.
 
-| Tool | Licence | Used for |
-|---|---|---|
-| Node.js (already installed) | MIT | the whole asset pipeline |
-| `scripts/anim/glb.js` (written for this) | project | reading and writing GLB, decoding meshopt compression |
-| meshoptimizer decoder (ships with three.js) | MIT | decoding the source GLBs |
-| three.js GLTFLoader, SkeletonUtils, AnimationMixer | MIT | loading, cloning and animating players in the browser |
+## Movement and ball contact
 
-**Blender was not installed.** Every asset the game needs is already a GLB on one shared skeleton,
-so nothing needs FBX import or retargeting. A Node pipeline also runs on GitHub's build servers
-without a 350 MB download. If FBX sources or clips on a different skeleton are added later,
-Blender's free command line (`blender --background --python script.py`) is the right tool and
-can be added then.
+Forward locomotion remains phase-locked across the walk, jog and sprint blends. The phase rate is
+computed from ground speed, the selected clip's natural rate and its duration. The actual view now
+adds:
 
-## Assets
+* **World-space leg IK.** A two-segment thigh/calf solver aims the ankle and then rotates the boot
+  to keep its toe at the chosen world point. A foot is held only while the hip can physically reach
+  its anchor; it releases at the end of stance instead of stretching or skating past the leg's range.
+* **Dribble contact IK.** The scheduled left or right foot reaches the ball's current simulated
+  position at the planned contact. The rendered ball is never corrected or capped to make contact.
+* **A procedural football dribble layer.** Short alternating steps, ball-side boot roll, recovery-leg
+  flex, torso counter-sway and arm balance sit on the shared locomotion cycle. The timed contact
+  reach is one part of the movement, not its only dribble motion.
+* **Recovery.** `simDribble` predicts the player's velocity easing toward the desired velocity and
+  searches the ball's rolling trajectory. It makes a touch only inside the contact envelope. If the
+  ball rolls outside close control, the player visibly chases its natural stop point until it can be
+  played; the authoritative match possession is unchanged.
 
-See `assets/animations/licenses/REGISTER.md` for the full register: source, download URL,
-licence, commercial use, attribution and status of each asset.
+The contact scheduler covers either foot, alternating close touches, preferred-foot running,
+acceleration, deceleration and turns. The game can play at 1x, 2x, 4x and 8x. Dedicated football
+mocap was investigated: Rokoko lists a free 12-clip sports pack exported to a Mixamo rig at 30 FPS,
+but access is through a registration form; no account or contact details were supplied, so no pack
+was downloaded. TechLabID lists soccer dribble and receive animations, but marks their downloads
+paused. Neither candidate is in the build. No money was spent.
 
-* **Used:** Mesh2Motion's human mannequin and 38 of its clips (CC0 1.0 — commercial use allowed,
-  no attribution needed).
-* **Downloaded and verified but not used:** the KinemIQ 35-clip pack (CC0). It is on a different
-  skeleton and duplicates clips already covered.
-* **Not downloadable by script:** Quaternius Universal Animation Library (itch.io only). Its
-  content is already available as CC0 through the KinemIQ pack.
+## Regression measurements (local, Node/Vitest)
 
-## Pipeline
+`test/dribble.test.js` drives the existing match simulation and loads the shipped GLB skeleton and
+animation clips for contact/stance measurements:
 
-```
-npm run inspect:anim   # report every source file: skeleton, clips, frame rates, root motion
-npm run build:anim     # rebuild public/models/ from assets/animations/source/
-```
+* **Touch matrix:** acceleration, deceleration and left/right turns; both declared feet; 164 cm and
+  198 cm players; 1x, 2x, 4x and 8x. The 32 simulated profiles produced 124 scheduling events.
+* **Selected boot at the touch frame:** a second matrix applied the production `shapeBody` recipe at
+  lean and heavier build slider values on the 164/198 cm rigs. All 248 selected-foot contacts were
+  within 0.12 m after IK; median separation 0.012 m, p95 0.031 m, maximum 0.035 m. This is a
+  skeleton/animation regression, not a claim of visual phone testing.
+* **Planted foot:** 120 seconds each at 1.1, 3.5 and 7.5 m/s on the exact walk, blended stride-warped
+  jog/run and stride-warped sprint clips used by the renderer, at 60 Hz, with the production body
+  shape recipe at the ordinary build. The gait clock uses each clip's actual duration, speed blend,
+  height scale and natural stride rate. Across 14,018 reachable, low-foot samples, median world-space
+  slip was 0.004 m/s, p95 0.029 m/s and maximum 0.042 m/s. By gait: walk 7,848 samples (p95 0.031,
+  max 0.042), jog 3,604 (p95 0.004, max 0.007), sprint 2,566 (p95 0.012, max 0.023). Left/right
+  anchored time was 68.30/65.47 s walking, 38.23/27.43 s jogging and 26.60/23.10 s sprinting.
+  Median stance-phase lengths by left/right foot
+  were 0.767/0.733 s walking, 0.233/0.167 s jogging and 0.133/0.117 s sprinting. Raw clip ground
+  shares per foot were 52.4/51.2%, 17.8/8.9% and 14.3/14.3%, respectively. Unreachable stance
+  points are released, not counted as planted. These are repeatable CPU-side rig measurements; the
+  browser's complete match and a real GPU still need visual/device review.
 
-`scripts/anim/build-footballer.js`:
+## Diagnostic and remaining work
 
-1. Reads the mannequin and decodes it.
-2. Splits the mesh into kit regions by the bone that moves each vertex most: shirt, shorts,
-   socks, boots, skin, hands (gloves for keepers) and head (hidden; the player's own head is
-   attached instead). The shorts and sock lines are cut along the mesh's own edge rings.
-3. Writes `public/models/footballer.glb` (uncompressed glTF, no texture, about 330 KB; about
-   230 KB as served).
-4. Reads each clip and keeps bone rotations plus the pelvis translation. Static tracks are
-   collapsed to one key, finger poses are held, and values are rounded.
-5. Finds each kick's ball-contact moment and kicking foot by running the skeleton forward and
-   timing the foot's fastest moment.
-6. Writes `public/models/footballer-anims.json` (about 830 KB; about 150 KB as served) and a
-   report to `assets/animations/processed/build-report.json`. Fails loudly if a clip is missing
-   or broken.
+Append `?matchDebug=1` to a local match URL to show frame time/FPS, player count, gait/phase/speed,
+left/right contact state, ball position/velocity, current boot-ball distance, recent contact p95,
+planted-foot slip percentiles, decoded-audio estimates, service-worker control and browser/installed
+mode. The overlay is created only when that query value is present.
 
-The source files are never modified.
+The players retain the current stylised-realism anatomy and appearance pipeline. This milestone
+improves whole-body movement and ground contact; it does not replace the body mesh. A dedicated
+captured close-control/dribble library, full visual review on the live match and GPU testing on an
+Android phone remain outstanding. The existing fallback to the classic procedural player remains.
 
-## In the match (`public/match3d.js`)
-
-* Each player is a clone of the mannequin in his club's colours, with his own head (face, hair
-  and beard from his permanent look) on the head bone and his number on his back. He is scaled
-  to his real height and build.
-* **Locomotion:** idle, walk, jog and sprint are blended by his actual ground speed, and the
-  playback speed follows that speed so the feet don't slide. He walks backwards when retreating
-  and strafes when side-stepping. Taller players have a slightly longer stride.
-* **Match events trigger one-shot clips:**
-  * pass → side-foot kick;
-  * shot or long ball → driven kick, timed so the foot meets the ball as it leaves (contact moment
-    from the pipeline);
-  * tackle → slide;
-  * high ball → header jump;
-  * keeper → dive left or right with a sideways launch, block on a save or punch;
-  * goal → each scorer's own celebration (fist pump, victory, backflip or dab), team-mates clap or
-    punch the air, opponents slump;
-  * card → the referee raises his arm and team-mates appeal;
-  * injury → falls, then gets up.
-* Clips fade in and out (0.12–0.2 s). A finished action hands back to locomotion.
-* The referee, both assistants and the fourth official use the same system.
-* **Fallback:** the files are fetched once, when you press Play, cached for offline use, and shared
-  by every player. If they can't be loaded in 30 s, or Settings → 3D players is set to Classic,
-  the view uses the previous procedural figures.
-
-## Testing
-
-* `test/animation.test.js` checks the processed files:
-  * the mesh has all seven regions and is person-sized;
-  * every needed clip exists, binds to existing bones and has finite values;
-  * each kick has a contact time;
-  * every source clip is in the licence register.
-* `public/dev/anim-lab.html` shows every clip on its own footballer, for visual checks of
-  orientation, foot contact and distortion.
-* A full match was played in a headless browser while logging which actions fired and how far
-  each kick's foot contact was from the ball leaving (see the commit notes for results).
-
-## Known limitations
-
-* The mannequin is a stylised, muscular figure, not a photo-real footballer.
-* There is no mocap clip for a goalkeeper's full-length dive: a sidestep clip is launched sideways
-  in code.
-* Kicks use one foot each (front kick: left; side-foot pass: right). There is no mirroring yet.
-* Headers use a general jump.
-* No inverse kinematics: feet follow the clips, which keeps them on the ground on flat turf.
-* Smoothness on real phones was not measured. Hands are high-poly in the source model; if phones
-  struggle, the hands are the first thing to simplify, and the Classic setting is the fallback.
+Run `npx vitest run test/dribble.test.js` for the measurements and `npm run build:anim` only when
+changing the source model or clip pipeline.

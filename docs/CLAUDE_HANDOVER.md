@@ -1,6 +1,6 @@
 # Claude handover: The Gaffer
 
-*Updated 2026-11-28 (milestone 15). Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
+*Updated 2026-11-28 (milestone 16). Live at <https://moniversity23.github.io/manager/> (GitHub Pages, from `main`
 through `.github/workflows/pages.yml`).*
 
 ## Architecture
@@ -45,6 +45,15 @@ through `.github/workflows/pages.yml`).*
 
 ## Completed in this release
 See `docs/INTEGRATION_CHANGELOG.md`. In short:
+* **Real football movement (milestone 16):** velocity-aware dribble scheduling and loose-ball
+  recovery; the selected boot is solved to the actual ball on the shipped skeleton; world-space
+  planted-foot IK releases at the leg's reach limit; and a procedural dribble step/torso layer runs
+  on the existing gait. The ball render is not moved to fake contact.
+* **Audio memory and offline streams (milestone 16):** streamed local ambience beds, bounded stadium
+  and commentary AudioBuffer caches, cache release on match close, byte-range responses for cached
+  audio in service worker v30, and `?matchDebug=1` movement/audio diagnostics.
+* **Evidence:** see `docs/evidence/m16/README.md` for the automated rig/memory results and the real
+  Android/PWA checklist.
 * **Realism milestone (2026-11-28, section 15; evidence in `docs/evidence/m15/`):**
   * athletes stand upright (the rebind keeps the animation's rest), with photographic skins by
     heritage and age, four eye colours, image-based light and fuller beards;
@@ -102,7 +111,9 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
   * MakeHuman-based (photographic skins, modelled hair), not hand-sculpted; faces vary within
     MakeHuman's range. Hairlines of the short styles are cut-outs (soft only with antialiasing).
   * No tattoos, headbands or sleeves. Beards are shells (fuller now) rather than strands.
-  * The dribble's leg reach is an overlay on the run, not a dedicated dribbling clip.
+* The dribble uses a procedural layer plus live boot IK on the shared locomotion clips. Dedicated
+  football mocap clips remain a quality opportunity; the browsed sports pack needs registration and
+  the soccer pack currently marks its downloads paused.
   * Portraits use the club's default home kit (a Studio-designed kit shows in matches, not yet in
     portraits).
   * Only male athletes. Fingers differ from Ara's by about 15 mm (held poses).
@@ -113,8 +124,8 @@ See `docs/INTEGRATION_CHANGELOG.md`. In short:
   sound was checked there with phone emulation. `docs/AUDIO.md` has a checklist for real phones.
 * The commentary library is about 7 MB. The installed app prefetches it for offline play; a
   browser user streams what a match needs.
-* The soak test's 400 ms/week limit fails when the whole suite runs in parallel on this 4-core
-  machine. Run alone it passes (341 ms/week).
+* Recheck the soak test's 400 ms/week gate in isolation and in the full parallel suite; the M15
+  baseline passed alone and was contention-sensitive in the full run.
 
 ## Run and test
 ```

@@ -10,5 +10,9 @@ yarn-error.log*
 # KinemIQ pack: downloaded for inspection only (not used). Re-download with the URL and hash in assets/animations/licenses/REGISTER.md
 /assets/animations/source/kinemiq/
 
+# Personal-only asset experiments; never feed these into the public model build.
+/assets/animations/local-only/*
+!/assets/animations/local-only/README.md
+
 # Reference projects reviewed locally (not part of the game)
 /FOOTBALL-RALISM-LAB/

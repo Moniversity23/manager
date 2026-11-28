@@ -94,8 +94,14 @@
   // ── The recorded commentator ──
   const BASE = 'audio/commentary/';
   const LEVEL = 0.62;                 // the voice over the ground: about 10 dB above the crowd's murmur
-  const MAX_DECODED = 48;             // decoded clips kept (the compressed files are all kept: ~10 KB each)
-  const R = { index: null, loading: null, banks: {}, names: {}, namesX: {}, lower: {}, bytes: new Map(), decoded: new Map(), recent: {} };
+  const MAX_DECODED = 48, MAX_DECODED_BYTES = 7 * 1024 * 1024;
+  const R = { index: null, loading: null, generation: 0, banks: {}, names: {}, namesX: {}, lower: {}, bytes: new Map(), byteSizes: new Map(), compressedBytes: 0, pending: new Map(), decoded: new Map(), live: new Set(), decodedBytes: 0, peakDecodedBytes: 0, recent: {} };
+  const bufferBytes = b => b ? b.length * (b.numberOfChannels || 1) * 4 : 0;
+  function residentDecodedBytes() {
+    const cached = new Set(R.decoded.values()); let bytes = R.decodedBytes;
+    for (const s of R.live) if (s.buffer && !cached.has(s.buffer)) { cached.add(s.buffer); bytes += bufferBytes(s.buffer); }
+    R.peakDecodedBytes = Math.max(R.peakDecodedBytes, bytes); return bytes;
+  }
   const audio = () => { try { return window.GafferSound && window.GafferSound.voice ? window.GafferSound.voice() : null; } catch (e) { return null; } };
   function loadIndex() {
     if (R.index) return Promise.resolve(R.index);
@@ -113,18 +119,34 @@
   function bytes(file) {
     let p = R.bytes.get(file);
     if (!p) {
-      p = fetch(BASE + file).then(r => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+      p = fetch(BASE + file).then(r => (r.ok ? r.arrayBuffer() : null)).then(ab => { if (ab) { R.byteSizes.set(file, ab.byteLength); R.compressedBytes += ab.byteLength; } return ab; }).catch(() => null);
       R.bytes.set(file, p); p.then(b => { if (!b) R.bytes.delete(file); });
     }
     return p;
   }
   async function decoded(file) {
     if (R.decoded.has(file)) { const b = R.decoded.get(file); R.decoded.delete(file); R.decoded.set(file, b); return b; }
+    if (R.pending.has(file)) return R.pending.get(file);
     const V = audio(); if (!V) return null;
-    const ab = await bytes(file); if (!ab) return null;
-    const b = await new Promise(res => { try { const p = V.ctx.decodeAudioData(ab.slice(0), res, () => res(null)); if (p && p.then) p.then(res, () => res(null)); } catch (e) { res(null); } });
-    if (b) { R.decoded.set(file, b); while (R.decoded.size > MAX_DECODED) R.decoded.delete(R.decoded.keys().next().value); }
-    return b;
+    const generation = R.generation;
+    const task = (async () => {
+      let b = null;
+      try {
+        const ab = await bytes(file); if (ab) b = await new Promise(res => { try { const p = V.ctx.decodeAudioData(ab.slice(0), res, () => res(null)); if (p && p.then) p.then(res, () => res(null)); } catch (e) { res(null); } });
+      } finally {
+        R.bytes.delete(file); R.compressedBytes = Math.max(0, R.compressedBytes - (R.byteSizes.get(file) || 0)); R.byteSizes.delete(file);
+      }
+      if (b && generation === R.generation) {
+        R.decoded.set(file, b); R.decodedBytes += bufferBytes(b);
+        while (R.decoded.size > MAX_DECODED || (R.decodedBytes > MAX_DECODED_BYTES && R.decoded.size > 1)) {
+          const oldest = R.decoded.keys().next().value, old = R.decoded.get(oldest); R.decoded.delete(oldest); R.decodedBytes -= bufferBytes(old);
+        }
+        residentDecodedBytes();
+      }
+      return generation === R.generation ? b : null;
+    })();
+    R.pending.set(file, task);
+    try { return await task; } finally { if (R.pending.get(file) === task) R.pending.delete(file); }
   }
   // The surname as recorded ("Okafor" for "Chidi Okafor"; accents and case forgiven).
   function nameOf(full) {
@@ -191,7 +213,7 @@
   // done(false) when a recording could not be had (the caption stays, nothing is said).
   function playParts(item, done) {
     const V = audio(); if (!V) { done(false); return; }
-    Promise.all(item.parts.map(p => decoded(p.file))).then(bufs => {
+    (async () => { const bufs = []; for (const part of item.parts) bufs.push(await decoded(part.file)); return bufs; })().then(bufs => {
       if (item.cancelled) return;
       if (!bufs.some(Boolean) || !bufs[bufs.length - 1]) { done(false); return; }
       const c = V.ctx, g = c.createGain(); g.gain.value = Math.max(0, Math.min(1.6, opts.volume)) * LEVEL; g.connect(V.out);
@@ -199,12 +221,15 @@
       item.parts.forEach((p, i) => {
         const b = bufs[i]; if (!b) return;
         const s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = p.rate || 1; s.connect(g); s.start(t);
+        R.live.add(s); residentDecodedBytes();
+        s.onended = () => { R.live.delete(s); s.buffer = null; residentDecodedBytes(); };
         t += b.duration / (p.rate || 1) + (p.gap ?? 0.1); srcs.push(s);
       });
       let over = false;
       const fin = () => { if (over) return; over = true; try { g.disconnect(); } catch (e) { /* gone */ } done(true); };
-      item.stop = () => { for (const s of srcs) { try { s.stop(); } catch (e) { /* ended */ } } fin(); };
-      srcs[srcs.length - 1].onended = fin;
+      item.stop = () => { for (const s of srcs) { try { s.stop(); } catch (e) { /* ended */ } R.live.delete(s); s.buffer = null; } residentDecodedBytes(); fin(); };
+      const last = srcs[srcs.length - 1], lastEnded = last.onended;
+      last.onended = () => { if (lastEnded) lastEnded(); fin(); };
       // A stand-in for onended, which some browsers skip: measured on the audio clock, so a paused
       // match (a suspended context) does not end the line early.
       const endAt = t;
@@ -217,8 +242,10 @@
     const ix = await loadIndex(); if (!ix) return 0;
     const files = Object.values(ix.lines).map(l => l.file);
     for (const n of names) { const s = nameOf(n); if (s) { files.push(R.names[s]); if (R.namesX[s]) files.push(R.namesX[s]); } }
+    // Warm the service-worker/browser compressed cache without retaining every MP3 ArrayBuffer
+    // in this page's heap. The first spoken call fetches its single file if needed, then decodes it.
     let ok = 0;
-    for (let i = 0; i < files.length; i += 6) ok += (await Promise.all(files.slice(i, i + 6).map(f => bytes(f)))).filter(Boolean).length;
+    for (let i = 0; i < files.length; i += 6) ok += (await Promise.all(files.slice(i, i + 6).map(f => fetch(BASE + f).then(r => r.ok, () => false)))).filter(Boolean).length;
     return ok;
   }
   // Fetches every recording (no decoding), so the service worker has the whole voice for offline play.
@@ -317,6 +344,13 @@
     push({ kind: 'pa-' + kind, pa: true, prio: 1, text: fill(bank[kind], { ...data, assist: extra }) });
   }
   function stop() { queue.length = 0; if (speaking) cut(speaking); speaking = null; if (synth) { try { synth.cancel(); } catch (e) { /* none */ } } onSpeak(false); caption(''); }
+  // Drop decoded PCM after a match; the service worker keeps the compressed MP3s for offline play.
+  function release() {
+    stop();
+    R.generation++; R.pending.clear(); R.bytes.clear(); R.byteSizes.clear(); R.compressedBytes = 0;
+    for (const s of R.live) { try { s.stop(); } catch (e) { /* already ended */ } s.buffer = null; }
+    R.live.clear(); R.decoded.clear(); R.decodedBytes = 0; R.recent = {};
+  }
   // The recorded voice pauses with the match's audio (GafferSound.suspend()); the device voice here.
   function pause() { if (synth) { try { synth.pause(); } catch (e) { /* none */ } } }
   function resume() { if (synth) { try { synth.resume(); } catch (e) { /* none */ } } }
@@ -336,6 +370,6 @@
   function onCaption(fn) { caption = fn || (() => {}); }
   function onSpeaking(fn) { onSpeak = fn || (() => {}); }
 
-  function state() { return { available: !!synth, unlocked, voices: voices.length, speaking: !!speaking, queued: queue.length, speech: opts.speech, volume: opts.volume, paVolume: opts.paVolume, voice: voiceMode(), recorded: { ready: !!R.index, lines: R.index ? Object.keys(R.index.lines).length : 0, names: Object.keys(R.names).length, called: Object.keys(R.namesX).length, fetched: R.bytes.size, decoded: R.decoded.size } }; }
-  window.GafferCommentary = { say, announce, stop, pause, resume, unlock, configure, onCaption, onSpeaking, state, preload, prefetch, compose: (k, d) => (R.index ? compose(k, d || {}) : null), ready: loadIndex, PHRASES, PA, get available() { return !!synth; }, get voices() { return voices.map(v => `${v.name} (${v.lang})`); } };
+  function state() { const residentBytes = residentDecodedBytes(); return { available: !!synth, unlocked, voices: voices.length, speaking: !!speaking, queued: queue.length, speech: opts.speech, volume: opts.volume, paVolume: opts.paVolume, voice: voiceMode(), recorded: { ready: !!R.index, lines: R.index ? Object.keys(R.index.lines).length : 0, names: Object.keys(R.names).length, called: Object.keys(R.namesX).length, fetched: R.bytes.size, compressedBytes: R.compressedBytes, decoded: R.decoded.size, decodedBytes: residentBytes, cacheBytes: R.decodedBytes, liveBuffers: R.live.size, peakDecodedBytes: R.peakDecodedBytes, decodedLimitBytes: MAX_DECODED_BYTES } }; }
+  window.GafferCommentary = { say, announce, stop, release, pause, resume, unlock, configure, onCaption, onSpeaking, state, preload, prefetch, compose: (k, d) => (R.index ? compose(k, d || {}) : null), ready: loadIndex, PHRASES, PA, get available() { return !!synth; }, get voices() { return voices.map(v => `${v.name} (${v.lang})`); } };
 })();

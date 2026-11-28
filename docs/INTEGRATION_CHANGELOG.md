@@ -680,6 +680,44 @@ screenshots, each labelled, with an index). The other documents were updated too
 | Live site (GitHub Pages, service worker v25) | **Passed:** the four bodies and `index.json` return 200 at their built sizes. Studio: only the needed body loaded, export with club colours, throw-in clean. Award ceremony shown, no errors. 3D match played with no body files requested. The connection measured about 22 KB/s that day, so first loads were slow (a 0.5 MB body took 33–37 s, the existing 1.4 MB clip file 63 s) |
 | Real phone, real GPU | **Not tested** |
 
+## 16. Dribble contact, world-space foot planting, audio memory and offline playback
+
+* **Dribble timing:** `public/index.html` now predicts the player's easing toward desired velocity,
+  searches the live rolling-ball path and only emits a touch when the ball is in the player's contact
+  envelope. A ball that runs ahead is left on its natural path; the visual player chases its stopping
+  point until it can recover it. Possession and match outcomes are not changed.
+* **Contact and motion:** `public/match3d.js` solves a selected boot to the ball on the existing GLB
+  skeleton, then solves each planted toe in world space with an analytic thigh/calf IK pass and boot
+  orientation. Anchors release when the leg cannot reach them. A procedural dribble layer adds short
+  alternating steps, recovery-leg flex, boot roll and torso/arm counter-sway on top of the locomotion.
+  The ball render remains at the authoritative simulated coordinates.
+* **Regression measurements:** the 32-profile scheduling matrix covers acceleration, deceleration,
+  both turning directions, both feet, 164/198 cm players and 1x/2x/4x/8x. The shipped rig and
+  stride-warp clips were loaded for 248 selected-foot contacts across lean/heavier body slider
+  extremes: 248/248 within 0.12 m; median 0.012 m, p95 0.031 m, max 0.035 m. A 120-second-per-gait,
+  60 Hz stance run produced 14,018 reachable low-foot samples: median slip 0.004 m/s, p95 0.029
+  m/s, max 0.042 m/s. Detailed
+  per-speed samples and contact durations are in `docs/ANIMATION.md` and `docs/evidence/m16/`.
+* **Audio memory:** stadium ambience streams from local MP3s. Short stadium reactions use a 10 MiB
+  decoded LRU; commentary uses a 7 MiB / 48-clip LRU. Both report unique resident `AudioBuffer`
+  memory including active sources and drop cached PCM when a match closes. The service worker keeps
+  compressed assets. Browser-internal media decoder memory and real-device heap use are not exposed
+  by these counters.
+* **Offline media fix:** service worker v30 serves byte ranges for cached same-origin audio. This
+  lets the streamed ambience beds continue to work offline when a media element requests a partial
+  MP3. The regression test covers the first online range and a later offline range.
+* **Developer diagnostics:** `?matchDebug=1` adds the match-only overlay with frame time, gait,
+  speed, phase, feet, ball, boot gap, touch timing, session-sampled decoded-memory peak, active
+  buffers, service-worker control and standalone/browser mode.
+* **Asset exploration:** no paid assets or services were used. Rokoko's sports pack requires a
+  registration form; the site did not provide its contents without access. TechLabID's soccer
+  dribble and receive downloads were marked paused. The runtime therefore keeps the existing
+  skeleton and adds original procedural motion. Local-only assets can be recorded in the ignored
+  `assets/animations/local-only/` folder without entering the public build.
+* **Device/live validation:** this environment did not provide an accessible live browser session or
+  physical Android device. The real-phone and installed-PWA checklist is in
+  `docs/evidence/m16/ANDROID_TEST_STEPS.md`; no hardware test or live deployment is claimed here.
+
 ## Test results (2026-11-24, Windows 10, 4 cores, Node 22)
 | Check | Result |
 |---|---|
@@ -699,8 +737,22 @@ screenshots, each labelled, with an index). The other documents were updated too
   no way to get a cross in, such as a turnover right before the shot.
 * Athletes: MakeHuman-based rather than hand-sculpted; short-hair hairlines are cut-outs; beards are
   shells; only male athletes (see the integration audit).
-* Dribbling: a touch forced late, after the carrier slowed with the ball rolling on, is not drawn
-  touching. The dribble's leg reach is an overlay on the run, not a dribbling clip.
+* Dribbling: M16 removes the forced late touch and measures the selected boot against the ball on
+  the shipped rig. The dribble now has a procedural full-body layer; dedicated captured football
+  control clips remain future work.
 * Portraits show the club's default home kit, not a kit designed in the Studio.
 * Sound was not checked on a real Android or iOS device, nor as an installed app.
 * Real-phone frame rate and first-half start on a real GPU were not measured.
+
+## Milestone 16 verification (2026-11-28)
+
+| Check | Result |
+|---|---|
+| Build and lint in `npm test` | Build passed; lint passed with one pre-existing unused-variable warning in `test/tactics-extra.test.js` |
+| Full Vitest run | 29/30 files passed; 196/197 tests passed. The only failure was the unchanged soak timing assertion: 512 ms/week versus 400 ms while all suites were running. The soak correctness checks completed with zero exceptions. |
+| Isolated `test/soak.test.js` | **Passed:** 96 weeks, median 335 ms/week, mean 362 ms/week, under the same 400 ms limit. |
+| Focused movement/audio/service-worker run | **Passed:** 36 tests across dribble, commentary, sound and offline range handling. Selected-foot rig contact was 248/248 across body-build extremes; world foot slip p95 was 0.029 m/s. |
+| Live site / physical Android | Not verified in this environment. The Windows browser helper failed to connect to its native pipe. Phone and installed-PWA steps are in `docs/evidence/m16/ANDROID_TEST_STEPS.md`. |
+
+The full-suite soak timing is consistent with the prior parallel-run failure documented in this file;
+the isolated run meets the original threshold, so the threshold remains 400 ms/week.

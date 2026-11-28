@@ -58,9 +58,10 @@ match view (public/index.html)                         what you hear
   murmur to the fuller crowd with equal power. A little of the fuller crowd is always there.
 * **The synthesised murmur** drops to 12% under the recordings. The synthesised chants (claps and a
   drum) still come round now and then, quieter.
-* **Loading.** Nothing loads until the first match starts. Then the index loads, the two beds are
-  decoded first and start, and the reactions are decoded four at a time. A file that fails stays
-  synthesised. A failed index is tried again at the next match.
+* **Loading.** Nothing loads until a match starts. The two beds stream through looping media
+  elements; they are not expanded into full-length Web Audio `AudioBuffer`s. Short reactions decode
+  one at a time into a 10 MiB byte-bounded LRU. A missing file keeps its synthesised fallback.
+  Leaving the match stops sound sources and drops the decoded reaction cache.
 * **Offline.** The service worker keeps every file it serves from `audio/`. The installed app
   prefetches the stadium and the whole commentary about 20 seconds after it opens; in a browser this
   happens 30 seconds into the first match. It is skipped on data-saver and 2G connections.
@@ -93,9 +94,10 @@ match view (public/index.html)                         what you hear
 * **Mixing.** The crowd ducks to 75% while the commentator speaks (60% for the announcer). The voice
   goes through the same phone EQ and compressor as the ground, after the master volume. Its own
   level is the Commentary slider × master ÷ 0.6.
-* **Loading.** At kick-off every line and the names of both teams (and the substitutes who will come
-  on) are fetched, about 2.5 MB and mostly from the service worker's cache. They are decoded just
-  before they are played; the last 48 decoded clips are kept.
+* **Loading.** Calls decode recordings only when they are about to play. The LRU keeps at most 48
+  clips and 7 MiB of cached decoded audio; active source buffers are tracked separately in the
+  resident-memory estimate. Leaving the match clears those decoded buffers. Compressed files remain
+  in the service-worker cache for offline use.
 * **The stadium announcer** reads club names, shirt numbers and attendances that cannot be recorded
   in advance. With the recorded voice it is a PA chime and a caption; with the device voice it
   speaks as before.
@@ -107,7 +109,7 @@ Settings has the following controls:
 * **Match audio mixer:** Crowd, Referee, Ball and boots, Commentary and Stadium announcer.
 * **Spoken commentary** on/off, and **Captions** on/off.
 * **Commentary voice:** the match commentator (recorded) or your device's own voice, with **▶ Test**
-  to hear a sample goal call at the current volumes.
+  to hear normal play, a named player, a goal call and the score in sequence at the current volumes.
 
 Each slider goes to 0 (off), and all of them apply at once, during a match too.
 
@@ -119,17 +121,35 @@ Each slider goes to 0 (off), and all of them apply at once, during a match too.
   holds. This covers the recorded beds, reactions and the commentator, which all share the one
   context. A hidden tab also drops waiting commentary, so nothing stale is said when you come back.
 
-## Sizes
+## Sizes and decoded-memory budget (Milestone 16)
 
 | What | Files | Size |
 |---|---|---|
-| Stadium (`public/audio/stadium/`) | 25 MP3 + index | 1.4 MB |
-| Commentary lines (`public/audio/commentary/*.mp3`) | 205 + index (60 KB) | 1.68 MB |
-| Surnames, calm (`public/audio/commentary/names/`) | 503 | 2.85 MB |
-| Surnames, called out (`names/*-x.mp3`) | 503 | 2.57 MB |
+| Stadium (`public/audio/stadium/`) | 26 MP3 + index | 1,414,909 bytes (1.35 MiB) |
+| All commentary (`public/audio/commentary/`) | 1,212 files including index | 7,157,034 bytes (6.83 MiB) |
 
-A match fetches its lines and both teams' names: about 2.5 MB the first time, from the service
-worker's cache after that.
+The complete compressed audio library is 8.18 MiB on disk. A match transfers only requested files;
+the service worker caches audio for offline use. Thirty seconds after a match starts, the page
+prefetches the compressed library when the worker controls it and the connection is not data-saving
+or 2G. In `?matchDebug=1`, the panel shows when this prefetch completes.
+
+The decoded-memory counters use each actual `AudioBuffer`'s `length × channels × 4` bytes and
+include buffers still held by playing source nodes. The current cache limits are 10 MiB for stadium
+reactions and 7 MiB / 48 clips for recorded commentary. Match-start commentary prefetch warms the
+compressed cache without holding a second copy of the whole requested MP3 set in JavaScript. The two
+ambience beds (31.5 s + 25.5 s,
+stereo) stream from cached MP3s through media elements rather than creating 20.9 MiB of 48 kHz
+stereo PCM in JavaScript. Browser-internal streaming decoder memory is not exposed by the Web Audio
+API, so it cannot be claimed as zero or measured exactly. The procedural noise buffer adds about
+0.55 MiB at 48 kHz. Stadium reactions decode one at a time with cache space reserved before decode;
+commentary clips decode serially within a call. `GafferSound.state()` and `GafferCommentary.state()` expose current resident bytes and
+session high-water marks. Closing a match drops cached PCM; high-water marks persist across matches.
+
+**Automated memory evidence:** fake Web Audio tests verify the stadium byte limit, streamed-bed
+path, event playback and cache release; commentary tests verify sequence playback, resident bytes and
+release. This milestone did not include a real-browser memory profile or Android heap inspection.
+The `?matchDebug=1` overlay sums both live AudioBuffer estimates. Collect that value during a full
+match and after leaving it with [`evidence/m16/ANDROID_TEST_STEPS.md`](evidence/m16/ANDROID_TEST_STEPS.md).
 
 **Measured** in headless Chrome as a phone (390 × 844, touch, coarse pointer), after one real touch,
 master volume 0.6 (RMS at the output, 0..1):
@@ -144,7 +164,7 @@ master volume 0.6 (RMS at the output, 0..1):
 | Crowd slider at 0 | 0 |
 | Master at 0 | 0 |
 | Pause / resume | suspended / running |
-| Stadium recordings decoded | all 25 |
+| M15 headless audio check | all 25 recordings decoded in the prior build (the beds stream in M16) |
 
 ## Building the audio again
 
@@ -167,7 +187,8 @@ real Android phone (Chrome) and an iPhone (Safari), in the browser and as the in
 1. **First sound.** Open the game and do nothing: no sound. Tap anything, then start a match: the
    crowd bed starts within about 2 seconds of kick-off, with the long kick-off whistle.
 2. **Commentator.** The commentator speaks the kick-off line. Settings → Commentary voice → ▶ Test
-   plays a goal call with a scorer's name. The voice is male and British, clear over the crowd.
+   plays normal play, a player's surname, a goal call and the score. Listen for intelligibility,
+   natural timing, clipping and how well the voice sits over the crowd; record what you hear.
 3. **Volumes.** Move each slider during a match:
    * Crowd 0 silences the beds and reactions only.
    * Referee 0 silences the whistles.

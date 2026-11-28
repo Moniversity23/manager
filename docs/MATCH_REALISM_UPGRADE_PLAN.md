@@ -102,5 +102,29 @@ Status of the priorities above after this milestone (details and measurements in
   * The athletes for replay close-ups and goal celebrations, after real-phone measurements.
   * The kick and pass clips' foot contact is timed to the ball (section 13), not yet adjusted to it
     by IK.
-  * The dribble reaches with the leg on top of the run, not a dedicated dribbling clip; a set of
-    dribbling clips (inside, outside, drag-back) would be the next step.
+* The M15 dribble used a leg reach on top of the run; Milestone 16 adds a coordinated procedural
+  dribble layer. A dedicated football mocap library (inside, outside, drag-back) remains future work.
+
+## Milestone 16 update (2026-11-28)
+
+* **Dribble contact:** improved. The scheduler predicts velocity easing and rolling-ball motion,
+  does not force a late touch, and sends the visible player after a ball outside close control.
+  Selected-foot IK places the toe at the actual simulated ball. The shipped skeleton/warped clip
+  test measured 248/248 contacts within 0.12 m across 164/198 cm and lean/heavier builds (median
+  0.012 m, p95 0.031 m, max 0.035 m).
+* **Ground contact:** an analytic two-bone leg solver anchors each reachable planted toe in world
+  space and rotates the boot to retain toe contact. Across 14,018 60 Hz low-foot samples from the
+  shipped walk/jog/sprint gaits, slip was median 0.004, p95 0.029 and max 0.042 m/s. Unreachable
+  anchors release instead of stretching. Per-foot stance duration and gait detail are in
+  `docs/ANIMATION.md`.
+* **Dribbling movement:** the existing run remains the base locomotion, with new football-specific
+  procedural step, boot, leg-recovery and upper-body counter-sway motion layered with the timed
+  contact IK. Dedicated football mocap was not added: one source requires registration and another
+  accessible catalogue marks its soccer clips paused. Source notes are in `docs/ANIMATION.md`.
+* **Audio/PWA:** ambience beds stream from offline MP3s; decoded reaction/commentary caches are
+  byte-bounded and released at match exit. Service worker v30 handles cached media byte ranges.
+  Automated audio and worker tests cover the limits, release path, event order and offline range.
+* **Still outstanding:** visual review of the complete 3D match and front/side body proportions,
+  actual Android GPU/audio/heap measurements, installed-app/offline testing on a phone, and listening
+  to the final recorded commentary on device. The query-only diagnostic is ready for those tests.
+  Current match bodies and career/player identity data remain on the existing pipelines.

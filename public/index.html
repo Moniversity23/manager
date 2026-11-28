@@ -1182,7 +1182,7 @@ function applyAudioPrefs(){
   try { if (window.GafferSound) { window.GafferSound.setMix(m); window.GafferSound.setVolume(PREFS.volume ?? 0.6); } } catch {}
   try { if (window.GafferCommentary) window.GafferCommentary.configure({ voice: PREFS.voice || 'recorded', speech: PREFS.speech !== false && PREFS.sound !== false, captions: PREFS.captions !== false || (PREFS.viewMode || '3d') === 'commentary', commentary: m.commentary > 0, announcer: m.announcer > 0, volume: m.commentary * (PREFS.volume ?? 0.6) / 0.6, paVolume: m.announcer * (PREFS.volume ?? 0.6) / 0.6, speed: PREFS.speed || 2 }); } catch {}
 }
-function audioStop(){ try { if (window.GafferCommentary) window.GafferCommentary.stop(); } catch {} try { if (window.GafferSound) window.GafferSound.stopAll(); } catch {} }
+function audioStop(){ try { if (window.GafferCommentary) { window.GafferCommentary.stop(); window.GafferCommentary.release && window.GafferCommentary.release(); } } catch {} try { if (window.GafferSound) window.GafferSound.stopAll(); } catch {} try { const d=globalThis.__m16MatchDebug, s=window.GafferSound&&window.GafferSound.state?window.GafferSound.state():{}, c=window.GafferCommentary&&window.GafferCommentary.state?window.GafferCommentary.state():{}, bytes=(s.decodedBytes||0)+(c.recorded&&c.recorded.decodedBytes||0), p=globalThis.__m16AudioPrefetch||{}; if(d&&d.pre) d.pre.textContent+='\nMATCH CLOSED | decoded now '+(bytes/1048576).toFixed(2)+' MiB | session sampled peak '+((d.peakAudioBytes||0)/1048576).toFixed(2)+' MiB | cached PCM '+((s.cacheBytes||0)+(c.recorded&&c.recorded.cacheBytes||0))+'\nAUDIO PREFETCH | '+(p.state||'unknown')+' | stadium '+(p.stadium??'—')+' | commentary '+(p.commentary??'—'); } catch {} }
 const surname = n => String(n || '').split(' ').slice(-1)[0];
 const clubOf = (v, side) => (side === 'home' ? v.m.home : v.m.away);
 const goalSideX = side => (side === 'home' ? 0.98 : 0.02);
@@ -1212,19 +1212,34 @@ function matchNames(m){
 // them) so matches have them offline: in the installed app soon after it opens, in a browser after a
 // first match has started; never on a data-saving or 2G connection.
 let AUDIO_PREFETCHED = false;
+globalThis.__m16AudioPrefetch = globalThis.__m16AudioPrefetch || { state: 'waiting' };
 function prefetchAudio(){
-  if (AUDIO_PREFETCHED || !('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
-  const c = navigator.connection; if (c && (c.saveData || /(^|-)2g/.test(c.effectiveType || ''))) return;
+  const status = globalThis.__m16AudioPrefetch;
+  if (AUDIO_PREFETCHED) return;
+  if (!('serviceWorker' in navigator)) { status.state = 'service worker unsupported'; return; }
+  if (!navigator.serviceWorker.controller) {
+    status.state = 'waiting for worker control';
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (!AUDIO_PREFETCHED) prefetchAudio(); }, { once: true });
+    return;
+  }
+  const c = navigator.connection; if (c && (c.saveData || /(^|-)2g/.test(c.effectiveType || ''))) { status.state = 'skipped for data saver/2G'; return; }
   AUDIO_PREFETCHED = true;
+  status.state = 'fetching'; status.startedAt = Date.now();
   Promise.resolve().then(() => window.GafferSound && window.GafferSound.prefetch && window.GafferSound.prefetch())
-    .then(() => window.GafferCommentary && window.GafferCommentary.prefetch && window.GafferCommentary.prefetch()).catch(() => {});
+    .then(n => { status.stadium = n; return window.GafferCommentary && window.GafferCommentary.prefetch && window.GafferCommentary.prefetch(); })
+    .then(n => { status.commentary = n; status.state = 'complete'; status.finishedAt = Date.now(); })
+    .catch(e => { status.state = 'failed'; status.error = e && e.message || String(e); });
 }
-// Settings: a sample call in the chosen voice, at the chosen volume.
+// Settings: a four-part preview makes the player name and score read as audible as the voice itself.
 function testVoice(){
   applyAudioPrefs();
   try { window.GafferSound && window.GafferSound.unlock(); } catch {}
   const C = window.GafferCommentary; if (!C) return;
-  Promise.resolve(C.ready && C.ready()).then(() => { C.stop(); C.say('goal', { player: 'Okafor', club: STATE.club || 'your side', side: 'home', hs: 1, as: 0, min: 30 }, { cooldown: 0 }); });
+  Promise.resolve(C.ready && C.ready()).then(() => {
+    C.stop();
+    const club = STATE.club || 'your side', sample = { player: 'Okafor', club, side: 'home', hs: 2, as: 1, min: 68 };
+    for (const [kind, data] of [['build', sample], ['dribble', sample], ['goal', sample], ['score', { home: club, away: 'Northbridge', hs: 2, as: 1 }]]) C.say(kind, data, { prio: 11, cooldown: 0 });
+  });
 }
 function matchAudioEnd(v){
   const hs = v.score.home, as = v.score.away, d = { home: v.m.home, away: v.m.away, hs, as };
@@ -1694,9 +1709,21 @@ function stepPositions(now, dt){
         else { tx = d.bx; ty = d.by; sp = 0.04; }
       } else if (s.phase === 'reset') { tx = i === taker ? 0.5 - d0 * 0.012 : d.bx; ty = i === taker ? 0.5 : d.by; sp = 0.2; }
       else if (s.phase === 'held') { sp = 0.045; tx = d.bx + (inPoss ? d0 * 0.02 : -d0 * 0.04) * (gk ? 0 : 1); if (gk && inPoss && !s.goalKick) { tx = d.x; ty = d.y; } }
+      // If a touch carries the ball beyond close control, pursue its natural stopping point.
+      const recovery = s.phase === 'play' && inPoss && i === s.holder && !s.pass && s.drib
+        && s.drib.side === side && s.drib.idx === i && s.drib.recovering;
+      if (recovery) {
+        const dr = s.drib, stopIn = Math.max(0, dr.u / Math.max(0.1, dr.dec) - (s.t - dr.t0));
+        const stop = dribAt(dr, s.t + stopIn - dr.t0);
+        tx = Math.max(0.015, Math.min(0.985, stop[0] / DRIB_M[0]));
+        ty = Math.max(0.03, Math.min(0.97, stop[1] / DRIB_M[1]));
+        sp = Math.max(sp, 0.08);
+      }
       tx = Math.max(0.015, Math.min(0.985, tx)); ty = Math.max(0.03, Math.min(0.97, ty));
-      const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy * 0.65), want = Math.min(sp, dist * 6), acc = Math.min(1, dt * (sp > 0.12 ? 14 : 7));
-      d.vx = (d.vx || 0) + ((dist > 1e-5 ? dx / dist * want : 0) - (d.vx || 0)) * acc; d.vy = (d.vy || 0) + ((dist > 1e-5 ? dy / dist * want : 0) - (d.vy || 0)) * acc;
+      const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy * 0.65), want = Math.min(sp, dist * 6), accelRate = sp > 0.12 ? 14 : 7, acc = Math.min(1, dt * accelRate);
+      const wantVx = dist > 1e-5 ? dx / dist * want : 0, wantVy = dist > 1e-5 ? dy / dist * want : 0;
+      d.vx = (d.vx || 0) + (wantVx - (d.vx || 0)) * acc; d.vy = (d.vy || 0) + (wantVy - (d.vy || 0)) * acc;
+      d.wantVx = wantVx; d.wantVy = wantVy; d.accelRate = accelRate;
       d.x += d.vx * dt; d.y += d.vy * dt; d.tx = tx; d.ty = ty;
     });
   }
@@ -1730,55 +1757,81 @@ function dribAt(dr, t){
   if (over > 0) { const l = Math.hypot(tx, ty) || 1; x += tx / l * over; y += ty / l * over; }      // still rolling past where he was meant to meet it
   return [x, y];
 }
+function dribPredict(h, t, MX, MY) {
+  const rate = Math.max(1, h.accelRate || 14), decay = (1 - Math.exp(-rate * t)) / rate;
+  const vx = (h.vx || 0) * MX, vy = (h.vy || 0) * MY;
+  const wx = Number.isFinite(h.wantVx) ? h.wantVx * MX : vx;
+  const wy = Number.isFinite(h.wantVy) ? h.wantVy * MY : vy;
+  return [h.x * MX + wx * t + (vx - wx) * decay, h.y * MY + wy * t + (vy - wy) * decay];
+}
+function dribPlan(h, dr, s, hx, hy, fx, fy, MX, MY) {
+  let best = { gap: Infinity, t: 0.12, ball: [hx + fx * DRIB_REACH, hy + fy * DRIB_REACH], player: [hx, hy] };
+  const lateral = 0.1 * (dr.nextFoot || dr.strong || 1), horizon = 2.8, step = 0.025;
+  for (let t = step; t <= horizon; t += step) {
+    const player = dribPredict(h, t, MX, MY);
+    const vx = player[0] - hx, vy = player[1] - hy, vl = Math.hypot(vx, vy);
+    const dirX = vl > 0.2 ? vx / vl : fx, dirY = vl > 0.2 ? vy / vl : fy;
+    const [bx, by] = dribAt(dr, s.t + t - dr.t0);
+    const tx = player[0] + dirX * DRIB_REACH - dirY * lateral;
+    const ty = player[1] + dirY * DRIB_REACH + dirX * lateral;
+    const gap = Math.hypot(bx - tx, by - ty);
+    if (gap < best.gap) best = { gap, t, ball: [bx, by], player };
+  }
+  dr.meetGap = best.gap; dr.next = s.t + best.t;
+  dr.contact = [best.ball[0] / MX, best.ball[1] / MY];
+  dr.player = [best.player[0] / MX, best.player[1] / MY];
+  return best;
+}
 function simDribble(v, s, dt){
   const ball = v.ball, h = (v.dots[s.poss] || [])[s.holder]; if (!h) return;
   const [MX, MY] = DRIB_M, hx = h.x * MX, hy = h.y * MY, vx = (h.vx || 0) * MX, vy = (h.vy || 0) * MY, spd = Math.hypot(vx, vy);
   let dr = s.drib;
   if (!dr || dr.side !== s.poss || dr.idx !== s.holder) {
     const b0 = [ball.x * MX, ball.y * MY];
-    dr = s.drib = { side: s.poss, idx: s.holder, t0: s.t, u: 0, dec: DRIB_FRICTION, len: 0, from: b0, to: b0, ctrl: null, next: s.t, foot: 1, nextFoot: 1, fx: sideDir(s.poss), fy: 0, started: false,
-      strong: h.foot === 'left' || h.foot === 'L' ? -1 : h.foot ? 1 : ((Number(h.id) || 0) * 7919) % 4 === 1 ? -1 : 1 };   // about one in four left-footed
+    dr = s.drib = { side: s.poss, idx: s.holder, t0: s.t, u: 0, dec: DRIB_FRICTION, len: 0, from: b0, to: b0, ctrl: null, next: s.t, contact: [ball.x, ball.y], player: [h.x, h.y], meetGap: 0, recovering: false, foot: 1, nextFoot: 1, fx: sideDir(s.poss), fy: 0, started: false,
+      strong: h.foot === 'left' || h.foot === 'L' ? -1 : h.foot ? 1 : ((Number(h.id) || 0) * 7919) % 4 === 1 ? -1 : 1 };
   }
-  // His line: where he is going (his run's target), else where he runs, else the way he last faced.
-  // Going by his target keeps the ball on the right side when he turns, before his speed catches up.
   const gx = h.tx != null ? (h.tx - h.x) * MX : 0, gy = h.ty != null ? (h.ty - h.y) * MY : 0, gl = Math.hypot(gx, gy);
   if (gl > 0.6) { dr.fx = gx / gl; dr.fy = gy / gl; } else if (spd > 0.5) { dr.fx = vx / spd; dr.fy = vy / spd; }
   const fx = dr.fx, fy = dr.fy;
   let [bx, by] = dribAt(dr, s.t - dr.t0);
   const rx = bx - hx, ry = by - hy, dist = Math.hypot(rx, ry), along = rx * fx + ry * fy, across = -rx * fy + ry * fx;
-  const age = s.t - dr.t0, first = !dr.started;
-  const atFoot = along <= DRIB_REACH + 0.08 && Math.abs(across) < 0.45 && along > -0.1;
-  const due = s.t >= dr.next - 0.1 && atFoot;                                   // he has got to it, about when planned
-  const overrun = age > 0.15 && along > -0.1 && along < DRIB_REACH - 0.18 && Math.abs(across) < 0.6; // at his feet, and he would run past it
-  const late = s.t >= dr.next + 0.4;                                            // never far from his feet for long
-  const recover = age > Math.max(0.2, 0.75 * (dr.next - dr.t0)) && (along < -0.05 || dist > DRIB_REACH + 2.8);   // behind him or out of reach (once the last touch has had time to work)
-  if (first || due || overrun || late || recover) {
-    // The touch: the foot due now plays it towards where his next touch will be.
-    const thisFoot = dr.nextFoot || 1;
-    // A big change of direction (a turn or a drag-back): a short touch round his side, not through him.
+  const age = s.t - dr.t0, first = !dr.started, atFoot = along <= DRIB_REACH + 0.08 && Math.abs(across) < 0.45 && along > -0.14;
+  const wasRecovering = dr.recovering;
+  if (!first) {
+    dr.recovering = !atFoot && (along < -0.14 || dist > DRIB_REACH + 0.85);
+    dribPlan(h, dr, s, hx, hy, fx, fy, MX, MY);
+  }
+  // A late schedule never creates a pretend touch. Let the ball roll, pursue its stop point,
+  // and touch it only when the carrier reaches the boot envelope.
+  const due = s.t >= dr.next - 0.12;
+  const overrun = age > 0.15 && atFoot && along < DRIB_REACH - 0.18;
+  const recoveryContact = wasRecovering && atFoot;
+  if (first || (atFoot && (due || overrun || recoveryContact))) {
+    const thisFoot = recoveryContact
+      ? (across > 0.05 ? -1 : across < -0.05 ? 1 : (dr.nextFoot || dr.strong))
+      : (dr.nextFoot || dr.strong);
     const turn = dist > 0.05 && along / dist < 0.3;
-    const T = recover ? 0.32 : turn ? 0.45 : spd < 1.2 ? 0.55 : spd < 4 ? 0.62 + (spd - 1.2) * 0.1 : Math.min(1.6, 0.9 + (spd - 4) * 0.2);
-    const nextFoot = spd < 3 || turn ? -thisFoot : dr.strong;
-    const side = 0.1 * nextFoot;                                                  // a little to that foot's side (+ = his right)
-    const run = Math.min(9, spd), px = hx + fx * run * T, py = hy + fy * run * T;  // where he will be, along the way he is going
-    const tx = px + fx * DRIB_REACH - fy * side, ty = py + fy * DRIB_REACH + fx * side;
+    const T = recoveryContact ? 0.32 : turn ? 0.45 : spd < 1.2 ? 0.55 : spd < 4 ? 0.62 + (spd - 1.2) * 0.1 : Math.min(1.6, 0.9 + (spd - 4) * 0.2);
+    const nextFoot = spd < 3 || turn ? -thisFoot : dr.strong, side = 0.1 * nextFoot;
+    const [px, py] = dribPredict(h, T, MX, MY);
+    const dx = px - hx, dy = py - hy, futureSpeed = Math.hypot(dx, dy);
+    const ffx = futureSpeed > 0.25 ? dx / futureSpeed : fx, ffy = futureSpeed > 0.25 ? dy / futureSpeed : fy;
+    const tx = px + ffx * DRIB_REACH - ffy * side, ty = py + ffy * DRIB_REACH + ffx * side;
     if (turn) { const sgn = across >= 0 ? 1 : -1; dr.ctrl = [hx - fy * sgn * 0.6 + fx * 0.45, hy + fx * sgn * 0.6 + fy * 0.45]; } else dr.ctrl = null;
     const chord = Math.hypot(tx - bx, ty - by), len = dr.ctrl ? (chord + Math.hypot(dr.ctrl[0] - bx, dr.ctrl[1] - by) + Math.hypot(tx - dr.ctrl[0], ty - dr.ctrl[1])) / 2 : chord;
-    // The speed off his boot to cover that in T as the grass slows it; a short touch that would stop
-    // short is played softer and stops at his foot.
     let dec = DRIB_FRICTION, u = len / T + dec * T / 2;
     if (len < dec * T * T / 2) { u = 2 * len / T; dec = u / T; }
     u = Math.min(14, u);
-    Object.assign(dr, { from: [bx, by], to: [tx, ty], len, u, dec, t0: s.t, next: s.t + T, foot: thisFoot, nextFoot, started: true });
+    Object.assign(dr, { from: [bx, by], to: [tx, ty], len, u, dec, t0: s.t, next: s.t + T, contact: [tx / MX, ty / MY], player: [px / MX, py / MY], meetGap: 0, recovering: false, foot: thisFoot, nextFoot, started: true });
     if (!first) {
-      s.touch = { side: s.poss, idx: s.holder, t0: s.t, foot: thisFoot, turn };   // the view plays the touch
+      s.touch = { side: s.poss, idx: s.holder, t0: s.t, foot: thisFoot, turn, recover: recoveryContact, contact: [bx / MX, by / MY] };
       audioEv('DRIBBLE', { side: s.poss, x: bx / MX, turn });
     }
     [bx, by] = dribAt(dr, 0);
   }
   ball.x = bx / MX; ball.y = by / MY; ball.z *= Math.max(0, 1 - dt * 12);
-}
-function drawPitch(now){
+}function drawPitch(now){
   const v = VIEW; const cv = document.getElementById('mvCanvas'); if (!cv || !cv.getContext) return;
   const ctx = cv.getContext('2d'); const W = cv.width, H = cv.height, t = now / 1000;
   for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#1d6b3c' : '#1a6236'; ctx.fillRect(i * W / 10, 0, W / 10, H); }
@@ -3259,7 +3312,7 @@ function rSettings(){
       <div class="card" style="padding:10px">${[['crowd', '🏟 Crowd'], ['ref', '🟨 Referee'], ['ball', '⚽ Ball and boots'], ['commentary', '🎙 Commentary'], ['announcer', '📢 Stadium announcer']].map(([k, l]) => { const val = { ...MIX_DEFAULT, ...(PREFS.mix || {}) }[k]; return `<div class="row" style="gap:8px;margin-bottom:6px"><span class="small" style="width:132px">${l}</span><input type="range" min="0" max="1" step="0.05" value="${val}" style="flex:1" oninput="PREFS.mix={...MIX_DEFAULT,...(PREFS.mix||{}),'${k}':+this.value};savePrefs();applyAudioPrefs();this.nextElementSibling.textContent=this.value>0?Math.round(this.value*100)+'%':'off'"><span class="small dim" style="width:34px;text-align:right">${val > 0 ? Math.round(val * 100) + '%' : 'off'}</span></div>`; }).join('')}
         <div class="row mt8"><button class="btn bsm ${PREFS.speech === false ? 'bg' : 'bact'}" onclick="toggleCommentary();renderSection('settings')">${PREFS.speech === false ? '🎙 Spoken commentary off' : '🎙 Spoken commentary on'}</button><button class="btn bsm ${PREFS.captions === false ? 'bg' : 'bact'}" onclick="PREFS.captions=PREFS.captions===false;savePrefs();applyAudioPrefs();renderSection('settings')">${PREFS.captions === false ? 'Captions off' : 'Captions on'}</button></div>
         <label class="lbl mt8">Commentary voice</label><div class="row" style="gap:8px"><select style="flex:1" onchange="PREFS.voice=this.value;savePrefs();applyAudioPrefs()">${[['recorded', 'Match commentator — a recorded British broadcast voice'], ['device', "Your device's own voice"]].map(([k, l]) => `<option value="${k}" ${(PREFS.voice || 'recorded') === k ? 'selected' : ''}>${l}</option>`).join('')}</select><button class="btn bsm bs" onclick="testVoice()">▶ Test</button></div>
-        <div class="small dim mt4">The commentator's voice was recorded for the game with an open speech model (Kokoro): every line and every player's surname is stored with the app, so it works offline and costs nothing. The stadium recordings are real crowds (Creative Commons 0). Everything is shown as captions too; the stadium announcer is a chime and a caption unless your device's voice reads it. A slider at 0 switches that sound off.</div></div>
+        <div class="small dim mt4">The commentator's voice was recorded for the game with an open speech model (Kokoro): every line and every player's surname is stored with the app, so it works offline and costs nothing. Test plays normal play, a named player, a goal call and the score in sequence. The stadium recordings are real crowds (Creative Commons 0). Everything is shown as captions too; the stadium announcer is a chime and a caption unless your device's voice reads it. A slider at 0 switches that sound off.</div></div>
       <label class="lbl mt12">Sound</label><div class="row"><button class="btn bsm ${PREFS.sound === false ? 'bg' : 'bact'}" onclick="toggleSound();renderSection('settings')">${PREFS.sound === false ? '🔇 Off' : '🔊 On'}</button>
         <input type="range" min="0" max="1" step="0.05" value="${PREFS.volume ?? 0.6}" oninput="PREFS.volume=+this.value;savePrefs();applyAudioPrefs()" style="flex:1;padding:0"></div></div>
     ${settingsExtra()}

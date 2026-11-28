@@ -170,7 +170,29 @@
 
   // ── The recorded ground ──
   const REC_BASE = 'audio/stadium/';
-  const rec = { files: null, buf: {}, loading: null, ready: false, beds: null, live: new Set(), last: {}, goal: Math.floor(Math.random() * 3) };
+  const MAX_REACTION_BYTES = 10 * 1024 * 1024;
+  const rec = { files: null, buf: {}, order: new Map(), decodedBytes: 0, peakDecodedBytes: 0, loading: null, generation: 0, ready: false, beds: null, live: new Set(), last: {}, goal: Math.floor(Math.random() * 3) };
+  const bufferBytes = b => b ? b.length * (b.numberOfChannels || 1) * 4 : 0;
+  function residentReactionBytes() {
+    const cached = new Set(Object.values(rec.buf)); let bytes = rec.decodedBytes;
+    for (const s of rec.live) if (s.buffer && !cached.has(s.buffer)) { cached.add(s.buffer); bytes += bufferBytes(s.buffer); }
+    rec.peakDecodedBytes = Math.max(rec.peakDecodedBytes, bytes); return bytes;
+  }
+  function trimReactions(incomingBytes = 0) {
+    const live = new Set([...rec.live].map(s => s.buffer).filter(Boolean));
+    while (rec.decodedBytes + incomingBytes > MAX_REACTION_BYTES && rec.order.size) {
+      const name = [...rec.order.keys()].find(k => !live.has(rec.buf[k])); if (!name) break;
+      const old = rec.buf[name]; rec.order.delete(name); delete rec.buf[name]; rec.decodedBytes -= bufferBytes(old);
+    }
+  }
+  function keepReaction(name, buffer) {
+    if (!buffer) return;
+    if (rec.buf[name]) rec.decodedBytes -= bufferBytes(rec.buf[name]);
+    rec.buf[name] = buffer; rec.order.delete(name); rec.order.set(name, true);
+    rec.decodedBytes += bufferBytes(buffer);
+    trimReactions();
+    residentReactionBytes();
+  }
   // Bed levels (calm murmur, fuller crowd) and how far the synthesised murmur steps back under them.
   const BED = { calm: 0.65, lively: 0.72, under: 0.12 };
   function decode(ab) {
@@ -178,23 +200,25 @@
       try { const p = ctx.decodeAudioData(ab, b => res(b), () => res(null)); if (p && p.then) p.then(res, () => res(null)); } catch (e) { res(null); }
     });
   }
-  // Fetches and decodes the recordings once: the two beds first (the crowd is waiting for them), then
-  // the reactions a few at a time. A file that fails stays synthesised; a failed index is tried again
-  // at the next match.
+  // The two long ambience beds stream through media elements. Short event recordings decode in small
+  // batches and remain in a byte-bounded LRU; the service worker retains the compressed offline files.
   function loadStadium() {
     if (rec.loading || !init() || typeof fetch !== 'function') return rec.loading;
+    const generation = rec.generation;
     rec.loading = (async () => {
       try {
         const r = await fetch(REC_BASE + 'index.json'); if (!r.ok) throw new Error('index ' + r.status);
         rec.files = (await r.json()).files || {};
-        const one = async n => { try { const f = await fetch(REC_BASE + rec.files[n].file); if (!f.ok) return; const b = await decode(await f.arrayBuffer()); if (b) rec.buf[n] = b; } catch (e) { /* this sound stays synthesised */ } };
-        const names = Object.keys(rec.files), beds = names.filter(n => n.startsWith('bed-')), rest = names.filter(n => !n.startsWith('bed-'));
-        await Promise.all(beds.map(one));
+        const one = async n => { try { const meta = rec.files[n], f = await fetch(REC_BASE + meta.file); if (!f.ok) return; const estimated = Math.ceil((Number(meta.seconds) || 0) * (Number(meta.channels) || 1) * ctx.sampleRate * 4 * 1.03); trimReactions(estimated); const b = await decode(await f.arrayBuffer()); if (b && generation === rec.generation) keepReaction(n, b); } catch (e) { /* this sound stays synthesised */ } };
+        const names = Object.keys(rec.files), rest = names.filter(n => !n.startsWith('bed-'));
         if (crowdNodes) startBeds();
-        for (let i = 0; i < rest.length; i += 4) await Promise.all(rest.slice(i, i + 4).map(one));
+        // Decode one reaction at a time so four large clips cannot temporarily sit beside
+        // the whole cache on a phone. The byte LRU still allows recently used takes to be reused.
+        for (const name of rest) { if (generation !== rec.generation) return false; await one(name); }
+        if (generation !== rec.generation) return false;
         rec.ready = true;
         return true;
-      } catch (e) { rec.files = null; rec.loading = null; return false; }
+      } catch (e) { if (generation === rec.generation) { rec.files = null; rec.loading = null; } return false; }
     })();
     return rec.loading;
   }
@@ -207,19 +231,26 @@
     return [i / b.sampleRate, (j + 1) / b.sampleRate];
   }
   function startBeds() {
-    if (rec.beds || !crowdNodes || !rec.buf['bed-calm']) return;
-    const t = ctx.currentTime;
+    if (rec.beds || !crowdNodes || !rec.files) return;
+    if (!ctx.createMediaElementSource || !document.createElement) return;
     const loop = name => {
-      const b = rec.buf[name]; if (!b) return null;
-      const s = ctx.createBufferSource(); s.buffer = b; s.loop = true;
-      const [a, z] = span(b); if (z - a > 2) { s.loopStart = a; s.loopEnd = z; }
-      const g = ctx.createGain(); g.gain.value = 0.0001; s.connect(g); g.connect(bus.crowd || master);
-      s.start(t, a + Math.random() * Math.max(0, z - a) * 0.7);
-      return { s, g };
+      const meta = rec.files[name]; if (!meta) return null;
+      try {
+        const el = document.createElement('audio'); if (!el || typeof el.play !== 'function') return null;
+        el.__gafferName = name; el.preload = 'auto'; el.loop = true; el.src = REC_BASE + meta.file;
+        const source = ctx.createMediaElementSource(el), g = ctx.createGain(); g.gain.value = 0.0001;
+        source.connect(g); g.connect(bus.crowd || master);
+        return { el, source, g };
+      } catch (e) { return null; }
     };
-    rec.beds = { calm: loop('bed-calm'), lively: loop('bed-lively') };
-    bedLevel(1.2);
-    crowdNodes.syn.gain.setTargetAtTime(BED.under, t, 1.2);
+    const t = ctx.currentTime, beds = { calm: loop('bed-calm'), lively: loop('bed-lively') };
+    if (!beds.calm && !beds.lively) return;
+    rec.beds = beds; bedLevel(1.2); crowdNodes.syn.gain.setTargetAtTime(BED.under, t, 1.2);
+    const parts = [beds.calm, beds.lively].filter(Boolean);
+    Promise.all(parts.map(p => Promise.resolve().then(() => p.el.play()).then(() => true, () => false))).then(ok => {
+      if (rec.beds !== beds || ok.every(Boolean)) return;
+      stopBeds(); // if autoplay is denied, the synthesised crowd remains audible; a later tap retries.
+    });
   }
   // An equal-power crossfade from the murmur to the fuller crowd as the danger rises (a little of the
   // fuller crowd is always there, for depth).
@@ -233,17 +264,18 @@
     const b = rec.beds; rec.beds = null; if (!b || !ctx) return;
     const t = ctx.currentTime, parts = [b.calm, b.lively].filter(Boolean);
     for (const p of parts) { p.g.gain.cancelScheduledValues(t); p.g.gain.setTargetAtTime(0.0001, t, 0.5); }
-    setTimeout(() => { for (const p of parts) try { p.s.stop(); } catch (e) { /* already stopped */ } }, 2500);
+    setTimeout(() => { for (const p of parts) { try { if (p.el) { p.el.pause(); p.el.removeAttribute('src'); p.el.load(); p.source.disconnect(); } else p.s.stop(); } catch (e) { /* already stopped */ } } }, 2500);
   }
   // One recording, once: on a category's volume, optionally later, faster or slower, left or right.
   function shot(name, cat, gain = 1, { delay = 0, rate = 1, pan = 0 } = {}) {
     const b = name && rec.buf[name]; if (!b || !ctx) return false;
+    if (rec.order.has(name)) { rec.order.delete(name); rec.order.set(name, true); }
     const s = ctx.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
     const g = ctx.createGain(); g.gain.value = gain; s.connect(g);
     let out = g;
     if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); out = p; }
     out.connect(bus[cat] || master);
-    rec.live.add(s); s.onended = () => rec.live.delete(s);
+    rec.live.add(s); residentReactionBytes(); s.onended = () => { rec.live.delete(s); s.buffer = null; };
     s.start(ctx.currentTime + delay);
     return true;
   }
@@ -360,7 +392,7 @@
     level = 0;
     chantTimer = setInterval(() => { if (Math.random() < (rec.beds ? 0.35 : 0.55)) chant(); }, 9000);
     setTimeout(chant, 2500);
-    if (rec.buf['bed-calm']) startBeds(); else loadStadium();
+    if (rec.files) startBeds(); else loadStadium();
   }
 
   // 0 = quiet midfield, 1 = a goal is coming / being celebrated.
@@ -383,11 +415,19 @@
   function apply() { if (!ctx) return; if (appPaused || hidden) { if (ctx.state === 'running') ctx.suspend(); } else wake(); }
   function suspend() { appPaused = true; apply(); }
   function resume() { appPaused = false; apply(); }
-  function stopAll() { crowd(false); duck(0); for (const s of rec.live) { try { s.stop(); } catch (e) { /* already ended */ } } rec.live.clear(); }
+  function release() {
+    rec.generation++; rec.loading = null; rec.ready = false;
+    crowd(false); duck(0);
+    for (const s of rec.live) { try { s.stop(); } catch (e) { /* already ended */ } }
+    for (const s of rec.live) { try { s.buffer = null; } catch (e) { /* stopped */ } }
+    rec.live.clear(); rec.buf = {}; rec.order.clear(); rec.decodedBytes = 0; rec.last = {};
+  }
+  function stopAll() { release(); }
   // A gesture: create the context (first time), play one silent sample inside the gesture, wake it.
   function unlock() {
     if (!init()) return;
     if (!unlocked) { try { const b = ctx.createBuffer(1, 1, ctx.sampleRate), src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.start(0); unlocked = true; } catch (e) { /* tried again on the next gesture */ } }
+    if (crowdNodes && rec.files && !rec.beds) startBeds();
     if (!appPaused && !hidden) wake();
   }
   if (typeof document !== 'undefined') {
@@ -408,7 +448,7 @@
     } catch (e) { return 0; }
   }
   // For checks: the state of the audio, and the level at the output (RMS, 0..1) over the last frame.
-  function state() { return { context: ctx ? ctx.state : 'none', unlocked, appPaused, hidden, crowd: !!crowdNodes, volume, mix: { ...mix }, phone, sampleRate: ctx ? ctx.sampleRate : null, recorded: { ready: rec.ready, loaded: Object.keys(rec.buf).length, beds: !!rec.beds, playing: rec.live.size } }; }
+  function state() { const residentBytes = residentReactionBytes(); return { context: ctx ? ctx.state : 'none', unlocked, appPaused, hidden, crowd: !!crowdNodes, volume, mix: { ...mix }, phone, sampleRate: ctx ? ctx.sampleRate : null, decodedBytes: residentBytes, cacheBytes: rec.decodedBytes, peakDecodedBytes: rec.peakDecodedBytes, decodedBuffers: Object.keys(rec.buf).length, recorded: { ready: rec.ready, loaded: Object.keys(rec.buf).length, decodedBytes: residentBytes, cacheBytes: rec.decodedBytes, peakDecodedBytes: rec.peakDecodedBytes, decodedLimitBytes: MAX_REACTION_BYTES, beds: !!rec.beds, bedMode: rec.beds ? 'media-stream' : 'stopped-or-synth', playing: rec.live.size } }; }
   function outputLevel() {
     if (!ctx || !master) return 0;
     if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.comp.connect(meter); }
@@ -417,5 +457,5 @@
     return Math.sqrt(sum / a.length);
   }
 
-  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, unlock, state, level: outputLevel, mix, log, voice, preload: loadStadium, prefetch, recordings: () => Object.keys(rec.buf) };
+  window.GafferSound = { play, crowd, excite, setVolume, setMix, event, duck, suspend, resume, stopAll, release, unlock, state, level: outputLevel, mix, log, voice, preload: loadStadium, prefetch, recordings: () => Object.keys(rec.buf) };
 })();

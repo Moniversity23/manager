@@ -1,0 +1,29 @@
+{
+  "test": "test/dribble.test.js",
+  "method": "simulate possession and ball trajectory, then pose the shipped footballer rig with the renderer's stride-warped locomotion and measure the selected toe against the unmodified simulated ball position after IK",
+  "schedulingMatrix": {
+    "profiles": 32,
+    "dimensions": {
+      "movement": ["acceleration", "deceleration", "left turn", "right turn"],
+      "declaredFoot": ["left", "right"],
+      "heightCm": [164, 198],
+      "playback": [1, 2, 4, 8]
+    },
+    "touchEvents": 124,
+    "ballToCarrierRootEnvelopeMeters": 0.85,
+    "note": "This envelope check measures ball-to-player-root control reach. Boot contact is measured separately below."
+  },
+  "selectedBootContact": {
+    "rigProfiles": 64,
+    "buildSliderValues": [1, 14],
+    "events": 248,
+    "within0_12m": 248,
+    "misses": 0,
+    "successPercent": 100,
+    "medianMeters": 0.012,
+    "p95Meters": 0.031,
+    "maximumMeters": 0.035,
+    "profile": "acceleration, deceleration, both turn directions, both feet, lean/heavier body slider extremes, 164/198 cm bodies, 1x/2x/4x/8x",
+    "limitation": "Deterministic rig regression, not a camera-rendered or physical-device observation."
+  }
+}

@@ -1,7 +1,10 @@
 # Animation and character asset register
 
-Only assets whose licence allows commercial use without payment are included. Everything that ships
-in the game (public/models/) comes from the first row.
+This register tracks assets included in the public build (`public/models/`). Its existing rows meet
+the public project's distribution requirements. Personal experiments may use other accessible
+resources in the ignored `assets/animations/local-only/` folder; those files are never copied into
+`public/models/` or tracked by Git. Record the source and any redistribution restriction there, and
+ask before purchasing or subscribing to anything. Everything currently shipped is covered below.
 
 | Asset | Original source | Download location | Licence | Commercial use | Attribution | Downloaded / processed | Format | Status |
 |---|---|---|---|---|---|---|---|---|

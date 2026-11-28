@@ -28,7 +28,7 @@ function load({ index = INDEX, voice = 'recorded', failFiles = false } = {}) {
     currentTime: 10, state: 'running',
     createGain() { return { gain: param(1), connect() {}, disconnect() {} }; },
     createBufferSource() { const s = { buffer: null, playbackRate: param(1), connect() {}, start(t) { started.push({ file: this.buffer.file, at: t, rate: this.playbackRate.value, src: this }); }, stop() {} }; return s; },
-    decodeAudioData(ab) { return Promise.resolve({ file: ab.file, duration: 1 }); },
+    decodeAudioData(ab) { return Promise.resolve({ file: ab.file, duration: 1, length: 44100, numberOfChannels: 1, sampleRate: 44100 }); },
   };
   const fetch = async url => {
     const f = url.replace(/^audio\/commentary\//, '');
@@ -112,8 +112,26 @@ describe('recorded commentary', () => {
     for (let i = 1; i < started.length; i++) expect(started[i].at).toBeGreaterThan(started[i - 1].at + 0.99);   // one after another
     expect(captions.at(-1)[0]).toMatch(/Okafor!/);
     expect(ducks).toEqual([true]);
+    expect(C.state().recorded).toMatchObject({ decodedBytes: 3 * 44100 * 4, compressedBytes: 0 });
+    expect(C.state().recorded.peakDecodedBytes).toBeLessThanOrEqual(C.state().recorded.decodedLimitBytes);
     started.at(-1).src.onended();
     expect(ducks).toEqual([true, false]);
+  });
+
+  it('releases decoded commentary at match exit while retaining the session high-water mark', async () => {
+    const { C, flush } = load(); await C.ready();
+    C.say('goal', { player: 'Okafor', club: 'Lions', side: 'home', hs: 1, as: 0 }); await flush();
+    const peak = C.state().recorded.peakDecodedBytes;
+    expect(C.state().recorded.decodedBytes).toBeGreaterThan(0);
+    C.release();
+    expect(C.state().recorded).toMatchObject({ decodedBytes: 0, cacheBytes: 0, peakDecodedBytes: peak, liveBuffers: 0 });
+  });
+
+  it('warms compressed commentary without retaining the full prefetch in the page heap', async () => {
+    const { C } = load();
+    const loaded = await C.preload(['Okafor']);
+    expect(loaded).toBeGreaterThan(ALL.length);
+    expect(C.state().recorded).toMatchObject({ compressedBytes: 0, fetched: 0, decodedBytes: 0 });
   });
 
   it('the stadium announcer is a chime and a caption with the recorded voice; the device voice reads it when chosen', async () => {

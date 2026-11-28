@@ -22,11 +22,12 @@ MongoDB saves with a gzip-file fallback.
   minimap, a pre-match fly-over and slow-motion goal replays. Referee (shows cards), two assistant referees
   with flags, a fourth official with the substitution board; headers, first touches, keeper catches, punches
   and dives, shot blocks, injuries and per-player celebrations; a wide camera and a graphics-quality setting.
-  Players are **motion-captured** (CC0 Mesh2Motion mannequin and clips, processed by `npm run build:anim`):
-  speed-matched running, timed kicks, slide tackles, keeper dives, celebrations — see docs/ANIMATION.md.
+  Players use the existing skinned footballer rig and retargeted motion clips, with speed-matched running,
+  world-space foot planting, boot-to-ball IK dribble contacts, timed kicks, slide tackles, keeper dives
+  and celebrations — see docs/ANIMATION.md.
   Or full 2D, key moments, commentary or instant;
-  1×–8×. **Sound** (crowd, whistles, goal roars, near-miss "ooh"s),
-  synthesised in the browser. A half-time dressing room with **team talks**,
+  1×–8×. **Sound** uses recorded British commentary and stadium reactions, streamed crowd beds,
+  with synthesised fallback effects — see docs/AUDIO.md. A half-time dressing room with **team talks**,
   subs, tactic and formation; assistant subs; cards and bans.
 - **Dressing room:** morale from playing time against expected or promised roles, wage fairness and leaders;
   captain; one-to-one talks (praise, demand, promise games, persuade to stay); team talks; transfer requests.

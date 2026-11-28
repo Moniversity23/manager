@@ -1,0 +1,54 @@
+{
+  "test": "test/dribble.test.js",
+  "method": "world-space toe distance between 60 Hz frames while the runtime gait solver holds a reachable low-foot anchor; intentional swing, takeoff/release and unreachable samples are excluded",
+  "durationSecondsPerGait": 120,
+  "sampleRateHz": 60,
+  "totalMeasuredSamples": 14018,
+  "overallMetersPerSecond": {
+    "median": 0.004,
+    "p95": 0.029,
+    "maximum": 0.042
+  },
+  "gaits": [
+    {
+      "speedMetersPerSecond": 1.1,
+      "clips": { "walk": 1.0 },
+      "cycleStrideMeters": 1.487,
+      "samples": 7848,
+      "slipMetersPerSecond": { "median": 0.004, "p95": 0.031, "maximum": 0.042 },
+      "anchoredSeconds": { "left": 68.3, "right": 65.47 },
+      "stancePhaseSeconds": {
+        "left": { "count": 89, "median": 0.767, "p95": 0.783, "maximum": 0.783 },
+        "right": { "count": 89, "median": 0.733, "p95": 0.75, "maximum": 0.767 }
+      },
+      "rawClipGroundShare": { "left": 0.524, "right": 0.512 }
+    },
+    {
+      "speedMetersPerSecond": 3.5,
+      "clips": { "jogShort": 0.33, "run": 0.67 },
+      "cycleStrideMeters": 2.567,
+      "samples": 3604,
+      "slipMetersPerSecond": { "median": 0.004, "p95": 0.004, "maximum": 0.007 },
+      "anchoredSeconds": { "left": 38.23, "right": 27.43 },
+      "stancePhaseSeconds": {
+        "left": { "count": 164, "median": 0.233, "p95": 0.233, "maximum": 0.233 },
+        "right": { "count": 166, "median": 0.167, "p95": 0.167, "maximum": 0.25 }
+      },
+      "rawClipGroundShare": { "left": 0.178, "right": 0.089 }
+    },
+    {
+      "speedMetersPerSecond": 7.5,
+      "clips": { "sprintFull": 1.0 },
+      "cycleStrideMeters": 4.346,
+      "samples": 2566,
+      "slipMetersPerSecond": { "median": 0.004, "p95": 0.012, "maximum": 0.023 },
+      "anchoredSeconds": { "left": 26.6, "right": 23.1 },
+      "stancePhaseSeconds": {
+        "left": { "count": 207, "median": 0.133, "p95": 0.133, "maximum": 0.133 },
+        "right": { "count": 209, "median": 0.117, "p95": 0.117, "maximum": 0.133 }
+      },
+      "rawClipGroundShare": { "left": 0.143, "right": 0.143 }
+    }
+  ],
+  "limits": "The fixture uses the production skeleton, runtime stride warp/blend and IK on a flat ground plane. It does not simulate uneven turf, network stalls or measured phone rendering."
+}
